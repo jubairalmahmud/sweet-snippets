@@ -1,22 +1,32 @@
 // @ts-nocheck
-// Centralized Laravel API client for SK Love.
-// All real-data calls go through here so the base URL, auth header and
-// error handling stay consistent.
+// Centralized Laravel API client for SK Love with Dual / Failover Server Support.
+// Primary: https://api.keno70.com (or user config)
+// Failover Backup: https://api.sklove.nit.bd
 
-export function getApiBaseUrl(): string {
+export const DEFAULT_PRIMARY_API = "https://api.keno70.com";
+export const DEFAULT_BACKUP_API = "https://api.sklove.nit.bd";
+
+export function getBackendCandidates(): string[] {
+  let custom: string | null = null;
   try {
-    const customUrl = localStorage.getItem("sk_love_api_url");
-    if (customUrl && customUrl.trim()) {
-      return customUrl.trim().replace(/\/+$/, "");
-    }
+    custom = localStorage.getItem("sk_love_api_url");
   } catch {}
 
   const envUrl = (import.meta as any).env?.VITE_API_BASE_URL || (import.meta as any).env?.VITE_LARAVEL_API_URL;
-  if (envUrl && envUrl.trim()) {
-    return envUrl.trim().replace(/\/+$/, "");
-  }
+  const primaryCandidate = (custom && custom.trim()) ? custom.trim().replace(/\/+$/, "") : ((envUrl && envUrl.trim()) ? envUrl.trim().replace(/\/+$/, "") : DEFAULT_PRIMARY_API);
 
-  return "https://api.sklove.nit.bd";
+  const backupCandidate = primaryCandidate.includes("sklove.nit.bd") ? DEFAULT_PRIMARY_API : DEFAULT_BACKUP_API;
+
+  const list = [primaryCandidate, backupCandidate, DEFAULT_PRIMARY_API, DEFAULT_BACKUP_API]
+    .map((url) => (url ? url.trim().replace(/\/+$/, "") : ""))
+    .filter(Boolean);
+
+  return Array.from(new Set(list));
+}
+
+export function getApiBaseUrl(): string {
+  const candidates = getBackendCandidates();
+  return candidates[0] || DEFAULT_PRIMARY_API;
 }
 
 export function setApiBaseUrl(url: string): void {
@@ -62,82 +72,100 @@ export async function apiFetch<T = any>(
   options: RequestInit & { auth?: boolean } = {},
 ): Promise<T> {
   const { auth = true, headers, body, ...rest } = options;
-  const baseUrl = getApiBaseUrl();
-  const url = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+  const candidates = getBackendCandidates();
 
-  const finalHeaders: Record<string, string> = {
-    Accept: "application/json",
-    ...(headers as Record<string, string> | undefined),
-  };
+  let lastError: ApiError | null = null;
 
-  // Content-Type: auto based on body type. Do NOT set for FormData (browser adds boundary).
-  if (body instanceof FormData) {
-    // no Content-Type
-  } else if (body instanceof URLSearchParams) {
-    if (!finalHeaders["Content-Type"]) {
-      finalHeaders["Content-Type"] = "application/x-www-form-urlencoded;charset=UTF-8";
-    }
-  } else if (body !== undefined && body !== null) {
-    if (!finalHeaders["Content-Type"]) {
-      finalHeaders["Content-Type"] = "application/json";
-    }
-  }
+  for (let i = 0; i < candidates.length; i++) {
+    const baseUrl = candidates[i];
+    const url = `${baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 
-  if (auth) {
-    const token = getToken();
-    if (token) finalHeaders.Authorization = `Bearer ${token}`;
-  }
+    const finalHeaders: Record<string, string> = {
+      Accept: "application/json",
+      ...(headers as Record<string, string> | undefined),
+    };
 
-  let response: Response;
-  try {
-    response = await fetch(url, { ...rest, headers: finalHeaders, body: body as any });
-  } catch (e: any) {
-    const isPlaceholder = baseUrl.includes("sklove.nit.bd");
-    const rawMsg = e?.message || "Failed to fetch";
-
-    // For background GET requests when server is unreachable, log warning & return empty default structures to prevent UI crash / toast spam
-    const method = (options.method || "GET").toUpperCase();
-    if (method === "GET") {
-      console.warn(`[apiFetch GET failed] ${url} - ${rawMsg}`);
-      if (path.includes("live-rooms") || path.includes("messages") || path.includes("conversations") || path.includes("agencies") || path.includes("followers") || path.includes("search")) {
-        return { data: [] } as T;
+    if (body instanceof FormData) {
+      // no Content-Type for FormData
+    } else if (body instanceof URLSearchParams) {
+      if (!finalHeaders["Content-Type"]) {
+        finalHeaders["Content-Type"] = "application/x-www-form-urlencoded;charset=UTF-8";
       }
-      if (path.includes("unread") || path.includes("count")) {
-        return { count: 0 } as T;
+    } else if (body !== undefined && body !== null) {
+      if (!finalHeaders["Content-Type"]) {
+        finalHeaders["Content-Type"] = "application/json";
       }
     }
 
-    const detailedMsg = `সার্ভারে কানেক্ট করা সম্ভব হচ্ছে না (${rawMsg}). API Host: ${baseUrl}`;
+    if (auth) {
+      const token = getToken();
+      if (token) finalHeaders.Authorization = `Bearer ${token}`;
+    }
 
-    const err: ApiError = {
-      status: 0,
-      message: detailedMsg,
-    };
-    throw err;
+    try {
+      const response = await fetch(url, { ...rest, headers: finalHeaders, body: body as any });
+
+      // If server responded with Gateway/Server Down codes (502, 503, 504), failover to backup
+      if ([502, 503, 504].includes(response.status) && i < candidates.length - 1) {
+        console.warn(`[apiFetch] Server ${baseUrl} returned ${response.status}. Trying backup server...`);
+        continue;
+      }
+
+      let respBody: any = null;
+      try {
+        respBody = await response.json();
+      } catch {
+        /* non-JSON body */
+      }
+
+      if (!response.ok) {
+        const validation = flattenLaravelErrors(respBody);
+        const err: ApiError = {
+          status: response.status,
+          message:
+            validation ||
+            respBody?.message ||
+            respBody?.error ||
+            `Request failed with status ${response.status}`,
+          data: respBody,
+        };
+        throw err;
+      }
+
+      // If failover succeeded on candidate > 0, remember working backend for current session
+      if (i > 0) {
+        console.log(`[apiFetch] Switched to active working server: ${baseUrl}`);
+        setApiBaseUrl(baseUrl);
+      }
+
+      return respBody as T;
+    } catch (e: any) {
+      // If it's a HTTP error (status > 0), don't failover as server responded
+      if (e && typeof e === "object" && typeof e.status === "number" && e.status > 0) {
+        throw e;
+      }
+
+      const rawMsg = e?.message || "Network Error";
+      console.warn(`[apiFetch] Host ${baseUrl} unreachable (${rawMsg}). ${i < candidates.length - 1 ? "Attempting failover..." : "All hosts failed."}`);
+      lastError = {
+        status: 0,
+        message: `সার্ভারে কানেক্ট করা সম্ভব হচ্ছে না (${rawMsg}).`,
+      };
+    }
   }
 
-  let respBody: any = null;
-  try {
-    respBody = await response.json();
-  } catch {
-    /* non-JSON body is fine for empty responses */
+  // If all hosts failed, handle GET request default response or throw
+  const method = (options.method || "GET").toUpperCase();
+  if (method === "GET") {
+    if (path.includes("live-rooms") || path.includes("messages") || path.includes("conversations") || path.includes("agencies") || path.includes("followers") || path.includes("search")) {
+      return { data: [] } as T;
+    }
+    if (path.includes("unread") || path.includes("count")) {
+      return { count: 0 } as T;
+    }
   }
 
-  if (!response.ok) {
-    const validation = flattenLaravelErrors(respBody);
-    const err: ApiError = {
-      status: response.status,
-      message:
-        validation ||
-        respBody?.message ||
-        respBody?.error ||
-        `Request failed with status ${response.status}`,
-      data: respBody,
-    };
-    throw err;
-  }
-
-  return respBody as T;
+  throw lastError || { status: 0, message: "All API servers unreachable." };
 }
 
 function serializeBody(body: unknown): BodyInit | undefined {
