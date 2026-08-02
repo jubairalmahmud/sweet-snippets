@@ -45,7 +45,7 @@ const API_ORIGIN = (() => {
     (import.meta as any).env?.VITE_API_URL ||
     (import.meta as any).env?.VITE_BACKEND_URL ||
     (import.meta as any).env?.VITE_LARAVEL_URL ||
-    "https://api.keno70.com";
+    "https://api.sklove.nit.bd";
   try {
     return new URL(String(raw)).origin;
   } catch {

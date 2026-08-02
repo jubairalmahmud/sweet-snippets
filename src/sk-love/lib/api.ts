@@ -7,21 +7,16 @@ export function getApiBaseUrl(): string {
   try {
     const customUrl = localStorage.getItem("sk_love_api_url");
     if (customUrl && customUrl.trim()) {
-      const trimmed = customUrl.trim().replace(/\/+$/, "");
-      if (trimmed.includes("sklove.nit.bd")) {
-        localStorage.removeItem("sk_love_api_url");
-      } else {
-        return trimmed;
-      }
+      return customUrl.trim().replace(/\/+$/, "");
     }
   } catch {}
 
-  const envUrl = (import.meta as any).env?.VITE_LARAVEL_API_URL;
-  if (envUrl && envUrl.trim() && !envUrl.includes("sklove.nit.bd")) {
+  const envUrl = (import.meta as any).env?.VITE_API_BASE_URL || (import.meta as any).env?.VITE_LARAVEL_API_URL;
+  if (envUrl && envUrl.trim()) {
     return envUrl.trim().replace(/\/+$/, "");
   }
 
-  return "https://api.keno70.com";
+  return "https://api.sklove.nit.bd";
 }
 
 export function setApiBaseUrl(url: string): void {

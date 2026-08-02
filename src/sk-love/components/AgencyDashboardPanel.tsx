@@ -98,7 +98,7 @@ const API_BASE = String(
     import.meta.env.VITE_API_URL ||
     import.meta.env.VITE_BACKEND_URL ||
     import.meta.env.VITE_LARAVEL_URL ||
-    "https://api.keno70.com",
+    "https://api.sklove.nit.bd",
 ).replace(/\/+$/, "");
 
 const Avatar: React.FC<{ src?: string | null; name?: string; size?: number }> = ({ src, name, size = 32 }) => {
