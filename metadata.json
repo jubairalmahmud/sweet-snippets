@@ -1,0 +1,6 @@
+{
+  "name": "Sweet Snippets Live & Games",
+  "description": "Live streaming, PK battles, party rooms, interactive games, and social entertainment platform.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,314 @@
+131:          setError(err.name === 'NotAllowedError' ? 'পারমিশন রিফিউজড' : 'ক্যামেরা পাওয়া যায়নি');
+160:        <p className="text-[7.5px] mt-0.5 text-slate-500 font-medium">ক্যামেরা ডিভাইস চেক করুন</p>
+228:  const [profileWork, setProfileWork] = useState<string>('NMS বয়স্ক শিক্ষাকেন্দ্র');
+285:      userName: 'আরিফ আহমেদ',
+322:      userName: 'নূসরাত জাহান',
+335:      userName: 'আরিফ আহমেদ',
+346:      userName: 'মিতু আক্তার',
+348:      title: '🌸 চমৎকার নদী কুলে বাতাসে গান গাওয়া 🌸',
+370:      userName: 'আরিফ আহমেদ',
+373:      text: 'হ্যালো গাইজ! গতকালের গেমপ্লে কেমন ছিল? আজ রাতে আরেকটি কাস্টম রুম হবে, সবাই প্রস্তুত তো? 🎮🏆',
+378:        { id: 1, sender: 'Sarah Angel', senderAvatar: '👸', text: 'নিশ্চয়ই রেডি ভাইয়া! 🔥', timestamp: '1h ago' }
+386:      text: 'আজকের PK ব্যাটেলে আমাকে সাপোর্ট করার জন্য সবাইকে অনেক ধন্যবাদ। আপনারা সেরা! 👑💎',
+394:      userName: 'নূসরাত জাহান',
+397:      text: 'SK Love অ্যাপে নতুন আপডেট খুব চমৎকার লেগেছে! বিশেষ করে ড্যাশবোর্ড এবং ভিউ প্রোফাইল অপশন। 💖🎉',
+410:  const [editWork, setEditWork] = useState<string>('NMS বয়স্ক শিক্ষাকেন্দ্র');
+429:      userName: 'জুবায়ের- আল- মাহমুদ',
+432:      text: 'আজ আন্তর্জাতিক শ্রমিক দিবস — শ্রমের মর্যাদা ও অধিকার রক্ষার এক ঐতিহাসিক দিন। এই দিনে আমরা শ্রদ্ধা জানাই সেই সব পরিশ্রমী মানুষদের, যাদের অক্লান্ত পরিশ্রমে আমাদের সমাজ ও সভ্যতা গড়ে উঠছে। ❤️👷‍♂️',
+437:        { id: 1, sender: 'আরিফ আহমেদ', senderAvatar: '👦', text: 'অসাধারণ পোস্ট ভাই!', timestamp: '2h ago' },
+438:        { id: 2, sender: 'মিতু আক্তার', senderAvatar: '👧', text: 'শ্রমিকদের প্রতি বিনম্র শ্রদ্ধা 🌹', timestamp: '1h ago' }
+443:      userName: 'জুবায়ের- আল- মাহমুদ',
+446:      text: 'নড়াইলের সর্বজন শ্রদ্ধেয় বিশিষ্ট শিক্ষাবিদ, নড়াইলের অন্যতম সাংস্কৃতিক ও সামাজিক ব্যক্তিত্ব, প্রগতিশীল আন্দোলনের অন্যতম সমর্থক প্রফেসরের সাথে এক মনোরম আলোচনা সভা।',
+472:    { id: 74839, name: 'আরিফ আহমেদ', username: 'arif_bd', avatar: '👦', vipLevel: 2, status: 'Idle', rCoins: 450, bio: 'BD Gaming pro | Casual content creator' },
+473:    { id: 38491, name: 'মিতু আক্তার', username: 'mitu_angle', avatar: '👧', vipLevel: 3, status: 'In Party Room', rCoins: 3100, bio: 'Singing is my passion 🌹 Live every night' },
+474:    { id: 10492, name: 'রাকিব শাহ', username: 'shakib_king', avatar: '👨', vipLevel: 1, status: 'Idle', rCoins: 150, bio: 'Hello SK Love fans! Follow me.' },
+475:    { id: 82940, name: 'নূসরাত জাহান', username: 'nusrat_liza', avatar: '👰', vipLevel: 5, status: 'Streaming', rCoins: 7800, bio: 'Official SK Creator 🌟 Let\'s talk' }
+491:    { id: 1, name: 'আরিফ আহমেদ', text: 'শুভ রাত জুবায়ের ভাই!' },
+492:    { id: 2, name: 'মিতু আক্তার', text: 'কেমন আছেন সবাই? 🌹' },
+493:    { id: 3, name: 'রাকিব শাহ', text: 'আজকের PK ম্যাচটা চমৎকার হবে!' }
+503:      user: { id: 1, name: 'ঝুমা আক্তার', username: 'jhuma_host', avatar: '💃', vipLevel: 3, bio: 'Live Host on SK Love' },
+504:      lastMsg: 'হাই জুবায়েদ ভাই, আপনি কি লাইভে আসবেন আজ?',
+507:        { sender: 'them', text: 'হাই জুবায়েদ ভাই, কেমন আছেন?' },
+508:        { sender: 'me', text: 'জি ভালো, আপনি?' },
+509:        { sender: 'them', text: 'হাই জুবায়েদ ভাই, আপনি কি লাইভে আসবেন আজ?' }
+522:      user: { id: 3, name: 'আরিফ আহমেদ', username: 'arif_bd', avatar: '👦', vipLevel: 2, bio: 'BD Gaming pro | Casual content creator' },
+523:      lastMsg: 'আপনার অ্যাপ্লিকেশনের ডিজাইন খুবই দারুণ হয়েছে।',
+526:        { sender: 'them', text: 'ভাই আপনার এই রিলেショナル ডাটাবেজ আর লারাভেল ডিজাইন অসাধারণ।' },
+527:        { sender: 'them', text: 'আপনার অ্যাপ্লিকেশনের ডিজাইন খুবই দারুণ হয়েছে।' }
+545:    { seatNum: 2, occupant: 'আরিফ আহমেদ', icon: '👦' },
+547:    { seatNum: 4, occupant: 'মিতু আক্তার', icon: '👧' },
+550:    { seatNum: 7, occupant: 'রাকিব শাহ', icon: '👨' },
+744:        "হ্যালো! কেমন আছেন? আপনার সাথে কথা বলে ভালো লাগলো 😊",
+745:        "আপনার প্রোফাইলটা অনেক সুন্দর! 💖",
+746:        "আমাকে একটি গিফট পাঠাবেন প্লিজ? 🎁✨",
+747:        "ধন্যবাদ! ওউ আপনার দেশের আবহাওয়া কেমন এখন?",
+748:        "আপনার ভয়েস চমৎকার! গান গাইতে পারেন কি? 🎤",
+749:        "আমাদের সাপোর্ট করার জন্য আপনাকে অনেক ধন্যবাদ!"
+764:        "ওয়াও ভাইয়া! চমৎকার লাইভ স্ট্রিমিং! 🤩",
+767:        "R-Coins গিফট পাঠালাম ভাইয়া! নিন 🎁💎",
+768:        "আপনার লাইভ দেখতে ভালো লাগে অনেক!",
+821:    const nameToUse = registerName ? `${registerName} (ইউজার)` : 'জুবায়ের (ইউজার)';
+837:      triggerSystemAnnouncement('❌ অপর্যাপ্ত ডায়মন্ড ব্যালেন্স! প্লিজ অফলাইন রিচার্জ সেকশন থেকে রিচার্জ করুন।');
+858:    const displayName = registerName || 'জুবায়ের মাহমুদ';
+895:    const userAlias = registerName || 'জুবায়ের (ইউজার)';
+896:    const shortUserAlias = registerName ? registerName.split(' ')[0] : 'জুবায়ের';
+900:      triggerSystemAnnouncement(`👦 ${shortUserAlias} সফলভাবে #${updated[seatIndex].seatNum} সিটে যুক্ত হয়েছেন!`);
+904:      triggerSystemAnnouncement(`🚪 ${shortUserAlias} সিট থেকে নেমে গিয়েছেন।`);
+906:      triggerSystemAnnouncement(`❌ এই আসনটি ইতিমধ্যে দখল করা আছে!`);
+914:    triggerSystemAnnouncement('📺 একটি স্পন্সরড ভিডিও বিজ্ঞাপন প্লে হচ্ছে... অনুগ্রহ করে ৫ সেকেন্ড অপেক্ষা করুন।');
+918:      triggerSystemAnnouncement('🎉 অভিনন্দন! বিজ্ঞাপন দেখার জন্য আপনি ২৫টি ফ্রি ডায়মন্ড ক্যাশ ইন করেছেন!');
+925:      setGameFeedback('কমপক্ষে ১০০টি ডায়মন্ড প্রয়োজন স্পিন করার জন্য!');
+929:    setGameFeedback('চাকাটি ঘুরছে...');
+934:        { label: 'রোজ গিফট', value: 0, diamonds: 5, rCoins: 0, msg: 'আপনি একটি রোজ (৫ ডায়মন্ড) রিটার্ন পেয়েছেন!' },
+935:        { label: 'লস্ট', value: 0, diamonds: 0, rCoins: 0, msg: 'কপাল খারাপ! এবার কোনো কিছু জিততে পারেননি।' },
+936:        { label: 'মেগা ডায়মন্ডস', value: 300, diamonds: 300, rCoins: 0, msg: 'দারুন! ৩০০টি মেগা ডায়মন্ডস জিতেছেন!' },
+937:        { label: 'গোল্ডেন ক্রাউন', value: 1000, diamonds: 1000, rCoins: 1000, msg: 'ইউরেকা! ১০০০টি ডায়মন্ড ও ক্রাউন জিতেছেন!' },
+938:        { label: 'আর কয়েন বোনাস', value: 0, diamonds: 50, rCoins: 150, msg: '১৫০টি আর-কয়েন বোনাস পেয়েছেন!' }
+955:      setGameFeedback('কমপক্ষে ১৫০টি ডায়মন্ড প্রয়োজন এই স্লট ঘোরার জন্য!');
+959:    setGameFeedback('রিল ঘুরছে...');
+974:        setGameFeedback(`🎰 জ্যাকপট! ৩টি স্কয়ার ম্যাচ করেছে, আপনি পেয়েছেন ${win} ডায়মন্ডস!`);
+977:        setGameFeedback('✨ ২ টি ম্যাচ করেছে! আপনি ২০০ ডায়মন্ড রিফান্ড পেয়েছেন!');
+979:        setGameFeedback('কোন মিল পাওয়া যায়নি। আবার ট্রাই করুন!');
+988:      setGameFeedback('কমপক্ষে ৫০ ডায়মন্ড প্রয়োজন!');
+992:    setGameFeedback('ছক্কা দুটি রোল হচ্ছে...');
+1004:        setGameFeedback(`🎲 টোটাল ${sum} উঠেছে! আপনি একজন ডাবল বাস্টার, বোনাস ২৫০ ডায়মন্ডস লাভ হলো!`);
+1007:        setGameFeedback(`🎲 চমৎকার! ডাবল ছক্কা (${d1} & ${d2}) উঠেছে! ৪০০ ডায়মন্ড বোনাস!`);
+1009:        setGameFeedback(`টোটাল ${sum} উঠেছে। এবার ভাগ্য বদলায়নি!`);
+1034:    triggerSystemAnnouncement(`💳 অফলাইন পেমেন্ট রিকোয়েস্ট পেশ করা হয়েছে! ট্রানজেকশন আইডি: ${offlineTxId}`);
+1208:          মোবাইল অ্যাপ সিমুলেটর (Live Apps Simulation)
+1219:          লারাভেল অ্যাডমিন ড্যাশবোর্ড (Back-office Operations)
+1230:          ডাটাবেজ রিলেশনাল স্কিমা (MySQL & Controller Factory)
+1257:                    triggerSystemAnnouncement(isSimulatorExpanded ? '📱 মোবাইল ভিউতে ফিরে যাওয়া হয়েছে।' : '🖥️ ফুলস্ক্রিন প্রো-মোড অন করা হয়েছে!');
+1302:                                  placeholder="সার্চ ইউজার..."
+1362:                                  name: registerName || 'জুবায়ের মাহমুদ',
+1458:                                    Live Stream updates (২টি আপডেট)
+1482:                                        <p className="text-[9.5px] font-bold text-white truncate">নূসরাত আড্ডাঘর</p>
+1493:                                    Popular Applet Games (২টি আপডেট)
+1524:                                    Active Party Adda (২টি আপডেট)
+1553:                                    High Stakes Battles (২টি আপডেট)
+1597:                                  নিচে ক্লিক করে সরাসরি লাইভ ব্রডকাস্ট সেশন ইন্টারেক্টিভ ও কো-হোস্ট গিফটিংস উইন্ডোতে অ্যাক্সেস করুন:
+1604:                                      triggerSystemAnnouncement(`✨ আপনি ${user.name} এর ব্রডকাস্ট রুমে প্রবেশ করেছেন।`);
+1731:                                  যেকোনো খালি মাইক্রোফোন সিটের ওপরে ক্লিক করে লাইভ অডিও কো-হোস্টিং আড্ডায় অংশ নিন:
+1736:                                    const isSelf = seat.occupant === (registerName || 'জুবায়ের মাহমুদ');
+1766:                                    🎤 <span className="font-bold text-rose-300">স্পিকার স্ট্যাটাস:</span> ইউজার {partySeats.filter(s => s.occupant !== null).length} জন সিট নিয়েছেন।
+1818:                                  <span className="text-[8px] text-slate-400 mb-2 leading-none">যেকোনো গিফট পাঠিয়ে জুবায়েদ এর PK পয়েন্ট বাড়িয়ে দিন:</span>
+1825:                                            triggerSystemAnnouncement('❌ অপর্যাপ্ত ডায়মন্ড!');
+1838:                                              { id: generateUniqueNumberId(), name: registerName || 'জুবায়ের মাহমুদ', text: `Sent ${gift.icon} ${gift.name}! (+${uGain} PK Points)` }
+1854:                                          triggerSystemAnnouncement(`🎁 আপনি PK রুমে ${gift.icon} (${gift.diamonds}💎) গিফট প্রদান করেছেন!`);
+1893:                                  {activeSettingsTab === 'menu' && 'সেটিংস ও গোপনীয়তা'}
+1894:                                  {activeSettingsTab === 'personal' && 'ব্যক্তিগত তথ্য বিবরণী'}
+1895:                                  {activeSettingsTab === 'security' && 'নিরাপত্তা ও পাসওয়ার্ড'}
+1896:                                  {activeSettingsTab === 'privacy' && 'প্রোফাইল নিরাপত্তা লক'}
+1897:                                  {activeSettingsTab === 'blocking' && 'ব্লকড ইউজার লিস্ট'}
+1898:                                  {activeSettingsTab === 'nid' && 'এনআইডি পরিচয়পত্র যাচাই'}
+1899:                                  {activeSettingsTab === 'agency_contract' && 'এজেন্সি হোস্ট আইডি রেজিস্টার'}
+1913:                                      <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">আপনার ব্যক্তিগত বিবরণ, নিরাপত্তা ও গোপনীয়তা সেটিংস এক জায়গায় নিয়ন্ত্রণ করুন।</p>
+1919:                                    <span className="text-[8.5px] font-black text-slate-500 uppercase tracking-widest pl-1 font-bold">১. অ্যাকাউন্ট এবং বিবরণী</span>
+1924:                                          setEditNameValue(registerName || 'জুবায়ের মাহমুদ');
+1933:                                            <p className="text-[11px] font-bold text-slate-200">ব্যক্তিগত তথ্য (Edit Info)</p>
+1934:                                            <p className="text-[8.5px] text-slate-500 mt-0.5">নাম, বায়োডাটা এবং লিঙ্গ আপডেট</p>
+1951:                                            <p className="text-[11px] font-bold text-slate-200">পাসওয়ার্ড পরিবর্তন (Password)</p>
+1952:                                            <p className="text-[8.5px] text-slate-500 mt-0.5">অ্যাকাউন্টের মূল পাসওয়ার্ড পরিবর্তন</p>
+1965:                                            <p className="text-[11px] font-bold text-slate-200">আইডি ভেরিফিকেশন (NID Verification)</p>
+1966:                                            <p className="text-[8.5px] text-slate-500 mt-0.5">অফিসিয়াল হোস্ট ও এনআইডি প্রদান</p>
+1986:                                            <p className="text-[11px] font-bold text-slate-200">এজেন্সি হোস্ট আইডি (Agency Contract)</p>
+1987:                                            <p className="text-[8.5px] text-slate-500 mt-0.5">অফিসিয়াল এজেন্সি কোড রেজিস্টার ও বাতিল</p>
+2005:                                    <span className="text-[8.5px] font-black text-slate-500 uppercase tracking-widest pl-1 font-bold">২. দৃশ্যমানতা এবং পছন্দসমূহ</span>
+2012:                                            <p className="text-[11px] font-bold text-slate-200">অনлайн স্ট্যাটাস (Active Status)</p>
+2013:                                            <p className="text-[8.5px] text-slate-400 leading-none mt-0.5">{isActiveStatusOn ? 'অনлайн কার্যকারিতা চালু আছে' : 'স্ট্যাটাস অফলাইন করা আছে'}</p>
+2019:                                            triggerSystemAnnouncement(`🟢 অনলাইন স্ট্যাটাস পরিবর্তন: ${!isActiveStatusOn ? 'সক্রিয় (Active)' : 'নিষ্ক্রিয় (Offline)'}`);
+2036:                                            <p className="text-[11px] font-bold text-slate-200">প্রোফাইল কড়া লক (Profile Lock)</p>
+2037:                                            <p className="text-[8.5px] text-slate-500 mt-0.5">সব তথ্য অপরিচিতের থেকে সম্পূর্ণ গোপন রাখুন</p>
+2057:                                            <p className="text-[11px] font-bold text-slate-200">ব্লক লিস্ট সেটিংস (Block List)</p>
+2058:                                            <p className="text-[8.5px] text-slate-500 mt-0.5">যাদেরক ব্লক বা নিষিদ্ধ করা হয়েছে</p>
+2072:                                    <h4 className="text-[9px] uppercase font-black text-rose-500 tracking-wider">পদ্ধতি ও অন্যান্য সার্ভিস</h4>
+2074:                                      <p>• অ্যাপ্লিকেশন ভার্সন: <span className="text-white font-mono font-bold">SK-v5.0.2-Production</span></p>
+2075:                                      <p>• ডাটাবেজ সিস্টেম সংযোগ: <span className="text-emerald-400 font-bold">সক্রিয় (Interactive Live)</span></p>
+2076:                                      <p>• হেল্প ডেক্স সাপোর্ট: <span className="text-indigo-400 font-bold">২৪/৭ অনলাইন সহায়তা হেল্পডেক্স</span></p>
+2087:                                    সেটিংস থেকে বের হন (Exit Settings)
+2097:                                    <h3 className="text-white text-xs font-black uppercase tracking-wider text-pink-500 border-b border-slate-900 pb-2">প্রোফাইল বিবরণী এডিট</h3>
+2101:                                        <label className="block text-[10px] text-slate-400 mb-1">আপনার দৃশ্যমান নাম (Profile Name)</label>
+2111:                                        <label className="block text-[10px] text-slate-400 mb-1">প্রোফাইল বায়ো (Bio Snippet)</label>
+2121:                                        <label className="block text-[10px] text-slate-400 mb-1">আপনার লিঙ্গ (Gender)</label>
+2127:                                          <option value="Male">পুরুষ (Male ♂)</option>
+2128:                                          <option value="Female">নারী (Female ♀)</option>
+2139:                                        বাতিল করুন
+2144:                                            triggerSystemAnnouncement('⚠️ অনুগ্রহ করে একটি সঠিক নাম প্রদান করুন!');
+2149:                                          triggerSystemAnnouncement('🎉 প্রোফাইল তথ্য এবং বিবরণী সফলভাবে পরিবর্তন করা হয়েছে!');
+2154:                                        সংরক্ষণ করুন
+2166:                                    <h3 className="text-white text-xs font-black uppercase tracking-wider text-pink-500 border-b border-slate-900 pb-2">পাসওয়ার্ড পরিবর্তন করুন</h3>
+2170:                                        <label className="block text-[10px] text-slate-400 mb-1">বর্তমান পাসওয়ার্ড (Current Password)</label>
+2181:                                        <label className="block text-[10px] text-slate-400 mb-1">নতুন পাসওয়ার্ড (New Password)</label>
+2184:                                          placeholder="কমপক্ষে ৬ ডিজিট লিখুন"
+2192:                                        <label className="block text-[10px] text-slate-400 mb-1">নতুন পাসওয়ার্ড নিশ্চিত করুন (Confirm New Password)</label>
+2195:                                          placeholder="পুনরায় নতুন পাসওয়ার্ড লিখুন"
+2209:                                        বাতিল করুন
+2214:                                            triggerSystemAnnouncement('⚠️ অনুগ্রহ করে নতুন পাসওয়ার্ড ফীল্ডগুলো পূরণ করুন!');
+2218:                                            triggerSystemAnnouncement('⚠️ দুঃখিত! নতুন পাসওয়ার্ড দুটি একে অপরের সাথে মেলেনি।');
+2222:                                            triggerSystemAnnouncement('⚠️ নিরাপত্তা বৃদ্ধির লক্ষ্যে কমপক্ষে ৬ ডিজিটের পাসওয়ার্ড দিন।');
+2226:                                          triggerSystemAnnouncement('🎉 পাসওয়ার্ড সফলভাবে হালনাগাদ করা হয়েছে! পরবর্তী লগইনে এটি কার্যকর হবে।');
+2231:                                        পাসওয়ার্ড আপডেট করুন
+2249:                                    <h3 className="text-white text-sm font-black uppercase tracking-wider">প্রোফাইল লক সেটিংস (Profile Lock)</h3>
+2251:                                      আপনার অ্যাকাউন্ট নিরাপদে লক করুন। প্রোফাইল লক করা থাকলে অপরিচিত ভিজিটররা আপনার পোস্ট, কলার হিস্ট্রি, ছবি বা ফ্যানদের তালিকা দেখতে পারবে না।
+2260:                                            <p className="text-[10.5px] font-bold text-white leading-none">লকিং সক্রিয় রয়েছে (Locked)</p>
+2261:                                            <p className="text-[8.5px] text-indigo-300 mt-1">আপনার প্রোফাইল বর্তমানে সর্বোচ্চ সুরক্ষিত আছে।</p>
+2268:                                            <p className="text-[10.5px] font-bold text-slate-300 leading-none">লকিং বন্ধ রয়েছে (Unlocked)</p>
+2269:                                            <p className="text-[8.5px] text-slate-500 mt-1">আপনার প্রোফাইল বর্তমানে পাবলিক করা আছে।</p>
+2280:                                        triggerSystemAnnouncement(targetState ? '🔒 আপনার সম্পূর্ণ প্রোফাইল সফলভাবে লক করা হয়েছে!' : '🔓 প্রোফাইল আনলক সম্পন্ন হয়েছে এবং জনসাধারণ দেখতে পারবে।');
+2284:                                      {isProfileLocked ? 'প্রোফাইল আনলক করুন' : 'নিরাপত্তা লক সক্রিয় করুন'}
+2291:                                      ফিরে যান
+2303:                                      <h3 className="text-white text-xs font-black uppercase tracking-wider text-orange-400 font-bold">নিষেধাজ্ঞা তালিকা (Block List)</h3>
+2308:                                      ব্লক করা ইউজাররা আপনাকে হোস্ট রুমে দেখতে পারবে না এবং আপনার ব্রডকাস্টে মেসেজ বা গিফট পাঠাতে পারবে না।
+2328:                                                  triggerSystemAnnouncement(`🔓 আপনি ${user.name}-কে সফলভাবে আনব্লক করেছেন!`);
+2338:                                          কোনো ইউজার অবরুদ্ধ বা ব্লক করা নেই।
+2346:                                        <label className="block text-[8.5px] text-slate-500 mb-1.5 uppercase font-bold tracking-wider">সিমুলেশন: অন্য ইউজার ব্লক করুন</label>
+2356:                                                    triggerSystemAnnouncement(`❌ ${user.name}-কে ব্লক করা হয়েছে!`);
+2372:                                      মেনুতে ফিরে যান
+2383:                                    <h3 className="text-white text-xs font-black uppercase tracking-wider text-pink-500 border-b border-slate-900 pb-2">জাতীয় পরিচয়পত্র যাচাইকরণ</h3>
+2388:                                        <h4 className="text-white text-xs font-black">যাচাইকরণ প্রক্রিয়া পেন্ডিং রয়েছে</h4>
+2390:                                          আপনার জাতীয় পরিচয়পত্রের ফ্রন্ট এবং ব্যাকপেইজ সফলভাবে সাবমিট করা হয়েছে। আমাদের টিম ২৪ ঘণ্টার মধ্যে এই তথ্যসমূহ যাচাই করে অফিসিয়াল স্মার্ট হোস্ট ব্যাজ প্রদান করবে।
+2393:                                          <p>প্রদত্ত নাম: <span className="text-white font-bold">{nidName}</span></p>
+2394:                                          <p>আইডি নাম্বার: <span className="text-slate-300 font-mono font-bold">{nidNumber.replace(/.(?=.{4})/g, '*')}</span></p>
+2399:                                            triggerSystemAnnouncement('🔄 এনআইডি ডাটা সাবমিশন এডিটর পুনরায় ওপেন করা হয়েছে।');
+2403:                                          পুনরায় তথ্য পরিবর্তন করে সাবমিট করুন
+2409:                                          SK Love হোস্টিং পার্টনার এবং অফিসিয়াল হোস্ট ভেরিফাইড হওয়ার জন্য জাতীয় পরিচয়পত্র (NID) সাবমিশন বাধ্যতামূলক।
+2413:                                          <label className="block text-[10px] text-slate-400 mb-1 font-sans">পরিчয়পত্র অনুযায়ী পূর্ণ নাম (Full Name)</label>
+2416:                                            placeholder="উদা: জুবায়ের সিকদার"
+2424:                                          <label className="block text-[10px] text-slate-400 mb-1 font-bold">১০ অথবা ১৭ সংখ্যার এনআইডি নাম্বার (NID Number)</label>
+2427:                                            placeholder="উদা: ৫৪৫৭৭২৩১২০"
+2436:                                          <label className="block text-[10px] text-slate-400 mb-1 font-bold">পরিчয়পত্রের ছবি আপলোড (NID Front Image)</label>
+2438:                                            onClick={() => triggerSystemAnnouncement('📁 অ্যালবাম বা ক্যামেরা মডিউল সিমুলেশন: পরিচয়পত্র ইমেজ আপলোড সম্পন্ন!')}
+2442:                                            <span className="text-[10px] font-bold text-slate-400 group-hover:text-white transition">ছবি ড্র্যাগ অথবা এখানে ক্লিক করুন</span>
+2453:                                            বাতিল করুন
+2458:                                                triggerSystemAnnouncement('⚠️ অনুগ্রহ করে আপনার নাম ও এনআইডি নাম্বার প্রদান করুন!');
+2462:                                                triggerSystemAnnouncement('⚠️ এনআইডি নাম্বার বা যাচাইকৃত কার্ড নাম্বারটি অনেক ছোট!');
+2466:                                              triggerSystemAnnouncement('🎉 অভিনন্দন! আপনার এনআইডি ও পরিচয়পত্র সফলভাবে ভেরিফিকেশনের জন্য সাবমিট করা হয়েছে।');
+2470:                                            সাবমিট করুন
+2483:                                    <h3 className="text-white text-xs font-black uppercase tracking-wider text-pink-550 border-b border-slate-900 pb-2">এজেন্সি এবং হোস্ট চুক্তিপত্র</h3>
+2486:                                      SK Love প্লাটফর্মে একজন অফিসিয়াল হোস্ট ক্রিয়েটর হিসেবে ভেরিফাইড হওয়ার পর আপনার আয়ের R-Coins লাভজনক হারে ক্যাশআউট করতে একটি এজেন্সির সাথে যুক্ত হওয়া আবশ্যক। এতে উইথড্রয়াল প্রসেস অনেক সহজ ও দ্রুত হয়।
+2494:                                            <p className="text-[11px] font-black tracking-wide text-emerald-400">এজেন্সি চুক্তিতে সক্রিয় আছেন</p>
+2501:                                            <span className="text-slate-400 font-sans">যুক্ত এজেন্সির কোড:</span>
+2505:                                            <span className="text-slate-400 font-sans">একাউন্ট আইডি:</span>
+2509:                                            <span className="text-slate-400 font-sans">চুক্তির স্থিতি:</span>
+2510:                                            <span className="text-emerald-400 font-bold font-sans">অনুমোদিত (Official Host)</span>
+2513:                                            <span className="text-slate-400 font-sans">কমিশন রেট:</span>
+2514:                                            <span className="text-pink-400 font-bold font-sans">১২% এক্সট্রা বোনাস প্রোমো</span>
+2520:                                            চুক্তি পরিবর্তন বা এজেন্সি বাতিল করতে চাইলে সাপোর্ট টিকেট সাবমিট করুন অথবা নিচের বাটনে ক্লিক করুন।
+2526:                                              triggerSystemAnnouncement('🛑 আপনার এজেন্সি চুক্তি সফলভাবে রিলিজ করা হয়েছে। আপনি এখন নতুন এজেন্সিতে যুক্ত হতে পারবেন।');
+2530:                                            🛑 চুক্তিপত্র বাতিল করুন (Terminate Contract)
+2537:                                          <label className="block text-[10px] text-slate-400 font-bold">এজেন্সি কোড বসান (Enter Agency Code)</label>
+2549:                                                  triggerSystemAnnouncement('⚠️ অনুগ্রহ করে একটি সঠিক এজেন্সি কোড বসান!');
+2554:                                                  triggerSystemAnnouncement('❌ দুঃখিত! এই এজেন্সি কোডটি আমাদের ডাটাবেজে রেজিস্টার্ড নাই। অ্যাডমিন প্যানেলে নতুন এজেন্সি এড করুন!');
+2558:                                                triggerSystemAnnouncement(`🎉 অভিনন্দন! আপনি সফলভাবে [${myHostAgencyCode}] এজেন্সির অফিশিয়াল হোস্ট হিসেবে নিবন্ধিত হয়েছেন।`);
+2562:                                              যুক্ত হন
+2568:                                          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider font-sans">অনুমোদিত সচল এজেন্সিসূত্রসমূহ:</p>
+2575:                                                  triggerSystemAnnouncement(`✏️ এজেন্সি কোড '${ag.code}' সিলেক্ট করা হয়েছে। চুক্তি বাটন টিপুন।`);
+2581:                                                  <p className="text-[8px] font-mono text-slate-400 mt-0.5">কোড: <span className="text-pink-400">{ag.code}</span></p>
+2585:                                                  <p className="text-[7.5px] text-slate-500 font-sans">স্পন্সরড পার্টনার</p>
+2598:                                      সেটিংস মেনুতে ফিরে যান
+2809:                                      {selectedProfileUser.id === 77777 ? (registerName || 'জুবায়ের- আল- মাহমুদ') : selectedProfileUser.name}
+2964:                                              <p className="text-[11px] font-bold text-slate-200">{selectedProfileUser.id === 77777 ? profileWork : 'NMS বয়স্ক শিক্ষাকেন্দ্র'}</p>
+2965:                                              <p className="text-[8.5px] text-slate-400 font-bold">সদস্য (Member)</p>
+3044:                                              placeholder="What's on your mind? (লিখুন আপনার মনের কথা...)"
+3101:                                                    userName: 'জুবায়ের- আল- মাহমুদ',
+3128:                                      const pName = isSelf ? (registerName || 'জুবায়ের- আল- মাহমুদ') : selectedProfileUser.name;
+3236:                                                        sender: 'জুবায়ের- আল- মাহমুদ',
+3275:                                      { id: 1, title: 'নড়াইল ভ্রমণ স্মৃতি! 🛥️', views: '12K views', thumbnail: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=400&q=70', duration: '0:15' },
+3276:                                      { id: 2, title: 'লাইভ আড্ডায় চমৎকার আড্ডা! 🎤', views: '24K views', thumbnail: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=400&q=70', duration: '0:30' },
+3277:                                      { id: 3, title: 'শুভ সকাল বন্ধুরা ☕', views: '6.4K views', thumbnail: 'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=400&q=70', duration: '0:12' },
+3278:                                      { id: 4, title: 'আমাদের SK-Love অ্যাপ ডেমো! 📱', views: '45K views', thumbnail: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&w=400&q=70', duration: '0:45' }
+3365:                               ইউজার প্রোফাইল পেজ (MAIN USER PROFILE VIEW)
+3418:                                      {selectedProfileUser.id === 77777 ? (registerName || 'জুবায়ের মাহমুদ') : selectedProfileUser.name}
+3421:                                      {selectedProfileUser.name && (selectedProfileUser.name.toLowerCase().includes('sarah') || selectedProfileUser.name.toLowerCase().includes('angle') || selectedProfileUser.name.toLowerCase().includes('মিতু') || selectedProfileUser.name.toLowerCase().includes('নূসরাত')) ? '♀' : '♂'}
+3430:                                      triggerSystemAnnouncement(`📋 আইডি (${currentId}) কপি সম্পন্ন হয়েছে!`);
+3440:                                  {/* User Type: এজেন্ট, ইউজার perfectly matching local design/role flags */}
+3444:                                        এজেন্ট (অফিসিয়াল এডমিন)
+3448:                                        {selectedProfileUser.vipLevel >= 4 ? 'স্মার্ট হোস্ট (এজেন্ট)' : 'সাধারণ ইউজার'}
+3459:                                    const computedName = isSelf ? (registerName || 'জুবায়ের- আল- মাহমুদ') : selectedProfileUser.name;
+3482:                                    <p className="font-extrabold text-sm text-white font-mono">০</p>
+3483:                                    <p className="text-[10px] text-slate-400 mt-0.5 font-sans">ফলোয়িং</p>
+3487:                                    <p className="font-extrabold text-sm text-white font-mono">০</p>
+3488:                                    <p className="text-[10px] text-slate-400 mt-0.5 font-sans">ফ্যান্স</p>
+3492:                                    <p className="font-extrabold text-sm text-white font-mono">০</p>
+3493:                                    <p className="text-[10px] text-slate-400 mt-0.5 font-sans">রুমড</p>
+3497:                                {/* "আমার ওয়ালেট" Card (My Wallet) */}
+3502:                                    আমার ওয়ালেট
+3513:                                          <p className="text-[9px] text-slate-400 leading-none">টোটাল কয়েন</p>
+3522:                                          triggerSystemAnnouncement('💳 রিচার্জ গেটওয়েতে রিডাইরেক্ট হচ্ছে...');
+3527:                                        টপ-আপ
+3536:                                          <p className="text-[9px] text-slate-400 leading-none">টোটাল ডায়মন্ড</p>
+3548:                                          triggerSystemAnnouncement('🔄 এক্সচেঞ্জ মডিউল সক্রিয় হয়েছে। আর-কয়েন ডায়মন্ডে রুপান্তর করুন!');
+3552:                                        এক্সচেঞ্জ
+3568:                                  <span>হোম পেজে ফিরে যান</span>
+3582:                                  <span>🔄</span> আর-কয়েন এক্সচেঞ্জ ও ক্যাশআউট
+3590:                                    ডায়মন্ডে রুপান্তর
+3759:                                  placeholder="টাইপ করুন..."
+3782:                                              { sender: 'them', text: `অসাধারণ! আপনার মেসেজটি পেয়েছি। আমি শীঘ্রই উত্তর দেব।` }
+3844:                                <h3 className="text-sm font-extrabold text-white tracking-tight">সরাসরি ১-টু-১ ভিডিও কল</h3>
+3845:                                <p className="text-[10px] text-slate-400 font-medium font-sans">সক্রিয় হোস্টদের সাথে এখনই প্রাইভেট ১-টু-১ হাই-ডেফিনিশন ভিডিও চ্যাট শুরু করুন।</p>
+3862:                                    name: 'নূসরাত জাহান',
+3871:                                    name: 'মিতু আক্তার',
+3880:                                    name: 'আরিফ আহমেদ',
+3915:                                          triggerSystemAnnouncement(`❌ ১-টু-১ কল সংযোগের জন্য ডায়মন্ডের ব্যালেন্স যথেষ্ট নয়! প্রতি মিনিট চার্জ ${comp.cost} 💎`);
+3935:                                  <p className="text-slate-400 font-sans">আপনার কারেন্ট ওয়ালেট ব্যালেন্স</p>
+3948:                                <p className="font-extrabold text-slate-450 uppercase tracking-wide">🔒 1to1 কল নিয়মাবলী ও নিরাপত্তা বিধান:</p>
+3949:                                <p>১. এসকে কোম্পানির ১-টু-১ ভিডিও কল সম্পূর্ণ এন্ড-টু-এন্ড এনক্রিপ্টেড এবং গোপনীয়।</p>
+3950:                                <p>২. এখানে কোনো প্রকার অশ্লীল বা আপত্তিকর আচরণ দেখালে আইডি সাথে সাথে স্থায়ীভাবে ব্যান করা হবে।</p>
+3951:                                <p>৩. কানেকশন চার্জ কল সংযোগ হওয়ার সাথে সাথে স্বয়ংক্রিয়ভাবে কাটা হয়।</p>
+3967:                                <h3 className="text-sm font-extrabold text-white leading-normal">{callTargetUser.name} এর সাথে সংযোগ স্থাপন করা হচ্ছে...</h3>
+4107:                                            triggerSystemAnnouncement('❌ উপহার পাঠানোর জন্য পর্যাপ্ত ডায়মন্ড ব্যালেন্স নেই!');
+4205:                                <h3 className="text-sm font-extrabold text-rose-500 font-sans">ভিডিও কল সম্পন্ন হয়েছে</h3>
+4283:                                        <p className="text-[7.5px] text-slate-300 font-mono mt-0.5 max-w-[100px] truncate">{streamTitleInput || "এসকে লাইভ আড্ডায়..."}</p>
+4325:                                          triggerSystemAnnouncement('🎛️ কনসোল স্লিপ-ভিউ এনাবল করা হয়েছে।');
+4362:                                                triggerSystemAnnouncement('🖥️ ব্রাউজার ফুল-স্ক্রিন মোড চালু হয়েছে!');
+4365:                                                triggerSystemAnnouncement('🖥️ ওয়াইডস্ক্রিন মোড চালু করা হয়েছে।');
+4369:                                              triggerSystemAnnouncement('🖥️ ব্রাউজার ফুল-স্ক্রিন মোড বন্ধ করা হয়েছে।');
+4390:                                          <p className="text-[8px] text-slate-400 text-center py-1">📢 অপেক্ষারত... স্ট্রিমিং চ্যানেলে ব্রডকাস্ট চলছে</p>
+4402:                                          triggerSystemAnnouncement('🎥 ব্রডকাস্ট অফ করা হয়েছে।');
+4434:                                          triggerSystemAnnouncement('🖥️ লাইভ স্ট্রিমিং ফুল স্ক্রিন মোড অন করা হয়েছে!');
+4444:                                          triggerSystemAnnouncement('🎥 লাইভ স্ট্রিমিং ব্রডকাস্ট বন্ধ করা হয়েছে।');
+4497:                                          <p className="text-slate-400 font-sans text-[8.5px]">স্ট্রিমের টাইটেল</p>
+4498:                                          <p className="text-white font-extrabold truncate max-w-[150px]">{streamTitleInput || "এসকে লাইভ আড্ডায় সবাইকে স্বাগতম! 😍💖"}</p>
+4502:                                            const newTitle = prompt("আপনার লাইভ স্ট্রিম টাইটেল পরিবর্তন করুন:", streamTitleInput || "");
+4505:                                              triggerSystemAnnouncement('✏️ স্ট্রিমের টাইটেল সফলভাবে আপডেট করা হয়েছে!');
+4545:                                          triggerSystemAnnouncement(isStreamMicMuted ? '🎙️ Mic unmuted! শ্রোতারা আপনার কণ্ঠ শুনতে পাচ্ছে।' : '🎙️ Mic muted. ব্রডকাস্টের আওয়াজ বন্ধ।');
+4572:                                      <p className="text-[8px] text-slate-400 font-sans mb-1.5 font-bold">✨ এক্টিভ বিউটি ফিল্টারস:</p>
+4644:                                        triggerSystemAnnouncement('🖥️ ব্রাউজার ফুল-স্ক্রিন মোড চালু হয়েছে!');
+4647:                                        triggerSystemAnnouncement('🖥️ ওয়াইডস্ক্রিন মোড চালু করা হয়েছে।');
+4655:                                title="সম্পূর্ণ স্ক্রিন ভিউ করুন"
+4753:                              placeholder="মেসেজ পাঠান..."
+4889:                            অনলাইন পেমেন্ট গেটওয়ে ছাড়াই সরাসরি বিকাশ/রকেটে পেমেন্ট প্রুফ জমা দিয়ে ডায়মন্ড রিচার্জ রিকোয়েস্ট পেশ করুন।
+4952:                              প্রতিটি ভিডিও বিজ্ঞাপন দেখলে বিনামূল্যে পাবেন ২৫ মিলি-ডায়মন্ডস বোনাস! 
+5023:                                    const isSelf = post.userName === 'জুবায়ের- আল- মাহমুদ';
+5024:                                    const pName = isSelf ? (registerName || 'জুবায়ের- আল- মাহমুদ') : post.userName;
+5036:                                                name: 'জুবায়ের- আল- মাহমুদ', 
+5158:                                              sender: registerName || 'জুবায়ের- আল- মাহমুদ',
+5424:                                      sender: registerName || 'জুবায়ের- আল- মাহমুদ',
+5663:                                      sender: registerName || 'জুবায়ের- আল- মাহমুদ',
+6273:                              triggerSystemAnnouncement('🎥 আপনার লাইভ স্ট্রিমিং ব্রডকাস্ট শুরু হয়েছে! শ্রোতারা যুক্ত হচ্ছে...');
+6467:                  <span>🕹️</span> SK-LOVE সিমুলেশন কন্ট্রোল হাব (Simulator Control Hub)
+6470:                  নিচের বাটনগুলো দিয়ে মোবাইল অ্যাপ সিমুলেটরে ইনস্ট্যান্ট ইভেন্ট এবং ব্যবহারকারী কার্যকলাপ অফলাইনে ট্রিগার করুন:
+6495:                      triggerSystemAnnouncement(`🎁 সিমুলেশন: অপর হোস্ট আপনাকে একটি ${gift.name} ${gift.icon} গিফট করেছে! (+${gift.rCoins} আর-কয়েন ওয়ালেটে যুক্ত হলো)`);
+6500:                    <h4 className="text-[#e91e63] font-bold text-[10.5px] uppercase tracking-wide mt-1.5">গিফট রিসিভ সিমুলেশন</h4>
+6501:                    <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">ভার্চুয়াল দর্শকদের থেকে রেন্ডম গিফট ও আর-কয়েন অর্জন টেস্ট করুন।</p>
+6508:                        'ওয়াও! জুবায়ের ভাই একদম কোপ লাইভ হচ্ছে! 🔥',
+6509:                        'সুপার PK ব্যাটল ম্যাচ! ১০০% সাপোর্ট!',
+6510:                        'এজেন্সি দিয়ে হোস্ট রেজিস্টার কিভাবে করব?',
+6511:                        'BKash অফলাইন পেমেন্টটা সাবমিট করেছি ভাইয়া ১০০০ টাকা!',
+6512:                        'ডায়মন্ড ওয়ালেট ব্যালেন্স ইনস্ট্যান্ট আপডেট হচ্ছে!'
+6514:                      const names = ['তাহসিন জোয়ার্দার', 'আহসান খন্দকার', 'নাবিলা রহমান', 'রোমান সিকদার', 'সাজেদুল ইসলাম'];
+6526:                    <h4 className="text-indigo-400 font-bold text-[10.5px] uppercase tracking-wide mt-1.5">কমেন্ট সেশন ট্রিগার</h4>
+6527:                    <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">মেমোরিতে তাৎক্ষণিক আরেকটি দর্শক কমেন্ট যোগ করুন।</p>
+6534:                        triggerSystemAnnouncement(`⚠️ বিজ্ঞাপন লোড হচ্ছে! আরও ${adCooldown} সেকেন্ড পর ট্রাই করুন।`);
+6537:                      triggerSystemAnnouncement('📺 একটি স্পন্সরড ভিডিও বিজ্ঞাপন প্লে হচ্ছে... অনুগ্রহ করে ৫ সেকেন্ড অপেক্ষা করুন।');
+6544:                        triggerSystemAnnouncement('🎉 অভিনন্দন! ৫ সেকেন্ড বিজ্ঞাপন দেখার জন্য আপনি ২৫টি ফ্রি ডায়মন্ড অর্জন করেছেন!');
+6550:                    <h4 className="text-yellow-400 font-bold text-[10.5px] uppercase tracking-wide mt-1.5">ফ্রি ডায়মন্ড এডস</h4>
+6551:                    <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">৫ সেকেন্ডের অ্যাডভার্টাইজ বিজ্ঞাপন ও ডায়মন্ড রিওয়ার্ড সিমুলেশন।</p>
+6565:                    রিয়েল-টাইম লাইভ সিস্টেম লগ কনসোল (Live System Log Feed)
+6583:                  💡 <span className="text-white font-black">লারাভেল ড্যাশবোর্ডের সাথে সম্পর্ক:</span> বামপাশের সিমুলেটরে “টপ-আপ” থেকে টাকা Bkash/Nagad এ সাবমিট দিলে ব্যালেন্স পেন্ডিং থাকবে। এরপর উপরে ২ নং ট্যাব <span className="text-rose-450">“লারাভেল অ্যাডমিন ড্যাশবোর্ড”</span>-এ গিয়ে এপ্রুভ করলেই ব্যালেন্স সাথে সাথে এই সিমুলেটরে যুক্ত হবে!
+6633:                      কপি করা হয়েছে!
+6638:                      SQL কপি করুন
+6656:                <span>মডেল মাইগ্রেশন ফাইল রেডি টু পেস্ট ইন <code>database/migrations/</code></span>
+6674:                      কপি করা হয়েছে!
+6679:                      কপি কোড
+6692:                <span className="font-bold text-indigo-400">🔥 Pro Recommendation:</span> আপনার লারাভেল প্রোজেক্টে এপিআই রাউট ডিফাইন করুন এভাবে: <code className="bg-slate-900 px-1 py-0.5 rounded text-white text-[10px]">Route::post(&apos;/recharge&apos;, [RechargeController::class, &apos;submitRechargeRequest&apos;]);</code>

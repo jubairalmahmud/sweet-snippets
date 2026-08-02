@@ -1,0 +1,63 @@
+name: Auto Deploy to Shared Hosting
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-frontend:
+    name: Build & Deploy Frontend (sklove.nit.bd)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Project
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: https://api.sklove.nit.bd/api
+
+      - name: Sync Frontend Files to Hosting via FTP
+        uses: SamKirsch/ftp-deploy-action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./dist/
+          server-dir: ${{ secrets.FTP_FRONTEND_DIR }} # e.g. /public_html/ or /public_html/sklove/
+          dangerous-clean-slate: false
+
+  deploy-backend:
+    name: Deploy Laravel API (api.sklove.nit.bd)
+    runs-on: ubuntu-latest
+    needs: deploy-frontend
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Sync Backend Files via FTP
+        uses: SamKirsch/ftp-deploy-action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./laravel-api/laravel-api/
+          server-dir: ${{ secrets.FTP_BACKEND_DIR }} # e.g. /public_html/api/
+          exclude: |
+            **/.git**
+            **/.git*
+            **/node_modules/**
+            **/vendor/**
+            storage/logs/*
