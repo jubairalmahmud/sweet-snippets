@@ -9,5 +9,5 @@ deployment:
     - /bin/cp -R dist/* $FRONTEND_PATH/
     - /bin/cp public/.htaccess $FRONTEND_PATH/.htaccess
 
-    # 3. Deploy Laravel Backend API to api.sklove.nit.bd
-    - /bin/cp -R laravel-api/laravel-api/* $BACKEND_PATH/
+    # 3. Deploy Laravel Backend API to api.sklove.nit.bd (if laravel-api folder exists)
+    - if [ -d "laravel-api/laravel-api" ]; then /bin/cp -R laravel-api/laravel-api/* $BACKEND_PATH/; fi
