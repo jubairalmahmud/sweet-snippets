@@ -2888,7 +2888,8 @@ export default function App() {
     seatIndex?: number
   ) => {
     const rideId = rideIdOverride !== undefined ? rideIdOverride : equippedRide;
-    if (!rideId || !ownedRides[rideId]) return;
+    if (!rideId) return;
+    if (rideIdOverride === undefined && !ownedRides[rideId]) return;
 
     const rideItem = RIDES_CATALOG.find((r) => r.id === rideId) || {
       id: rideId,
@@ -7693,6 +7694,24 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         text: String(m.text ?? ""),
         replyToName: m.replyToName ?? m.reply_to_name ?? undefined,
       }));
+
+      // Trigger entry animation on viewers' devices when an entry chat broadcast is received
+      serverMsgs.forEach((m) => {
+        if (m.text && m.text.includes("[ENTRY:")) {
+          const match = m.text.match(/\[ENTRY:([^:]+):([^:]*):([^\]]*)\]/);
+          if (match) {
+            const entryRideId = match[1];
+            const entryUserName = match[2] || m.name;
+            const entryAvatar = match[3] || null;
+            const eventKey = `entry-msg-${m.id}`;
+            if (!seenPartyBroadcastIdsRef.current.has(eventKey)) {
+              seenPartyBroadcastIdsRef.current.add(eventKey);
+              triggerPartyEntryAnimation(entryUserName, entryAvatar, entryRideId);
+            }
+          }
+        }
+      });
+
       const serverKeys = new Set(serverMsgs.map((m) => `${m.name}|${m.text}`));
       setPartyChatMessages((prev) => {
         const pendingLocal = prev.filter(
@@ -7968,10 +7987,20 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       setAppSection("home");
       triggerPartyEntryAnimation(registerName || "Host", profileAvatarImg, equippedRide, 0);
       if (data?.data?.id) {
+        const createdRoomId = Number(data.data.id);
         setActivePartyRooms((current) => [
           data.data,
-          ...current.filter((room) => Number(room.id) !== Number(data.data.id)),
+          ...current.filter((room) => Number(room.id) !== createdRoomId),
         ]);
+        if (equippedRide) {
+          const rideInfo = RIDES_CATALOG.find((r) => r.id === equippedRide);
+          const rideLabel = rideInfo ? `${rideInfo.name} ${rideInfo.emoji}` : "VIP Ride 🏎️";
+          void api
+            .post(`/api/party-rooms/${createdRoomId}/chat`, {
+              text: `[ENTRY:${equippedRide}:${registerName || "Host"}:${profileAvatarImg || ""}] ✨ ${registerName || "Host"} opened the party room with ${rideLabel}!`,
+            })
+            .catch(() => undefined);
+        }
       }
       setPartyRoomStatus("Party room created.");
       // FIX (host mic): reset per-room top-gifter accumulator.
@@ -8012,6 +8041,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       setHomeSubTab("party");
       setAppSection("home");
       triggerPartyEntryAnimation(registerName || "User", profileAvatarImg, equippedRide);
+      if (equippedRide && joinedRoomId) {
+        const rideInfo = RIDES_CATALOG.find((r) => r.id === equippedRide);
+        const rideLabel = rideInfo ? `${rideInfo.name} ${rideInfo.emoji}` : "VIP Ride 🏎️";
+        void api
+          .post(`/api/party-rooms/${joinedRoomId}/chat`, {
+            text: `[ENTRY:${equippedRide}:${registerName || "User"}:${profileAvatarImg || ""}] ✨ ${registerName || "User"} entered the party room with ${rideLabel}!`,
+          })
+          .catch(() => undefined);
+      }
       setPartyRoomStatus(`Joined ${(data?.data || room)?.title || "party room"}.`);
     } catch (err: any) {
       setPartyRoomStatus(err?.message || "Party room join failed.");
@@ -8401,6 +8439,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       void publishPreparedPartyMicrophone();
       setPendingPartySeatIndex(null);
       triggerPartyEntryAnimation(selfName, profileAvatarImg, equippedRide, seatIndex);
+      if (equippedRide && activePartyRoom?.id) {
+        const rideInfo = RIDES_CATALOG.find((r) => r.id === equippedRide);
+        const rideLabel = rideInfo ? `${rideInfo.name} ${rideInfo.emoji}` : "VIP Ride 🏎️";
+        void api
+          .post(`/api/party-rooms/${activePartyRoom.id}/chat`, {
+            text: `[ENTRY:${equippedRide}:${selfName}:${profileAvatarImg || ""}] ✨ ${selfName} took seat ${seatIndex + 1} with ${rideLabel}!`,
+          })
+          .catch(() => undefined);
+      }
       triggerSystemAnnouncement("Joined seat (free).");
     } catch (err: any) {
       const status = err?.status ?? "?";
@@ -14728,7 +14775,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   : partyChatMessages.slice(-5)
                 ).map((m, index) => {
                   const trimmed = (m.text || "").trim();
-                  const emojiUrl = notoAnimatedUrl(trimmed);
+                  const cleanText = trimmed.replace(/\[ENTRY:[^\]]+\]\s*/g, "");
+                  const emojiUrl = notoAnimatedUrl(cleanText);
                   return (
                     <div
                       key={`party-chat-${m.id || index}`}
@@ -14762,20 +14810,20 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                       {emojiUrl ? (
                         <img
                           src={emojiUrl}
-                          alt={trimmed}
+                          alt={cleanText}
                           className="inline-block h-5 w-5 align-middle shrink-0"
                           loading="lazy"
                           onError={(ev) => {
                             const img = ev.currentTarget;
                             const span = document.createElement("span");
-                            span.textContent = trimmed;
+                            span.textContent = cleanText;
                             span.className = "text-slate-100 font-medium leading-tight truncate";
                             img.replaceWith(span);
                           }}
                         />
                       ) : (
                         <span className="text-slate-100 font-medium leading-tight truncate">
-                          {m.text}
+                          {cleanText}
                         </span>
                       )}
                     </div>
