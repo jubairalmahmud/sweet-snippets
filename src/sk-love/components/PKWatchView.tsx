@@ -81,8 +81,9 @@ interface Props {
 }
 
 const fmtTime = (sec: number) => {
-  const m = Math.max(0, Math.floor(sec / 60));
-  const s = Math.max(0, sec % 60);
+  const total = Math.max(0, Math.floor(sec || 0));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 };
 
@@ -220,32 +221,38 @@ export default function PKWatchView({
     return () => clearInterval(interval);
   }, [open]);
 
-  /* ---------- Reuse the viewer's already-open live stream track ---------- */
+  /* ---------- Reuse existing live video track if viewer is already in that room ---------- */
   useEffect(() => {
     if (!open || !battle) return;
     const existingKey = existingRoomId == null ? "" : String(existingRoomId);
     if (!existingKey || existingRemoteVideos.length === 0) return;
 
-    const playExisting = (
-      roomId: number | string | null | undefined,
-      containerRef: MutableRefObject<HTMLDivElement | null>,
-      setHasVideo: (v: boolean) => void,
-    ) => {
-      if (roomId == null || String(roomId) !== existingKey) return;
+    if (String(battle.from_room_id) === existingKey) {
       const video = existingRemoteVideos.find((item) => item?.track) || existingRemoteVideos[0];
-      if (!video?.track || !containerRef.current) return;
-      try {
-        containerRef.current.innerHTML = "";
-        video.track.play(containerRef.current);
-        setHasVideo(true);
-      } catch {
-        /* ignore */
+      if (video?.track && fromVideoRef.current) {
+        try {
+          fromVideoRef.current.innerHTML = "";
+          video.track.play(fromVideoRef.current);
+          setFromHasVideo(true);
+        } catch {
+          /* ignore */
+        }
       }
-    };
+    }
 
-    playExisting(battle.from_room_id, fromVideoRef, setFromHasVideo);
-    playExisting(battle.to_room_id, toVideoRef, setToHasVideo);
-  }, [open, battle?.from_room_id, battle?.to_room_id, existingRoomId, existingRemoteVideos.length]);
+    if (String(battle.to_room_id) === existingKey) {
+      const video = existingRemoteVideos.find((item) => item?.track) || existingRemoteVideos[0];
+      if (video?.track && toVideoRef.current) {
+        try {
+          toVideoRef.current.innerHTML = "";
+          video.track.play(toVideoRef.current);
+          setToHasVideo(true);
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+  }, [open, battle?.from_room_id, battle?.to_room_id, existingRoomId, existingRemoteVideos]);
 
   /* ---------- Dual Agora subscribe (from + to) ---------- */
   useEffect(() => {
@@ -253,14 +260,12 @@ export default function PKWatchView({
     let cancelled = false;
     const clients: any[] = [];
     const retryTimers: number[] = [];
-    const existingKey = existingRoomId == null ? "" : String(existingRoomId);
 
     const joinSide = async (
       roomId: number,
       containerRef: MutableRefObject<HTMLDivElement | null>,
       setHasVideo: (v: boolean) => void,
     ) => {
-      if (existingKey && String(roomId) === existingKey) return;
       try {
         const AgoraRTC = await AgoraRTCPromise;
         if (!AgoraRTC || cancelled) return;
@@ -314,9 +319,9 @@ export default function PKWatchView({
           });
         };
         subscribeExistingRemotes();
-        const retryId = window.setInterval(subscribeExistingRemotes, 1200);
+        const retryId = window.setInterval(subscribeExistingRemotes, 1000);
         retryTimers.push(retryId);
-        window.setTimeout(() => window.clearInterval(retryId), 12000);
+        window.setTimeout(() => window.clearInterval(retryId), 10000);
       } catch {
         /* ignore */
       }
@@ -339,7 +344,7 @@ export default function PKWatchView({
       setFromHasVideo(false);
       setToHasVideo(false);
     };
-  }, [open, battle?.from_room_id, battle?.to_room_id, existingRoomId, apiBase, authToken]);
+  }, [open, battle?.from_room_id, battle?.to_room_id, apiBase, authToken]);
 
   /* ---------- reset on close ---------- */
   useEffect(() => {
@@ -356,13 +361,7 @@ export default function PKWatchView({
         endedTimerRef.current = null;
       }
     } else {
-      // populate sample chat messages for rich live feeling
-      setComments([
-        { id: 1, user_id: 101, user_name: "doel", role: "viewer", text: "yes", level: 7 },
-        { id: 2, user_id: 102, user_name: "rehan🐍🐍", role: "viewer", text: "dr.miechel itu", level: 13 },
-        { id: 3, user_id: 103, user_name: "BLACK | MAMBAAA", role: "viewer", text: "doctor michel tu", level: 10 },
-        { id: 4, user_id: 104, user_name: "are_may91", role: "viewer", text: "joined", level: 17 },
-      ]);
+      setComments([]);
     }
   }, [open]);
 
@@ -517,18 +516,18 @@ export default function PKWatchView({
   if (!open) return null;
 
   const b = battle;
-  const leftScore = b?.from_score || 464380;
-  const rightScore = b?.to_score || 143087;
+  const leftScore = b?.from_score ?? 0;
+  const rightScore = b?.to_score ?? 0;
   const totalScore = Math.max(1, leftScore + rightScore);
   const leftPct = Math.min(85, Math.max(15, (leftScore / totalScore) * 100));
 
-  const hostAName = b?.from_name || "Jujuszz♥";
-  const hostBName = b?.to_name || "Aria";
-  const hostAAvatar = b?.from_avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600&auto=format&fit=crop";
-  const hostBAvatar = b?.to_avatar || "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=600&auto=format&fit=crop";
-  const hostAFlag = b?.from_flag || "🇲🇾";
-  const hostBFlag = b?.to_flag || "🇹🇼";
-  const viewersCount = b?.viewers || "1.6K";
+  const hostAName = b?.from_name || "Host";
+  const hostBName = b?.to_name || "Host";
+  const hostAAvatar = b?.from_avatar || undefined;
+  const hostBAvatar = b?.to_avatar || undefined;
+  const hostAFlag = b?.from_flag || "";
+  const hostBFlag = b?.to_flag || "";
+  const viewersCount = b?.viewers ?? 1;
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col justify-between overflow-hidden font-sans select-none text-white">
@@ -552,8 +551,12 @@ export default function PKWatchView({
       <div className="shrink-0 z-30 pt-3 px-3 pb-2 flex items-center justify-between bg-gradient-to-b from-black/80 via-black/40 to-transparent">
         {/* Left: Host Info Pill */}
         <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full p-1 pr-3 border border-white/10 shadow-lg">
-          <div className="relative w-8 h-8 rounded-full overflow-hidden border border-pink-500/80 shrink-0">
-            <img src={hostAAvatar} alt={hostAName} className="w-full h-full object-cover" />
+          <div className="relative w-8 h-8 rounded-full overflow-hidden border border-pink-500/80 shrink-0 bg-slate-800 flex items-center justify-center">
+            {hostAAvatar ? (
+              <img src={hostAAvatar} alt={hostAName} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-xs font-bold text-slate-300">{hostAName.slice(0, 1).toUpperCase()}</span>
+            )}
           </div>
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-1">
@@ -580,20 +583,8 @@ export default function PKWatchView({
           </button>
         </div>
 
-        {/* Right: Top Gifters, Viewer Count & Close */}
+        {/* Right: Viewer Count & Close */}
         <div className="flex items-center gap-2">
-          {/* Top gifter mini avatars */}
-          <div className="flex items-center -space-x-1.5 bg-black/30 backdrop-blur-md px-2 py-1 rounded-full border border-white/10">
-            <div className="relative w-6 h-6 rounded-full overflow-hidden border border-amber-300">
-              <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=100&auto=format&fit=crop" alt="" className="w-full h-full object-cover" />
-              <span className="absolute bottom-0 inset-x-0 bg-amber-400 text-slate-950 font-black text-[6px] text-center">28K</span>
-            </div>
-            <div className="relative w-6 h-6 rounded-full overflow-hidden border border-amber-300">
-              <img src="https://images.unsplash.com/photo-1580489944761-15a19d654956?q=80&w=100&auto=format&fit=crop" alt="" className="w-full h-full object-cover" />
-              <span className="absolute bottom-0 inset-x-0 bg-amber-400 text-slate-950 font-black text-[6px] text-center">28K</span>
-            </div>
-          </div>
-
           {/* Viewer count pill */}
           <div className="bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 text-[11px] font-bold text-white/90 flex items-center gap-1">
             <span>👤</span>
@@ -622,16 +613,20 @@ export default function PKWatchView({
             <span className="text-[12px] font-black text-white tracking-wider drop-shadow">
               {leftScore.toLocaleString()}
             </span>
-            <span className="bg-gradient-to-r from-amber-300 to-yellow-400 text-slate-950 font-black text-[9px] px-1.5 py-[1px] rounded shadow shrink-0">
-              WIN × {b?.from_wins || 0}
-            </span>
+            {Boolean(b?.from_wins && b.from_wins > 0) && (
+              <span className="bg-gradient-to-r from-amber-300 to-yellow-400 text-slate-950 font-black text-[9px] px-1.5 py-[1px] rounded shadow shrink-0">
+                WIN × {b.from_wins}
+              </span>
+            )}
           </div>
 
           {/* Right Blue/Cyan Side Score */}
           <div className="bg-gradient-to-r from-cyan-500 via-blue-500 to-blue-600 h-full flex-1 transition-all duration-500 flex items-center justify-between px-2.5">
-            <span className="bg-gradient-to-r from-amber-300 to-yellow-400 text-slate-950 font-black text-[9px] px-1.5 py-[1px] rounded shadow shrink-0">
-              WIN × {b?.to_wins || 1}
-            </span>
+            {Boolean(b?.to_wins && b.to_wins > 0) && (
+              <span className="bg-gradient-to-r from-amber-300 to-yellow-400 text-slate-950 font-black text-[9px] px-1.5 py-[1px] rounded shadow shrink-0">
+                WIN × {b.to_wins}
+              </span>
+            )}
             <span className="text-[12px] font-black text-white tracking-wider drop-shadow">
               {rightScore.toLocaleString()}
             </span>
@@ -657,31 +652,26 @@ export default function PKWatchView({
           <div ref={fromVideoRef} className="absolute inset-0 bg-black [&>video]:!w-full [&>video]:!h-full [&>video]:!object-cover" />
           {!fromHasVideo && (
             <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-rose-950 via-slate-900 to-black">
-              <img
-                src={hostAAvatar}
-                alt={hostAName}
-                className="w-full h-full object-cover filter brightness-95"
-              />
+              {hostAAvatar ? (
+                <img
+                  src={hostAAvatar}
+                  alt={hostAName}
+                  className="w-full h-full object-cover filter brightness-95"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-rose-900/60 border-2 border-rose-500/50 flex items-center justify-center text-white font-black text-2xl shadow-xl">
+                  {hostAName.slice(0, 1).toUpperCase()}
+                </div>
+              )}
             </div>
           )}
 
           {/* Left Country Flag Badge */}
-          <div className="absolute bottom-10 left-2 z-20 flex items-center gap-1 bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[11px] font-bold border border-white/10">
-            <span>{hostAFlag}</span>
-          </div>
-
-          {/* Left Top Contributors Overlapping Avatars */}
-          <div className="absolute bottom-2 left-2 z-20 flex items-center -space-x-2">
-            <div className="w-6 h-6 rounded-full border border-amber-300 overflow-hidden shadow">
-              <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=100&auto=format&fit=crop" alt="" className="w-full h-full object-cover" />
+          {hostAFlag && (
+            <div className="absolute bottom-4 left-2 z-20 flex items-center gap-1 bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[11px] font-bold border border-white/10">
+              <span>{hostAFlag}</span>
             </div>
-            <div className="w-6 h-6 rounded-full border border-pink-400 overflow-hidden shadow">
-              <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=100&auto=format&fit=crop" alt="" className="w-full h-full object-cover" />
-            </div>
-            <div className="w-6 h-6 rounded-full border border-blue-400 overflow-hidden shadow">
-              <img src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=100&auto=format&fit=crop" alt="" className="w-full h-full object-cover" />
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Right Host B Video (50%) */}
@@ -689,31 +679,26 @@ export default function PKWatchView({
           <div ref={toVideoRef} className="absolute inset-0 bg-black [&>video]:!w-full [&>video]:!h-full [&>video]:!object-cover" />
           {!toHasVideo && (
             <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-blue-950 via-slate-900 to-black">
-              <img
-                src={hostBAvatar}
-                alt={hostBName}
-                className="w-full h-full object-cover filter brightness-95"
-              />
+              {hostBAvatar ? (
+                <img
+                  src={hostBAvatar}
+                  alt={hostBName}
+                  className="w-full h-full object-cover filter brightness-95"
+                />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-blue-900/60 border-2 border-blue-500/50 flex items-center justify-center text-white font-black text-2xl shadow-xl">
+                  {hostBName.slice(0, 1).toUpperCase()}
+                </div>
+              )}
             </div>
           )}
 
           {/* Right Country Flag Badge */}
-          <div className="absolute bottom-10 right-2 z-20 flex items-center gap-1 bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[11px] font-bold border border-white/10">
-            <span>{hostBFlag}</span>
-          </div>
-
-          {/* Right Top Contributors Overlapping Avatars */}
-          <div className="absolute bottom-2 right-2 z-20 flex items-center -space-x-2">
-            <div className="w-6 h-6 rounded-full border border-amber-300 overflow-hidden shadow">
-              <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=100&auto=format&fit=crop" alt="" className="w-full h-full object-cover" />
+          {hostBFlag && (
+            <div className="absolute bottom-4 right-2 z-20 flex items-center gap-1 bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[11px] font-bold border border-white/10">
+              <span>{hostBFlag}</span>
             </div>
-            <div className="w-6 h-6 rounded-full border border-purple-400 overflow-hidden shadow">
-              <img src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=100&auto=format&fit=crop" alt="" className="w-full h-full object-cover" />
-            </div>
-            <div className="w-6 h-6 rounded-full border border-emerald-400 overflow-hidden shadow">
-              <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=100&auto=format&fit=crop" alt="" className="w-full h-full object-cover" />
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -721,12 +706,16 @@ export default function PKWatchView({
       <div className="shrink-0 relative h-36 px-3 py-1 flex flex-col justify-end z-30">
         <div ref={scrollRef} className="max-h-32 overflow-y-auto space-y-1.5 pr-16 scrollbar-none">
           {comments.map((c) => {
-            const levelNum = c.level || Math.floor(Math.random() * 20) + 1;
+            const avatarUrl = c.user_avatar || c.avatar;
             return (
               <div key={c.id} className="inline-flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full max-w-[80%] border border-white/5">
-                <span className="text-[9px] font-extrabold bg-blue-600 text-white px-1 py-[0.5px] rounded flex items-center gap-0.5 shrink-0">
-                  ▲ {levelNum}
-                </span>
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" className="w-4 h-4 rounded-full object-cover shrink-0 border border-white/20" />
+                ) : (
+                  <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-pink-500 to-rose-500 text-white text-[8px] font-bold flex items-center justify-center shrink-0">
+                    {(c.user_name || "U")[0].toUpperCase()}
+                  </div>
+                )}
                 <span className="text-[11px] font-bold text-slate-300 shrink-0">
                   {c.user_name || `user_${c.user_id}`}
                 </span>
@@ -854,10 +843,10 @@ export default function PKWatchView({
         {/* Share Button */}
         <button
           onClick={() => triggerFloatingHeart("💖")}
-          className="h-10 px-3 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center gap-1 text-white text-[11px] font-bold active:scale-90 transition shadow-lg"
+          className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white active:scale-90 transition shadow-lg"
+          title="Share"
         >
-          <Share2 className="w-4 h-4 text-white" />
-          <span>1.8K</span>
+          <Share2 className="w-5 h-5 text-white" />
         </button>
       </div>
     </div>,
