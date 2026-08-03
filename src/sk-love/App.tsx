@@ -4005,17 +4005,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       const walletInfo = { ...((me && me.user) || me || {}), ...(wallet || {}) };
       const syncedRole = getRoleFromUser(walletInfo);
 
-      const coinsBalance = Math.max(
-        walletInfo.rCoins !== undefined ? Number(walletInfo.rCoins) : 0,
-        walletInfo.diamonds !== undefined ? Number(walletInfo.diamonds) : 0,
-        walletInfo.coins !== undefined ? Number(walletInfo.coins) : 0,
-      );
-
       setUserWallet((prev) => ({
         ...prev,
         id: walletInfo.id !== undefined ? Number(walletInfo.id) : prev.id,
-        diamonds: coinsBalance,
-        rCoins: coinsBalance,
+        diamonds: walletInfo.diamonds !== undefined ? Number(walletInfo.diamonds) : (walletInfo.coins !== undefined ? Number(walletInfo.coins) : prev.diamonds),
+        rCoins: walletInfo.rCoins !== undefined ? Number(walletInfo.rCoins) : prev.rCoins,
         earnings: walletInfo.earnings !== undefined ? Number(walletInfo.earnings) : (walletInfo.host_earnings !== undefined ? Number(walletInfo.host_earnings) : prev.earnings),
         vipLevel: walletInfo.vipLevel !== undefined ? Number(walletInfo.vipLevel) : prev.vipLevel,
         avatarFrame: walletInfo.avatarFrame || prev.avatarFrame,
@@ -6994,16 +6988,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         rCoins: costAmount,
       });
 
-      const updatedCoins = Math.max(
-        res.diamonds !== undefined ? Number(res.diamonds) : 0,
-        res.rCoins !== undefined ? Number(res.rCoins) : 0,
-        Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0) - costAmount,
-      );
+      const remainingRecharge = res.diamonds !== undefined
+        ? Number(res.diamonds)
+        : Math.max(0, userWallet.diamonds - costAmount);
 
       setUserWallet((prev) => ({
         ...prev,
-        diamonds: updatedCoins,
-        rCoins: updatedCoins,
+        diamonds: remainingRecharge,
       }));
       // FIX (Batch 1): server-confirmed wallet সাথে সাথে refetch করে
       // C-Coin card + gift box balance সব যায়গায় sync করি (host side)।
@@ -7068,13 +7059,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       // instead of blocking downstream logic (seat booking, animations).
       const localId = -Date.now();
       const costAmount = Number(params.diamonds || params.rCoins || 0);
-      const currentCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
-      const localRemaining = Math.max(0, currentCoins - costAmount);
+      const localRemaining = Math.max(0, userWallet.diamonds - costAmount);
 
       setUserWallet((prev) => ({
         ...prev,
         diamonds: localRemaining,
-        rCoins: localRemaining,
       }));
       enqueueLocalBroadcast(localId);
 
@@ -7086,7 +7075,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       triggerSystemAnnouncement(`⚠️ ${userFriendlyMsg}`);
       return {
         diamonds: localRemaining,
-        rCoins: localRemaining,
+        rCoins: userWallet.rCoins,
         id: localId,
         receiver: params.receiverId ? { id: Number(params.receiverId), rCoins: 0 } : null,
       };
@@ -7171,9 +7160,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     }
 
     const totalCost = (gift.diamonds || 0) * targets.length;
-    const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
-    if (availableCoins < totalCost) {
-      triggerSystemAnnouncement(`Low coins — sending ${gift.name} to ${targets.length} user(s) anyway.`);
+    if (userWallet.diamonds < totalCost) {
+      triggerSystemAnnouncement(`Low recharge coins — sending ${gift.name} to ${targets.length} user(s) anyway.`);
     }
 
     const recipientNames = targets.map((t) => t.name).join(", ");
@@ -7301,9 +7289,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       triggerSystemAnnouncement("PK battle unavailable.");
       return;
     }
-    const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
-    if (availableCoins < gift.diamonds) {
-      triggerSystemAnnouncement("Low coins — sending gift anyway.");
+    if (userWallet.diamonds < gift.diamonds) {
+      triggerSystemAnnouncement("Low recharge coins — sending gift anyway.");
     }
 
     await sendGiftApi({
@@ -7368,9 +7355,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // ---- হ্যান্ডলার: গিফট পাঠানো / রিসিভ (handleSendGift) ----
   const handleSendGift = async (gift: GiftItem) => {
     // FIX: don't block send on low balance — degrade gracefully.
-    const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
-    if (availableCoins < gift.diamonds) {
-      triggerSystemAnnouncement("Low coins — sending gift anyway.");
+    if (userWallet.diamonds < gift.diamonds) {
+      triggerSystemAnnouncement("Low recharge coins — sending gift anyway.");
     }
 
     const ok = await sendGiftApi({
@@ -8208,10 +8194,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     // FIX: Do NOT block seat booking on wallet balance. sendGiftApi
     // degrades gracefully (local deduction / synthetic success) so the
     // seat + banner + animation must always proceed. Just warn once.
-    const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
-    if (availableCoins < avatarGift.diamonds) {
+    if (userWallet.diamonds < avatarGift.diamonds) {
       triggerSystemAnnouncement(
-        `Low coins — booking ${avatarGift.name} seat anyway.`,
+        `Low recharge coins — booking ${avatarGift.name} seat anyway.`,
       );
     }
 
@@ -8677,9 +8662,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   const handlePartyGiftSend = async (gift: any) => {
     // FIX: Don't block gift sending on wallet balance. sendGiftApi degrades
     // gracefully so the banner + animation + broadcast must always run.
-    const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
-    if (availableCoins < gift.diamonds) {
-      triggerSystemAnnouncement("Low coins — sending gift anyway.");
+    if (userWallet.diamonds < gift.diamonds) {
+      triggerSystemAnnouncement("Low recharge coins — sending gift anyway.");
     }
 
 
@@ -8762,9 +8746,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     }
 
     // FIX: degrade gracefully — allow send even with low balance.
-    const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
-    if (availableCoins < gift.diamonds) {
-      triggerSystemAnnouncement("Low coins — sending gift anyway.");
+    if (userWallet.diamonds < gift.diamonds) {
+      triggerSystemAnnouncement("Low recharge coins — sending gift anyway.");
     }
 
 
@@ -8825,10 +8808,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     // Multiple recipients selected
     const count = partyGiftBoxRecipients.length;
     const totalCost = (gift.diamonds || 0) * count;
-    const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
 
-    if (availableCoins < totalCost) {
-      triggerSystemAnnouncement(`Low coins — sending ${gift.name} to ${count} users anyway.`);
+    if (userWallet.diamonds < totalCost) {
+      triggerSystemAnnouncement(`Low recharge coins — sending ${gift.name} to ${count} users anyway.`);
     }
 
     const recipientNames = partyGiftBoxRecipients.map((r) => r.name).join(", ");
@@ -11548,8 +11530,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     currentUserIdForView !== null &&
     Number(selectedProfileUser?.id) === Number(currentUserIdForView);
   // Wallet balances are private. Any wallet surface always belongs to the signed-in user.
-  const selectedProfileCoins = Number(userWallet.rCoins || 0);
-  const selectedProfileDiamonds = Number(userWallet.diamonds || 0);
+  const selectedProfileCoins = Number(userWallet.diamonds || 0);
+  const selectedProfileRCoins = Number(userWallet.rCoins || userWallet.earnings || 0);
   const selectedProfileDetails = isOwnSelectedProfile
     ? {
         bio: userBio,
@@ -18989,7 +18971,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       <span className="text-base">🪙</span>
     </div>
     <p className="text-white font-black text-lg mt-2 tracking-tight">
-      {Number(userWallet.earnings || 0).toLocaleString()}
+      {selectedProfileRCoins.toLocaleString()}
     </p>
   </div>
 
@@ -20433,10 +20415,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               <button
                                 key={idx}
                                 onClick={async () => {
-                                   const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
-                                   if (availableCoins < gift.price) {
+                                   if (userWallet.diamonds < gift.price) {
                                      triggerSystemAnnouncement(
-                                       "Low coins — sending gift anyway.",
+                                       "Low recharge coins — sending gift anyway.",
                                      );
                                    }
                                    const ok = await sendGiftApi({
@@ -26097,20 +26078,16 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                             <button
                               key={gift.name}
                               onClick={() => {
-                                const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
-                                if (availableCoins < gift.price) {
+                                if (userWallet.diamonds < gift.price) {
                                   triggerSystemAnnouncement(
-                                    `Low coins — sending ${gift.name} anyway.`,
+                                    `Low recharge coins — sending ${gift.name} anyway.`,
                                   );
                                 }
 
-
                                 // Deduct user wallet
-                                const newCoins = Math.max(0, availableCoins - gift.price);
                                 setUserWallet((p) => ({
                                   ...p,
-                                  rCoins: newCoins,
-                                  diamonds: newCoins,
+                                  diamonds: Math.max(0, p.diamonds - gift.price),
                                 }));
 
                                 // Dynamically increment score
@@ -26430,15 +26407,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                           return (
                             <button
                               onClick={() => {
-                                const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
-                                if (availableCoins < cost) {
-                                  triggerSystemAnnouncement(`Low coins — purchasing ${selected.name} anyway!`);
+                                if (userWallet.diamonds < cost) {
+                                  triggerSystemAnnouncement(`Low recharge coins — purchasing ${selected.name} anyway!`);
                                 }
-                                const newCoins = Math.max(0, availableCoins - cost);
                                 setUserWallet((prev) => ({
                                   ...prev,
-                                  rCoins: newCoins,
-                                  diamonds: newCoins,
+                                  diamonds: Math.max(0, prev.diamonds - cost),
                                 }));
                                 const expiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
                                 setOwnedRides((prev) => ({
@@ -26493,9 +26467,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 window.alert("❌ এই ফ্রেমের ইনফো পাওয়া যায়নি।");
                                 return;
                               }
-                              if (userWallet.rCoins < catItem.price) {
+                              if (userWallet.diamonds < catItem.price) {
                                 window.alert(
-                                  `❌ পর্যাপ্ত কয়েন নেই।\n\nদরকার: 🪙 ${catItem.price.toLocaleString()}\nআপনার আছে: 🪙 ${userWallet.rCoins.toLocaleString()}`,
+                                  `❌ পর্যাপ্ত রিচার্জ কয়েন নেই।\n\nদরকার: 🪙 ${catItem.price.toLocaleString()}\nআপনার আছে: 🪙 ${userWallet.diamonds.toLocaleString()}`,
                                 );
                                 return;
                               }
@@ -26506,7 +26480,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               const expiry = Date.now() + catItem.durationDays * 24 * 60 * 60 * 1000;
                               setUserWallet((prev) => ({
                                 ...prev,
-                                rCoins: prev.rCoins - catItem.price,
+                                diamonds: Math.max(0, prev.diamonds - catItem.price),
                                 avatarFrame: catItem.name,
                               }));
                               setOwnedAvatarFrames((prev) => ({ ...prev, [catItem.id]: expiry }));
