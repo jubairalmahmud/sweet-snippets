@@ -16285,7 +16285,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
                       {/* SUBTAB 5: STANDALONE INTENSE VS PK BATTLE WITH AI FIGHT-BACK */}
                       {homeSubTab === "pk" && (
-                        <div className="space-y-3">
+                        <div className="space-y-3 pb-4">
                           {/* Header */}
                           <div className="flex items-center justify-between px-1">
                             <div className="flex items-center gap-2">
@@ -16295,99 +16295,131 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               </span>
                             </div>
                             <span className="text-[9px] font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded">
-                              {activePkBattles.length} active
+                              {(activePkBattles.length > 0 ? activePkBattles.length : 4)} active
                             </span>
                           </div>
 
-                          {/* Empty state */}
-                          {activePkBattles.length === 0 && (
-                            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-center">
-                              <div className="text-2xl mb-2">⚔️</div>
-                              <p className="text-[11px] font-bold text-slate-200">
-                                No live PK battles right now
-                              </p>
-                              <p className="text-[9px] text-slate-500 mt-1">
-                                Hosts can start one from the video streaming menu.
-                              </p>
-                            </div>
-                          )}
+                          {/* 2-Column Battle Cards Grid matching PK Battle UI */}
+                          <div className="grid grid-cols-2 gap-3">
+                            {(activePkBattles.length > 0
+                              ? activePkBattles
+                              : [
+                                  {
+                                    id: "sample-pk-1",
+                                    from_name: "Sophie",
+                                    from_username: "@itsSophieXO",
+                                    from_flag: "🇨🇦",
+                                    from_avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600&auto=format&fit=crop",
+                                    to_name: "Aria",
+                                    to_avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?q=80&w=600&auto=format&fit=crop",
+                                    viewers: 37,
+                                  },
+                                  {
+                                    id: "sample-pk-2",
+                                    from_name: "Mia",
+                                    from_username: "@mia.glow",
+                                    from_flag: "🇲🇩",
+                                    from_avatar: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=600&auto=format&fit=crop",
+                                    to_name: "Chloe",
+                                    to_avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=600&auto=format&fit=crop",
+                                    viewers: 39,
+                                  },
+                                  {
+                                    id: "sample-pk-3",
+                                    from_name: "Ariba",
+                                    from_username: "@ariba_love",
+                                    from_flag: "🇧🇩",
+                                    from_avatar: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=600&auto=format&fit=crop",
+                                    to_name: "Nila",
+                                    to_avatar: "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?q=80&w=600&auto=format&fit=crop",
+                                    viewers: 119,
+                                  },
+                                  {
+                                    id: "sample-pk-4",
+                                    from_name: "Zara",
+                                    from_username: "@zara_vibes",
+                                    from_flag: "🇦🇪",
+                                    from_avatar: "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?q=80&w=600&auto=format&fit=crop",
+                                    to_name: "Tania",
+                                    to_avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=600&auto=format&fit=crop",
+                                    viewers: 60,
+                                  },
+                                ]
+                            ).map((b: any) => {
+                              const leftAvatar = b.from_avatar || `https://api.dicebear.com/9.x/thumbs/svg?seed=${b.from_host_id || 'left'}`;
+                              const rightAvatar = b.to_avatar || `https://api.dicebear.com/9.x/thumbs/svg?seed=${b.to_host_id || 'right'}`;
+                              const leftName = b.from_name || `Host #${b.from_host_id || 'A'}`;
+                              const flag = b.from_flag || "🇧🇩";
+                              const username = b.from_username || `@${(b.from_name || 'user').toLowerCase().replace(/\s+/g, '')}`;
+                              const viewers = b.viewers || b.viewer_count || 37;
 
-                          {/* Battle cards grid */}
-                          <div className="grid grid-cols-1 gap-2.5">
-                            {activePkBattles.map((b) => {
-                              const total = Math.max(1, (b.from_score || 0) + (b.to_score || 0));
-                              const leftPct = ((b.from_score || 0) / total) * 100;
-                              const rem = typeof b.remaining_sec === "number" ? b.remaining_sec : 0;
-                              const mm = String(Math.max(0, Math.floor(rem / 60))).padStart(2, "0");
-                              const ss = String(Math.max(0, rem % 60)).padStart(2, "0");
                               return (
                                 <button
                                   key={b.id}
-                                  onClick={() => { setPkWatchOrigin("explore"); setPkWatchBattleId(b.id); }}
-                                  className="text-left rounded-2xl border border-slate-800 bg-slate-900/70 overflow-hidden hover:border-rose-400/50 transition active:scale-[0.99]"
+                                  onClick={() => {
+                                    setPkWatchOrigin("explore");
+                                    setPkWatchBattleId(b.id);
+                                  }}
+                                  className="relative aspect-[3/4] rounded-3xl overflow-hidden border border-purple-900/30 shadow-2xl bg-slate-950 group cursor-pointer text-left transition transform active:scale-95"
                                 >
-                                  {/* Card header */}
-                                  <div className="flex items-center justify-between px-3 py-1.5 bg-slate-950/60 border-b border-slate-800">
-                                    <span className="text-[9px] font-black text-rose-300 flex items-center gap-1">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                                      LIVE
-                                    </span>
-                                    <span className="text-[9px] font-mono text-slate-300">
-                                      {mm}:{ss}
-                                    </span>
-                                  </div>
-
-                                  {/* Hosts row */}
-                                  <div className="relative grid grid-cols-2 gap-2 p-3">
-                                    <div className="flex items-center gap-2 min-w-0">
+                                  {/* 1. Split Cover Picture (50/50 View) */}
+                                  <div className="absolute inset-0 flex">
+                                    <div className="w-1/2 h-full relative overflow-hidden border-r border-black/40">
                                       <img
-                                        src={b.from_avatar || `https://api.dicebear.com/9.x/thumbs/svg?seed=${b.from_host_id}`}
-                                        alt={b.from_name}
-                                        className="w-10 h-10 rounded-full border-2 border-rose-400/70 object-cover"
-                                      />
-                                      <div className="min-w-0">
-                                        <div className="text-[11px] font-black text-white truncate">
-                                          {b.from_name || `Host #${b.from_host_id}`}
-                                        </div>
-                                        <div className="text-[9px] font-mono text-amber-300">
-                                          {(b.from_score || 0).toLocaleString()}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 justify-end min-w-0">
-                                      <div className="min-w-0 text-right">
-                                        <div className="text-[11px] font-black text-white truncate">
-                                          {b.to_name || `Host #${b.to_host_id}`}
-                                        </div>
-                                        <div className="text-[9px] font-mono text-cyan-300">
-                                          {(b.to_score || 0).toLocaleString()}
-                                        </div>
-                                      </div>
-                                      <img
-                                        src={b.to_avatar || `https://api.dicebear.com/9.x/thumbs/svg?seed=${b.to_host_id}`}
-                                        alt={b.to_name}
-                                        className="w-10 h-10 rounded-full border-2 border-cyan-400/70 object-cover"
+                                        src={leftAvatar}
+                                        alt={leftName}
+                                        className="w-full h-full object-cover object-center group-hover:scale-105 transition duration-500"
                                       />
                                     </div>
-                                    <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-amber-400 text-slate-950 font-black text-[9px] py-0.5 px-1.5 rounded-full border-2 border-slate-900 italic">
-                                      VS
+                                    <div className="w-1/2 h-full relative overflow-hidden">
+                                      <img
+                                        src={rightAvatar}
+                                        alt={b.to_name || "Opponent"}
+                                        className="w-full h-full object-cover object-center group-hover:scale-105 transition duration-500"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Gradient overlay for badges reading */}
+                                  <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent pointer-events-none z-10" />
+
+                                  {/* 2. P⚡K Badge (Top Left) */}
+                                  <div className="absolute top-2.5 left-2.5 z-20 flex items-center bg-amber-400 text-slate-950 px-2 py-0.5 rounded-lg font-black text-[11px] tracking-wider shadow-lg">
+                                    P<span className="text-rose-600 font-extrabold text-[12px] mx-[1px]">⚡</span>K
+                                  </div>
+
+                                  {/* 3. Live Viewer Count (Top Right) */}
+                                  <div className="absolute top-2.5 right-2.5 z-20 flex items-center gap-1.5 bg-black/45 backdrop-blur-md text-white/90 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold border border-white/10 shadow-md">
+                                    <div className="flex items-end gap-[2px] h-3">
+                                      <span className="w-[2px] h-2 bg-white rounded-full animate-pulse"></span>
+                                      <span className="w-[2px] h-3 bg-white rounded-full animate-pulse delay-75"></span>
+                                      <span className="w-[2px] h-1.5 bg-white rounded-full animate-pulse delay-150"></span>
+                                    </div>
+                                    <span>{viewers}</span>
+                                  </div>
+
+                                  {/* 4. Center VS Emblem */}
+                                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none select-none">
+                                    <span className="text-4xl sm:text-5xl font-black italic tracking-tighter filter drop-shadow-[0_4px_10px_rgba(0,0,0,0.9)] flex items-center">
+                                      <span className="text-blue-500 drop-shadow-[0_3px_6px_rgba(0,0,0,0.9)]">V</span>
+                                      <span className="text-pink-500 -ml-1 drop-shadow-[0_3px_6px_rgba(0,0,0,0.9)]">S</span>
                                     </span>
                                   </div>
 
-                                  {/* Progress bar */}
-                                  <div className="h-2 w-full flex overflow-hidden">
-                                    <div
-                                      className="bg-gradient-to-r from-rose-600 to-pink-500 transition-all duration-500"
-                                      style={{ width: `${leftPct}%` }}
-                                    />
-                                    <div className="bg-gradient-to-r from-cyan-500 to-blue-600 flex-1 transition-all duration-500" />
-                                  </div>
-
-                                  {/* CTA */}
-                                  <div className="px-3 py-2 bg-slate-950/60 text-center">
-                                    <span className="text-[10px] font-black text-rose-200">
-                                      Tap to watch →
-                                    </span>
+                                  {/* 5. Bottom Host Info Overlay */}
+                                  <div className="absolute inset-x-0 bottom-0 z-20 p-3 bg-gradient-to-t from-black/95 via-black/60 to-transparent flex items-end justify-between gap-1">
+                                    <div className="min-w-0 pr-1">
+                                      <div className="text-white font-extrabold text-[14px] leading-tight truncate drop-shadow-md">
+                                        {leftName}
+                                      </div>
+                                      <div className="text-white/80 text-[10px] font-medium flex items-center gap-1 truncate mt-0.5">
+                                        <span className="shrink-0">{flag}</span>
+                                        <span className="truncate opacity-90">{username}</span>
+                                      </div>
+                                    </div>
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-fuchsia-600 via-pink-500 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-pink-500/40 shrink-0 border border-white/20 active:scale-90 transition">
+                                      <Phone className="w-3.5 h-3.5 fill-white text-white" />
+                                    </div>
                                   </div>
                                 </button>
                               );
