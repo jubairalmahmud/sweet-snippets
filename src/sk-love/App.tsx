@@ -3636,6 +3636,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     y: 0,
   });
   const [isDraggingLiveCohostTray, setIsDraggingLiveCohostTray] = useState<boolean>(false);
+  const [cohostManageUser, setCohostManageUser] = useState<{
+    userId: number;
+    name: string;
+    avatar?: string | null;
+  } | null>(null);
   const [showHandshakeAnim, setShowHandshakeAnim] = useState<boolean>(false);
 
   // Mini-Games Sandbox States
@@ -5154,7 +5159,40 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   useEffect(() => {
     const videoTrack = agoraLocalVideoTrackRef.current;
     if (videoTrack) {
-      void videoTrack.setEnabled(!isStreamCameraOff);
+      try {
+        if (isStreamCameraOff) {
+          if (typeof (videoTrack as any).setMuted === "function") {
+            void (videoTrack as any).setMuted(true).catch(() => {});
+          } else if (typeof videoTrack.setEnabled === "function") {
+            void videoTrack.setEnabled(false).catch(() => {});
+          }
+          if (agoraLocalVideoRef.current) {
+            try { agoraLocalVideoRef.current.innerHTML = ""; } catch {}
+          }
+        } else {
+          if (typeof (videoTrack as any).setMuted === "function") {
+            void (videoTrack as any).setMuted(false).then(() => {
+              if (agoraLocalVideoRef.current) {
+                try {
+                  agoraLocalVideoRef.current.innerHTML = "";
+                  videoTrack.play(agoraLocalVideoRef.current);
+                } catch {}
+              }
+            }).catch(() => {});
+          } else if (typeof videoTrack.setEnabled === "function") {
+            void videoTrack.setEnabled(true).then(() => {
+              if (agoraLocalVideoRef.current) {
+                try {
+                  agoraLocalVideoRef.current.innerHTML = "";
+                  videoTrack.play(agoraLocalVideoRef.current);
+                } catch {}
+              }
+            }).catch(() => {});
+          }
+        }
+      } catch (err) {
+        console.warn("Error toggling local camera track:", err);
+      }
     }
   }, [isStreamCameraOff]);
 
@@ -5429,8 +5467,16 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     agoraLocalVideoRef.current = element;
     const track = agoraLocalVideoTrackRef.current;
     if (element && track) {
-      element.innerHTML = "";
-      track.play(element);
+      try {
+        element.innerHTML = "";
+        if (!isStreamCameraOff) {
+          track.play(element);
+        }
+      } catch (err) {
+        console.warn("Error attaching local video element:", err);
+      }
+    } else if (element && isStreamCameraOff) {
+      try { element.innerHTML = ""; } catch {}
     }
   };
 
@@ -10531,6 +10577,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // ---- হ্যান্ডলার: লাইভ রুম (inviteLiveViewerToStage) ----
   const inviteLiveViewerToStage = async (viewer: any) => {
     if (!activeLiveRoom?.id || streamRole !== "streamer") return;
+    if (liveCohosts.length >= 4) {
+      triggerSystemAnnouncement("একসাথে সর্বোচ্চ ৪ জন কো-হোস্ট যুক্ত হতে পারবে।");
+      return;
+    }
     try {
       await api.post(`/api/live-rooms/${activeLiveRoom.id}/cohost-invites`, {
         userId: Number(viewer.userId || viewer.id),
@@ -10647,6 +10697,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       setTimeout(() => setToastAlert(null), 2000);
       return;
     }
+    if (liveCohosts.length >= 4) {
+      setToastAlert("একসাথে সর্বোচ্চ ৪ জন কো-হোস্ট যুক্ত হতে পারবে");
+      setTimeout(() => setToastAlert(null), 2000);
+      return;
+    }
     try {
       await requestLiveCohost();
       setIsCohostPending(true);
@@ -10661,6 +10716,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // ---- হ্যান্ডলার: লাইভ রুম (respondToLiveCohostRequest) ----
   const respondToLiveCohostRequest = async (requestId: number, action: "approve" | "reject") => {
     if (!activeLiveRoom?.id) return;
+    if (action === "approve" && liveCohosts.length >= 4) {
+      triggerSystemAnnouncement("একসাথে সর্বোচ্চ ৪ জন কো-হোস্ট যুক্ত হতে পারবে।");
+      return;
+    }
     try {
       await api.post(`/api/live-rooms/${activeLiveRoom.id}/cohost-requests/${requestId}/respond`, { action });
       setLiveCohostRequests((current) => current.filter((request) => Number(request.id) !== Number(requestId)));
@@ -21097,10 +21156,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                       key={`host-remote-${uid}`}
                                       onClick={() => {
                                         const gId = Number(uid);
-                                        setStreamGiftBoxRecipients([
-                                          { userId: gId, name: name || `Guest ${gId}`, avatar: avatar || null },
-                                        ]);
-                                        setIsStreamGiftPanelOpen(true);
+                                        setCohostManageUser({
+                                          userId: gId,
+                                          name: name || `Guest ${gId}`,
+                                          avatar: avatar || null,
+                                        });
                                       }}
                                       role="button"
                                       tabIndex={0}
@@ -21348,11 +21408,21 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                           {/* Middle visual cue & Screen Controls Indicator */}
                           <div className="relative z-10 flex-1 flex flex-col justify-center items-center pointer-events-none select-none">
                             {showGiftAnimation && (
-                              <div className="mb-3 rounded-2xl border border-amber-300/40 bg-black/70 px-5 py-2 text-center shadow-2xl backdrop-blur animate-pulse">
-                                <Gift className="mx-auto h-8 w-8 text-amber-200" />
-                                <p className="mt-1 text-[9px] font-black text-amber-200">
-                                  {recentGifterName || "Viewer"} sent a gift
-                                </p>
+                              <div className="pointer-events-none mb-3 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-300">
+                                <div className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-amber-300/80 bg-gradient-to-b from-[#1d123d]/90 via-[#130b2e]/95 to-[#090418]/95 px-6 py-3 text-center shadow-[0_0_35px_rgba(251,191,36,0.6)] backdrop-blur-md animate-bounce max-w-[220px]">
+                                  <div className="absolute -top-2 px-3 py-0.5 rounded-full bg-gradient-to-r from-amber-400 via-pink-500 to-rose-500 text-[9px] font-black uppercase text-slate-950 tracking-wider shadow">
+                                    🎁 GIFT RECEIVED! 🎁
+                                  </div>
+                                  <div className="my-1.5 flex h-14 w-14 items-center justify-center rounded-full border-2 border-amber-400/60 bg-amber-400/20 text-3xl shadow-inner animate-pulse">
+                                    {recentGiftIcon || "🎁"}
+                                  </div>
+                                  <p className="text-xs font-black text-amber-200 drop-shadow">
+                                    {recentGifterName || "Viewer"}
+                                  </p>
+                                  <p className="text-[10px] font-bold text-pink-200">
+                                    sent a gift! 🎉
+                                  </p>
+                                </div>
                               </div>
                             )}
                             {isStreamMicMuted && (
@@ -21395,7 +21465,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
                             {/* Comments overlay */}
                             {isLiveCommentsOpen && comments.length > 0 && (
-                              <div className="max-h-36 max-w-[100%] space-y-1.5 overflow-y-auto p-1 scrollbar-none flex flex-col justify-end">
+                              <div className="max-h-36 max-w-[100%] space-y-1.5 overflow-y-auto p-1 scrollbar-none">
                                 {comments.slice(-8).map((comment, index) => {
                                   const isGift = comment.badge === "Gift" || comment.text.includes("sent ");
                                   const isJoin = comment.badge === "Join" || comment.text.includes("joined");
@@ -22464,7 +22534,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                         </div>
 
                         {/* Middle Overlays & Controls */}
-                        <div className="relative z-20 flex-1 pointer-events-none">
+                        <div className="absolute inset-0 z-20 pointer-events-none">
                           {/* Cohost Guest Tray — host is always fullscreen, never in tiles.
                               Other cohosts + self (when cohost) appear as small tiles. */}
                           {(() => {
@@ -22481,52 +22551,30 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                             const showSelf = streamRole === "cohost";
                             if (!showSelf && otherCohostVideos.length === 0) return null;
                             return (
-                            <div className="pointer-events-auto">
-                              <button
-                                type="button"
-                                onClick={() => setIsLiveCohostTrayOpen((current) => !current)}
-                                className="absolute right-3 bottom-[160px] z-30 flex h-6 w-6 items-center justify-center rounded-full border border-white/20 bg-black/75 text-white shadow-xl backdrop-blur active:scale-95 transition cursor-pointer"
-                                aria-label="Toggle guest video grid"
-                                title="Toggle Guest Video"
-                              >
-                                <Users className="h-3 w-3" />
-                              </button>
-                              {isLiveCohostTrayOpen && (
-                                <div
-                                  className="absolute z-30 grid w-20 grid-cols-1 gap-1.5 rounded-xl bg-black/60 p-1 shadow-2xl backdrop-blur border border-white/20"
-                                  style={{
-                                    right: `${12 + liveCohostTrayPos.x}px`,
-                                    bottom: `${72 + liveCohostTrayPos.y}px`,
-                                  }}
-
-                                  onPointerDown={(event) => {
-                                    setIsDraggingLiveCohostTray(true);
-                                    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-                                  }}
-                                  onPointerMove={(event) => {
-                                    if (!isDraggingLiveCohostTray) return;
-                                    setLiveCohostTrayPos((current) => ({
-                                      x: Math.max(-220, Math.min(40, current.x - event.movementX)),
-                                      y: Math.max(-100, Math.min(260, current.y - event.movementY)),
-                                    }));
-                                  }}
-                                  onPointerUp={(event) => {
-                                    setIsDraggingLiveCohostTray(false);
-                                    (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
-                                  }}
+                              <div className="pointer-events-auto absolute right-3 bottom-[66px] z-30 flex flex-col items-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setIsLiveCohostTrayOpen((current) => !current)}
+                                  className="flex h-6 w-6 items-center justify-center rounded-full border border-white/20 bg-black/75 text-white shadow-xl backdrop-blur active:scale-95 transition cursor-pointer"
+                                  aria-label="Toggle guest video grid"
+                                  title="Toggle Guest Video"
                                 >
+                                  <Users className="h-3 w-3" />
+                                </button>
+                                {isLiveCohostTrayOpen && (
+                                  <div className="grid w-20 grid-cols-1 gap-1.5 rounded-xl bg-black/60 p-1 shadow-2xl backdrop-blur border border-white/20">
                                   {showSelf && (
                                     <div
                                       key="mini-remote-self"
-                                      ref={attachLiveLocalVideoElement}
                                       className="relative h-20 w-full overflow-hidden rounded-xl bg-slate-950 border border-white/20 shadow-md"
                                     >
+                                      <div ref={attachLiveLocalVideoElement} className="absolute inset-0" />
                                       {isStreamCameraOff && (
-                                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 text-center p-1">
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 text-center p-1 z-10">
                                           <img
                                             src={getUserAvatarUrl({ name: registerName || "You", avatar: profileAvatarImg })}
                                             alt="You"
-                                            className="h-8 w-8 rounded-full object-cover"
+                                            className="h-8 w-8 rounded-full object-cover border border-amber-300/80"
                                           />
                                           <span className="mt-0.5 max-w-[64px] truncate text-[8px] font-black text-white">
                                             You
@@ -22545,13 +22593,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                         key={`mini-remote-${uid}`}
                                         onClick={() => {
                                           const gId = Number(uid);
-                                          setStreamGiftBoxRecipients([
-                                            { userId: gId, name: name || `Guest ${gId}`, avatar: avatar || null },
-                                          ]);
-                                          setIsStreamGiftPanelOpen(true);
+                                          setCohostManageUser({
+                                            userId: gId,
+                                            name: name || `Guest ${gId}`,
+                                            avatar: avatar || null,
+                                          });
                                         }}
                                         className="relative h-20 w-full overflow-hidden rounded-xl bg-slate-950 border border-white/20 shadow-md cursor-pointer hover:border-pink-400/60 transition"
-                                        title="Tap to send gift"
+                                        title="Tap to manage co-host"
                                       >
                                         <div
                                           ref={(element) => {
@@ -22801,11 +22850,21 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
                           {/* Gift Animation */}
                           {showGiftAnimation && (
-                            <div className="pointer-events-none absolute left-1/2 top-24 z-40 -translate-x-1/2 rounded-2xl border border-amber-300/40 bg-black/70 px-4 py-2 text-center shadow-2xl backdrop-blur animate-pulse">
-                              <div className="text-3xl leading-none">{recentGiftIcon || "🎁"}</div>
-                              <p className="mt-1 text-[9px] font-black text-amber-200">
-                                {recentGifterName || "Viewer"} sent a gift
-                              </p>
+                            <div className="pointer-events-none absolute left-1/2 top-20 z-50 -translate-x-1/2 flex flex-col items-center justify-center animate-in fade-in zoom-in duration-300">
+                              <div className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-amber-300/80 bg-gradient-to-b from-[#1d123d]/90 via-[#130b2e]/95 to-[#090418]/95 px-6 py-3 text-center shadow-[0_0_35px_rgba(251,191,36,0.6)] backdrop-blur-md animate-bounce max-w-[220px]">
+                                <div className="absolute -top-2 px-3 py-0.5 rounded-full bg-gradient-to-r from-amber-400 via-pink-500 to-rose-500 text-[9px] font-black uppercase text-slate-950 tracking-wider shadow">
+                                  🎁 GIFT RECEIVED! 🎁
+                                </div>
+                                <div className="my-1.5 flex h-14 w-14 items-center justify-center rounded-full border-2 border-amber-400/60 bg-amber-400/20 text-3xl shadow-inner animate-pulse">
+                                  {recentGiftIcon || "🎁"}
+                                </div>
+                                <p className="text-xs font-black text-amber-200 drop-shadow">
+                                  {recentGifterName || "Viewer"}
+                                </p>
+                                <p className="text-[10px] font-bold text-pink-200">
+                                  sent a gift! 🎉
+                                </p>
+                              </div>
                             </div>
                           )}
 
@@ -22854,7 +22913,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
                           {/* Comments Feed Overlay (when open) */}
                           {isLiveCommentsOpen && (
-                            <div className="max-h-36 max-w-[100%] space-y-1.5 overflow-y-auto p-1 scrollbar-none flex flex-col justify-end">
+                            <div className="max-h-36 max-w-[100%] space-y-1.5 overflow-y-auto p-1 scrollbar-none">
                               {comments.map((comment, index) => {
                                 const isGift = comment.badge === "Gift" || comment.text.includes("sent ");
                                 const isJoin = comment.badge === "Join" || comment.text.includes("joined");
@@ -28168,6 +28227,101 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
             >
               Close
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Co-Host Management Modal (Kick, Mute, Block) */}
+      {cohostManageUser && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md pointer-events-auto"
+          onClick={() => setCohostManageUser(null)}
+        >
+          <div
+            className="relative w-full max-w-xs rounded-3xl border border-amber-400/40 bg-gradient-to-b from-slate-900 via-slate-950 to-black p-5 text-white shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setCohostManageUser(null)}
+              className="absolute top-3 right-3 rounded-full bg-white/10 p-1.5 text-slate-300 hover:bg-white/20 hover:text-white"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+
+            <div className="flex flex-col items-center text-center space-y-2">
+              <img
+                src={getUserAvatarUrl({ name: cohostManageUser.name, avatar: cohostManageUser.avatar })}
+                alt={cohostManageUser.name}
+                className="h-16 w-16 rounded-full object-cover border-2 border-amber-400 shadow-lg"
+              />
+              <div>
+                <h3 className="text-sm font-black text-amber-200">{cohostManageUser.name}</h3>
+                <p className="text-[10px] text-slate-400 font-bold">Co-Host Management</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2 pt-1">
+              {/* Mute / Unmute */}
+              <button
+                type="button"
+                onClick={() => {
+                  toggleLiveCohostMuteForHost(cohostManageUser.userId);
+                  setCohostManageUser(null);
+                }}
+                className={`flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 text-xs font-bold transition active:scale-95 cursor-pointer ${
+                  hostMutedLiveUserIds.includes(cohostManageUser.userId)
+                    ? "bg-amber-500 text-slate-950 hover:bg-amber-400"
+                    : "bg-slate-800 text-slate-200 hover:bg-slate-700"
+                }`}
+              >
+                <span>{hostMutedLiveUserIds.includes(cohostManageUser.userId) ? "🔇 Unmute Audio" : "🎙️ Mute Audio"}</span>
+              </button>
+
+              {/* Kick */}
+              <button
+                type="button"
+                onClick={() => {
+                  void kickLiveCohost(cohostManageUser.userId);
+                  setCohostManageUser(null);
+                }}
+                className="flex items-center justify-center gap-2 rounded-xl bg-rose-600 hover:bg-rose-500 py-2.5 px-3 text-xs font-bold text-white transition active:scale-95 cursor-pointer"
+              >
+                <span>🚫 Kick from Stream</span>
+              </button>
+
+              {/* Block */}
+              <button
+                type="button"
+                onClick={() => {
+                  void blockLiveCohost(cohostManageUser.userId, cohostManageUser.name);
+                  setCohostManageUser(null);
+                }}
+                className="flex items-center justify-center gap-2 rounded-xl bg-red-900 hover:bg-red-800 py-2.5 px-3 text-xs font-bold text-white transition active:scale-95 cursor-pointer"
+              >
+                <span>⛔ Block User</span>
+              </button>
+
+              {/* Send Gift Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  setStreamGiftBoxRecipients([
+                    {
+                      userId: cohostManageUser.userId,
+                      name: cohostManageUser.name,
+                      avatar: cohostManageUser.avatar || null,
+                    },
+                  ]);
+                  setIsStreamGiftPanelOpen(true);
+                  setCohostManageUser(null);
+                }}
+                className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-pink-500 hover:from-amber-400 hover:to-pink-400 py-2.5 px-3 text-xs font-black text-slate-950 transition active:scale-95 cursor-pointer"
+              >
+                <span>🎁 Send Gift</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

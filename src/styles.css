@@ -201,3 +201,12 @@
   z-index: 3;
 }
 
+/* Hide scrollbars while enabling overflow scrolling */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
