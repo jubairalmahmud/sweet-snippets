@@ -1749,9 +1749,10 @@ export default function App() {
     userId: number | null;
     until: number;
   } | null>(null);
-  const partySeatMuteOverrideRef = useRef<Record<number, { muted: boolean; until: number }>>({});
+  const partySeatMuteOverrideRef = useRef<Record<number, { muted: boolean }>>({});
   const hostMutedPartyUserIdsRef = useRef<Set<number>>(new Set());
   const hostMutedPartyUserNamesRef = useRef<Set<string>>(new Set());
+  const hostMutedPartySeatsRef = useRef<Set<number>>(new Set());
   // FIX (host mic auto-on): after toggling self-mute, hold the muted intent
   // for a short window so any subsequent server poll / applyPartyRoomState
   // cannot flip the mic back on due to a race with the mute POST response.
@@ -7607,31 +7608,51 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           seatUser?.avatar ??
           seatUser?.avatar_url ??
           null;
-        const normalizedMuted = Boolean(
-          seat.muted ?? seat.is_muted ?? seat.isMuted ?? seat.is_mute ?? false
-        );
+        const rawMuted = seat.muted ?? seat.is_muted ?? seat.isMuted ?? seat.is_mute;
+        const normalizedMuted =
+          rawMuted === true ||
+          rawMuted === 1 ||
+          rawMuted === "1" ||
+          (typeof rawMuted === "string" && rawMuted.toLowerCase() === "true");
+
         let localMuteOverrideValue: boolean | null = null;
         const seatUid = normalizedUserId ? Number(normalizedUserId) : null;
         const seatNameKey = normalizedOccupant ? String(normalizedOccupant).trim().toLowerCase() : null;
         const isUserMutedByHost = Boolean(
           (seatUid && hostMutedPartyUserIdsRef.current.has(seatUid)) ||
-          (seatNameKey && hostMutedPartyUserNamesRef.current.has(seatNameKey))
+          (seatNameKey && hostMutedPartyUserNamesRef.current.has(seatNameKey)) ||
+          hostMutedPartySeatsRef.current.has(index)
+        );
+
+        const currentUserId = getCurrentUserId();
+        const selfNameNow = (registerName || "").trim().toLowerCase();
+        const isSelfSeat = Boolean(
+          (seatUid && currentUserId && Number(seatUid) === Number(currentUserId)) ||
+          (selfNameNow && seatNameKey && seatNameKey === selfNameNow)
         );
 
         if (normalizedOccupant || normalizedUserId) {
           const localMuteOverride = partySeatMuteOverrideRef.current[index];
-          if (localMuteOverride && Date.now() < localMuteOverride.until) {
+          if (localMuteOverride) {
             localMuteOverrideValue = localMuteOverride.muted;
-          } else if (localMuteOverride) {
-            delete partySeatMuteOverrideRef.current[index];
           }
         }
+
+        if (normalizedMuted) {
+          partySeatMuteOverrideRef.current[index] = { muted: true };
+        }
+
+        const effectiveMuted =
+          isUserMutedByHost ||
+          (isSelfSeat && isPartyMicMutedRef.current) ||
+          (localMuteOverrideValue !== null ? localMuteOverrideValue : normalizedMuted);
+
         nextSeats[index] = {
           seatNum: index + 1,
           userId: seatUid,
           occupant: normalizedOccupant || null,
           icon: normalizedIcon || null,
-          muted: isUserMutedByHost ? true : (localMuteOverrideValue !== null ? localMuteOverrideValue : normalizedMuted),
+          muted: effectiveMuted,
           // Carry the frame so other viewers can render it (resolveUserFrameImg).
           frameId:
             seat.frameId ?? seat.frame ?? seat.frameCode ?? seat.frame_code ?? null,
@@ -8003,6 +8024,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       setIsPartyMicMuted(false);
       hostMutedPartyUserIdsRef.current.clear();
       hostMutedPartyUserNamesRef.current.clear();
+      hostMutedPartySeatsRef.current.clear();
       partySeatMuteOverrideRef.current = {};
       if (data?.data?.id) {
         locallyHostedPartyRoomIdsRef.current.add(Number(data.data.id));
@@ -8057,6 +8079,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     setIsPartyMicMuted(false);
     hostMutedPartyUserIdsRef.current.clear();
     hostMutedPartyUserNamesRef.current.clear();
+    hostMutedPartySeatsRef.current.clear();
     partySeatMuteOverrideRef.current = {};
     setPartyRoomStatus("Joining party room...");
     try {
@@ -8543,6 +8566,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     setPendingLeaveSeatIndex(null);
     if (idx === null) return;
     delete partySeatMuteOverrideRef.current[idx];
+    hostMutedPartySeatsRef.current.delete(idx);
     partyMicMuteHoldRef.current = null;
     isPartyMicMutedRef.current = false;
     setIsPartyMicMuted(false);
@@ -9000,19 +9024,20 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     const targetUid = targetSeat?.userId ? Number(targetSeat.userId) : null;
     const targetName = targetSeat?.occupant ? String(targetSeat.occupant).trim().toLowerCase() : null;
 
-    if (targetUid) {
-      if (muted) hostMutedPartyUserIdsRef.current.add(targetUid);
-      else hostMutedPartyUserIdsRef.current.delete(targetUid);
-    }
-    if (targetName) {
-      if (muted) hostMutedPartyUserNamesRef.current.add(targetName);
-      else hostMutedPartyUserNamesRef.current.delete(targetName);
+    if (muted) {
+      hostMutedPartySeatsRef.current.add(seatIndex);
+      if (targetUid) hostMutedPartyUserIdsRef.current.add(targetUid);
+      if (targetName) hostMutedPartyUserNamesRef.current.add(targetName);
+    } else {
+      hostMutedPartySeatsRef.current.delete(seatIndex);
+      if (targetUid) hostMutedPartyUserIdsRef.current.delete(targetUid);
+      if (targetName) hostMutedPartyUserNamesRef.current.delete(targetName);
     }
 
-    partySeatMuteOverrideRef.current[seatIndex] = { muted, until: Date.now() + 10000 };
+    partySeatMuteOverrideRef.current[seatIndex] = { muted };
     setPartySeats((prev) => {
       const next = [...prev];
-      if (next[seatIndex]?.occupant) {
+      if (next[seatIndex]) {
         next[seatIndex] = { ...next[seatIndex], muted };
       }
       partySeatsRef.current = next;
@@ -9023,6 +9048,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       const data: any = await api.post(`/api/party-rooms/${activePartyRoom.id}/seats/${seatNum}/mute`, {
         muted,
         is_muted: muted,
+        isMuted: muted,
+        is_mute: muted,
+        seatNum,
+        seat_num: seatNum,
       });
       if (data?.data) {
         applyPartyRoomState(data.data);
@@ -9038,6 +9067,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // ---- হ্যান্ডলার: পার্টি সিট (handleKickSeat) ----
   const handleKickSeat = async (seatIndex: number) => {
     delete partySeatMuteOverrideRef.current[seatIndex];
+    hostMutedPartySeatsRef.current.delete(seatIndex);
     const updated = [...partySeats];
     const occupantName = updated[seatIndex].occupant;
     if (!occupantName) return;
@@ -9135,7 +9165,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     const myName = (registerName || "").trim().toLowerCase();
     const isMutedByHost = Boolean(
       (myUid && hostMutedPartyUserIdsRef.current.has(Number(myUid))) ||
-      (myName && hostMutedPartyUserNamesRef.current.has(myName))
+      (myName && hostMutedPartyUserNamesRef.current.has(myName)) ||
+      (myIdx >= 0 && hostMutedPartySeatsRef.current.has(myIdx))
     );
 
     const next = !isPartyMicMuted;
@@ -9161,12 +9192,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       partySeatsRef.current = arr;
       return arr;
     });
-    partySeatMuteOverrideRef.current[myIdx] = { muted: next, until: Date.now() + 10000 };
+    partySeatMuteOverrideRef.current[myIdx] = { muted: next };
     if (activePartyRoom?.id) {
       try {
         const data: any = await api.post(
           `/api/party-rooms/${activePartyRoom.id}/seats/${myIdx + 1}/mute`,
-          { muted: next, is_muted: next },
+          { muted: next, is_muted: next, isMuted: next, is_mute: next, seatNum: myIdx + 1, seat_num: myIdx + 1 },
         );
         if (data?.data) {
           applyPartyRoomState(data.data);
