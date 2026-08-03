@@ -4005,11 +4005,17 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       const walletInfo = { ...((me && me.user) || me || {}), ...(wallet || {}) };
       const syncedRole = getRoleFromUser(walletInfo);
 
+      const coinsBalance = Math.max(
+        walletInfo.rCoins !== undefined ? Number(walletInfo.rCoins) : 0,
+        walletInfo.diamonds !== undefined ? Number(walletInfo.diamonds) : 0,
+        walletInfo.coins !== undefined ? Number(walletInfo.coins) : 0,
+      );
+
       setUserWallet((prev) => ({
         ...prev,
         id: walletInfo.id !== undefined ? Number(walletInfo.id) : prev.id,
-        diamonds: walletInfo.diamonds !== undefined ? Number(walletInfo.diamonds) : prev.diamonds,
-        rCoins: walletInfo.rCoins !== undefined ? Number(walletInfo.rCoins) : prev.rCoins,
+        diamonds: coinsBalance,
+        rCoins: coinsBalance,
         earnings: walletInfo.earnings !== undefined ? Number(walletInfo.earnings) : (walletInfo.host_earnings !== undefined ? Number(walletInfo.host_earnings) : prev.earnings),
         vipLevel: walletInfo.vipLevel !== undefined ? Number(walletInfo.vipLevel) : prev.vipLevel,
         avatarFrame: walletInfo.avatarFrame || prev.avatarFrame,
@@ -6974,17 +6980,30 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     };
 
     try {
+      const costAmount = Number(params.diamonds || params.rCoins || 0);
       const res = await api.post<{
         diamonds: number;
         rCoins: number;
         id: number;
         receiver: { id: number; rCoins: number } | null;
         recentGiftEvent?: PartyBroadcastEvent;
-      }>("/api/wallet/gift", params);
+      }>("/api/wallet/gift", {
+        ...params,
+        coins: costAmount,
+        diamonds: costAmount,
+        rCoins: costAmount,
+      });
+
+      const updatedCoins = Math.max(
+        res.diamonds !== undefined ? Number(res.diamonds) : 0,
+        res.rCoins !== undefined ? Number(res.rCoins) : 0,
+        Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0) - costAmount,
+      );
+
       setUserWallet((prev) => ({
         ...prev,
-        diamonds: res.diamonds,
-        rCoins: res.rCoins,
+        diamonds: updatedCoins,
+        rCoins: updatedCoins,
       }));
       // FIX (Batch 1): server-confirmed wallet সাথে সাথে refetch করে
       // C-Coin card + gift box balance সব যায়গায় sync করি (host side)।
@@ -7048,16 +7067,26 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       // so the UI still reflects the gift (deduct locally, show banner)
       // instead of blocking downstream logic (seat booking, animations).
       const localId = -Date.now();
+      const costAmount = Number(params.diamonds || params.rCoins || 0);
+      const currentCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
+      const localRemaining = Math.max(0, currentCoins - costAmount);
+
       setUserWallet((prev) => ({
         ...prev,
-        diamonds: Math.max(0, prev.diamonds - Number(params.diamonds || 0)),
-        rCoins: prev.rCoins,
+        diamonds: localRemaining,
+        rCoins: localRemaining,
       }));
       enqueueLocalBroadcast(localId);
-      triggerSystemAnnouncement(`⚠️ ${e?.message || "Gift server unreachable — sent locally."}`);
+
+      const rawMsg = e?.message || "Gift server unreachable — sent locally.";
+      const userFriendlyMsg = rawMsg
+        .replace(/diamonds/gi, "coins")
+        .replace(/diamond/gi, "coin");
+
+      triggerSystemAnnouncement(`⚠️ ${userFriendlyMsg}`);
       return {
-        diamonds: Math.max(0, userWallet.diamonds - Number(params.diamonds || 0)),
-        rCoins: userWallet.rCoins,
+        diamonds: localRemaining,
+        rCoins: localRemaining,
         id: localId,
         receiver: params.receiverId ? { id: Number(params.receiverId), rCoins: 0 } : null,
       };
@@ -7142,8 +7171,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     }
 
     const totalCost = (gift.diamonds || 0) * targets.length;
-    if (userWallet.diamonds < totalCost) {
-      triggerSystemAnnouncement(`Low diamonds — sending ${gift.name} to ${targets.length} user(s) anyway.`);
+    const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
+    if (availableCoins < totalCost) {
+      triggerSystemAnnouncement(`Low coins — sending ${gift.name} to ${targets.length} user(s) anyway.`);
     }
 
     const recipientNames = targets.map((t) => t.name).join(", ");
@@ -7271,8 +7301,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       triggerSystemAnnouncement("PK battle unavailable.");
       return;
     }
-    if (userWallet.diamonds < gift.diamonds) {
-      triggerSystemAnnouncement("Low diamonds — sending gift anyway.");
+    const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
+    if (availableCoins < gift.diamonds) {
+      triggerSystemAnnouncement("Low coins — sending gift anyway.");
     }
 
     await sendGiftApi({
@@ -7337,8 +7368,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // ---- হ্যান্ডলার: গিফট পাঠানো / রিসিভ (handleSendGift) ----
   const handleSendGift = async (gift: GiftItem) => {
     // FIX: don't block send on low balance — degrade gracefully.
-    if (userWallet.diamonds < gift.diamonds) {
-      triggerSystemAnnouncement("Low diamonds — sending gift anyway.");
+    const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
+    if (availableCoins < gift.diamonds) {
+      triggerSystemAnnouncement("Low coins — sending gift anyway.");
     }
 
     const ok = await sendGiftApi({
@@ -8176,9 +8208,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     // FIX: Do NOT block seat booking on wallet balance. sendGiftApi
     // degrades gracefully (local deduction / synthetic success) so the
     // seat + banner + animation must always proceed. Just warn once.
-    if (userWallet.diamonds < avatarGift.diamonds) {
+    const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
+    if (availableCoins < avatarGift.diamonds) {
       triggerSystemAnnouncement(
-        `Low diamonds — booking ${avatarGift.name} seat anyway.`,
+        `Low coins — booking ${avatarGift.name} seat anyway.`,
       );
     }
 
@@ -8644,8 +8677,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   const handlePartyGiftSend = async (gift: any) => {
     // FIX: Don't block gift sending on wallet balance. sendGiftApi degrades
     // gracefully so the banner + animation + broadcast must always run.
-    if (userWallet.diamonds < gift.diamonds) {
-      triggerSystemAnnouncement("Low diamonds — sending gift anyway.");
+    const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
+    if (availableCoins < gift.diamonds) {
+      triggerSystemAnnouncement("Low coins — sending gift anyway.");
     }
 
 
@@ -8728,8 +8762,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     }
 
     // FIX: degrade gracefully — allow send even with low balance.
-    if (userWallet.diamonds < gift.diamonds) {
-      triggerSystemAnnouncement("Low diamonds — sending gift anyway.");
+    const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
+    if (availableCoins < gift.diamonds) {
+      triggerSystemAnnouncement("Low coins — sending gift anyway.");
     }
 
 
@@ -8790,9 +8825,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     // Multiple recipients selected
     const count = partyGiftBoxRecipients.length;
     const totalCost = (gift.diamonds || 0) * count;
+    const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
 
-    if (userWallet.diamonds < totalCost) {
-      triggerSystemAnnouncement(`Low diamonds — sending ${gift.name} to ${count} users anyway.`);
+    if (availableCoins < totalCost) {
+      triggerSystemAnnouncement(`Low coins — sending ${gift.name} to ${count} users anyway.`);
     }
 
     const recipientNames = partyGiftBoxRecipients.map((r) => r.name).join(", ");
@@ -20397,9 +20433,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               <button
                                 key={idx}
                                 onClick={async () => {
-                                   if (userWallet.diamonds < gift.price) {
+                                   const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
+                                   if (availableCoins < gift.price) {
                                      triggerSystemAnnouncement(
-                                       "Low diamonds — sending gift anyway.",
+                                       "Low coins — sending gift anyway.",
                                      );
                                    }
                                    const ok = await sendGiftApi({
@@ -26060,17 +26097,20 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                             <button
                               key={gift.name}
                               onClick={() => {
-                                if (userWallet.diamonds < gift.price) {
+                                const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
+                                if (availableCoins < gift.price) {
                                   triggerSystemAnnouncement(
-                                    `Low diamonds — sending ${gift.name} anyway.`,
+                                    `Low coins — sending ${gift.name} anyway.`,
                                   );
                                 }
 
 
                                 // Deduct user wallet
+                                const newCoins = Math.max(0, availableCoins - gift.price);
                                 setUserWallet((p) => ({
                                   ...p,
-                                  diamonds: p.diamonds - gift.price,
+                                  rCoins: newCoins,
+                                  diamonds: newCoins,
                                 }));
 
                                 // Dynamically increment score
@@ -26390,12 +26430,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                           return (
                             <button
                               onClick={() => {
-                                if (userWallet.diamonds < cost) {
-                                  triggerSystemAnnouncement(`Low diamonds — purchasing ${selected.name} anyway!`);
+                                const availableCoins = Math.max(userWallet.rCoins || 0, userWallet.diamonds || 0);
+                                if (availableCoins < cost) {
+                                  triggerSystemAnnouncement(`Low coins — purchasing ${selected.name} anyway!`);
                                 }
+                                const newCoins = Math.max(0, availableCoins - cost);
                                 setUserWallet((prev) => ({
                                   ...prev,
-                                  diamonds: Math.max(0, prev.diamonds - cost),
+                                  rCoins: newCoins,
+                                  diamonds: newCoins,
                                 }));
                                 const expiry = Date.now() + 30 * 24 * 60 * 60 * 1000;
                                 setOwnedRides((prev) => ({
