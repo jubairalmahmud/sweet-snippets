@@ -7741,16 +7741,26 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     if (!holdActive) {
       const mySeat = nextSeats.find((seat) =>
         (seat.userId && currentUserIdForPartyState && Number(seat.userId) === Number(currentUserIdForPartyState)) ||
-        (selfNameForPartyState && seat.occupant && String(seat.occupant).trim() === selfNameForPartyState)
+        (selfNameForPartyState && seat.occupant && String(seat.occupant).trim().toLowerCase() === selfNameForPartyState.toLowerCase())
       );
       if (mySeat) {
-        const serverIsMuted = Boolean(mySeat.muted);
-        if (isPartyMicMutedRef.current !== serverIsMuted) {
-          isPartyMicMutedRef.current = serverIsMuted;
-          setIsPartyMicMuted(serverIsMuted);
+        const myIdx = nextSeats.indexOf(mySeat);
+        const hasLocalOverride = myIdx >= 0 && partySeatMuteOverrideRef.current[myIdx] !== undefined;
+        if (!hasLocalOverride) {
+          const serverIsMuted = Boolean(mySeat.muted);
+          if (isPartyMicMutedRef.current !== serverIsMuted) {
+            isPartyMicMutedRef.current = serverIsMuted;
+            setIsPartyMicMuted(serverIsMuted);
+          }
         }
       }
     }
+    // Apply local seat mute overrides to nextSeats
+    nextSeats.forEach((s: any, idx: number) => {
+      if (partySeatMuteOverrideRef.current[idx] !== undefined) {
+        s.muted = partySeatMuteOverrideRef.current[idx].muted;
+      }
+    });
     partySeatsRef.current = nextSeats;
     setPartySeats(nextSeats);
     // #11: Pick up transient emoji reactions the backend carries per seat so
@@ -7796,18 +7806,47 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         replyToName: m.replyToName ?? m.reply_to_name ?? undefined,
       }));
 
-      // Trigger entry animation on viewers' devices when an entry chat broadcast is received
+      // Trigger entry animation and seat mute broadcasts on viewers' devices
       serverMsgs.forEach((m) => {
-        if (m.text && m.text.includes("[ENTRY:")) {
+        if (!m.text) return;
+
+        // 1. ENTRY ANIMATION BROADCAST
+        if (m.text.includes("[ENTRY:")) {
           const match = m.text.match(/\[ENTRY:([^:]+):([^:]*):([^\]]*)\]/);
           if (match) {
             const entryRideId = match[1];
             const entryUserName = match[2] || m.name;
             const entryAvatar = match[3] || null;
-            const eventKey = `entry-msg-${m.id}`;
+            const msgIdKey = m.id && Number(m.id) > 0 ? String(m.id) : `${entryUserName}-${entryRideId}-${m.text}`;
+            const eventKey = `entry-msg-${msgIdKey}`;
             if (!seenPartyBroadcastIdsRef.current.has(eventKey)) {
               seenPartyBroadcastIdsRef.current.add(eventKey);
               triggerPartyEntryAnimation(entryUserName, entryAvatar, entryRideId);
+            }
+          }
+        }
+
+        // 2. SEAT MUTE BROADCAST ACROSS ALL DEVICES
+        if (m.text.includes("[SEATMUTE:")) {
+          const muteMatch = m.text.match(/\[SEATMUTE:(-?\d+):([01])\]/);
+          if (muteMatch) {
+            const mutedSeatIdx = Number(muteMatch[1]);
+            const isMutedVal = muteMatch[2] === "1";
+            const msgIdKey = m.id && Number(m.id) > 0 ? String(m.id) : `mute-${mutedSeatIdx}-${isMutedVal}-${m.text}`;
+            const eventKey = `seatmute-msg-${msgIdKey}`;
+            if (!seenPartyBroadcastIdsRef.current.has(eventKey)) {
+              seenPartyBroadcastIdsRef.current.add(eventKey);
+              if (mutedSeatIdx >= 0) {
+                partySeatMuteOverrideRef.current[mutedSeatIdx] = { muted: isMutedVal };
+                setPartySeats((prev) => {
+                  const arr = [...prev];
+                  if (arr[mutedSeatIdx]) {
+                    arr[mutedSeatIdx] = { ...arr[mutedSeatIdx], muted: isMutedVal };
+                  }
+                  partySeatsRef.current = arr;
+                  return arr;
+                });
+              }
             }
           }
         }
@@ -9217,7 +9256,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       return;
     }
 
-    partyMicMuteHoldRef.current = { muted: next, until: Date.now() + 10000 };
+    partyMicMuteHoldRef.current = { muted: next, until: Date.now() + 30000 };
     isPartyMicMutedRef.current = next;
     setIsPartyMicMuted(next);
     if (next) {
@@ -9225,21 +9264,32 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     } else {
       void publishPreparedPartyMicrophone();
     }
-    if (myIdx < 0) return; // not seated — just a local mic toggle
-    setPartySeats((prev) => {
-      const arr = [...prev];
-      if (arr[myIdx] || myIdx === 0) {
-        arr[myIdx] = { ...arr[myIdx], muted: next };
-      }
-      partySeatsRef.current = arr;
-      return arr;
-    });
-    partySeatMuteOverrideRef.current[myIdx] = { muted: next };
+    if (myIdx >= 0) {
+      partySeatMuteOverrideRef.current[myIdx] = { muted: next };
+      setPartySeats((prev) => {
+        const arr = [...prev];
+        if (arr[myIdx] || myIdx === 0) {
+          arr[myIdx] = { ...arr[myIdx], muted: next };
+        }
+        partySeatsRef.current = arr;
+        return arr;
+      });
+    }
+
     if (activePartyRoom?.id) {
+      if (myIdx >= 0) {
+        // Broadcast via room chat stream so all viewers across devices immediately update seat mute badge
+        void api
+          .post(`/api/party-rooms/${activePartyRoom.id}/chat`, {
+            text: `[SEATMUTE:${myIdx}:${next ? 1 : 0}]`,
+          })
+          .catch(() => undefined);
+      }
       try {
+        const seatNumToMute = myIdx >= 0 ? myIdx + 1 : 1;
         const data: any = await api.post(
-          `/api/party-rooms/${activePartyRoom.id}/seats/${myIdx + 1}/mute`,
-          { muted: next, is_muted: next, isMuted: next, is_mute: next, seatNum: myIdx + 1, seat_num: myIdx + 1 },
+          `/api/party-rooms/${activePartyRoom.id}/seats/${seatNumToMute}/mute`,
+          { muted: next, is_muted: next, isMuted: next, is_mute: next, seatNum: seatNumToMute, seat_num: seatNumToMute },
         );
         if (data?.data) {
           applyPartyRoomState(data.data);
@@ -15008,7 +15058,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   : partyChatMessages.slice(-5)
                 ).map((m, index) => {
                   const trimmed = (m.text || "").trim();
-                  const cleanText = trimmed.replace(/\[ENTRY:[^\]]+\]\s*/g, "");
+                  const cleanText = trimmed
+                    .replace(/\[ENTRY:[^\]]+\]\s*/g, "")
+                    .replace(/\[SEATMUTE:[^\]]+\]\s*/g, "")
+                    .trim();
+                  if (!cleanText) return null;
                   const emojiUrl = notoAnimatedUrl(cleanText);
                   return (
                     <div
