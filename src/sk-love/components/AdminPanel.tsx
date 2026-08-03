@@ -631,21 +631,22 @@ export default function AdminPanel({
     }
   };
 
-  const creditUserWallet = async (userId: number) => {
+  const modifyUserWallet = async (userId: number, type: "credit" | "debit") => {
     const entry = walletCredit[userId] || { diamonds: "", rCoins: "" };
-    // If coins entered in entry.diamonds or entry.rCoins, credit as Top Up coins (diamonds)
-    const amountToCredit = Math.max(0, Number(entry.diamonds || entry.rCoins || 0));
-    if (!amountToCredit) {
+    // If coins entered in entry.diamonds or entry.rCoins, modify Top Up coins (diamonds)
+    const amount = Math.max(0, Number(entry.diamonds || entry.rCoins || 0));
+    if (!amount) {
       setRoleMsg("Enter coins amount first.");
       return;
     }
+    const transferAmount = type === "credit" ? amount : -amount;
     setRoleMsg("");
     try {
       const res: any = await api.post("/api/admin/wallet-transfer", {
         receiver_id: userId,
-        diamonds: amountToCredit,
+        diamonds: transferAmount,
         r_coins: 0,
-        note: "Admin to user Top Up wallet credit",
+        note: type === "credit" ? "Admin to user Top Up wallet credit" : "Admin Top Up wallet debit",
       });
       const updated = res?.user || {};
       setRoleUsers((prev) =>
@@ -653,16 +654,16 @@ export default function AdminPanel({
           Number(user.id) === Number(userId)
             ? {
                 ...user,
-                diamonds: updated.diamonds ?? Number(user.diamonds || 0) + amountToCredit,
-                coins: updated.coins ?? Number(user.coins || 0) + amountToCredit,
+                diamonds: updated.diamonds ?? Math.max(0, Number(user.diamonds || 0) + transferAmount),
+                coins: updated.coins ?? Math.max(0, Number(user.coins || 0) + transferAmount),
               }
             : user,
         ),
       );
       setWalletCredit((prev) => ({ ...prev, [userId]: { diamonds: "", rCoins: "" } }));
-      setRoleMsg("Top Up coins credited successfully.");
+      setRoleMsg(type === "credit" ? "Top Up coins credited successfully." : "Top Up coins debited successfully.");
     } catch (e: any) {
-      setRoleMsg(e?.message || "Wallet credit failed");
+      setRoleMsg(e?.message || `Wallet ${type} failed`);
     }
   };
 
@@ -1362,12 +1363,20 @@ export default function AdminPanel({
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => void creditUserWallet(user.id)}
-                          className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-[10px] px-3 py-1.5 rounded-lg"
-                        >
-                          CREDIT
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => void modifyUserWallet(user.id, "credit")}
+                            className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-[10px] px-2.5 py-1.5 rounded-lg"
+                          >
+                            CREDIT
+                          </button>
+                          <button
+                            onClick={() => void modifyUserWallet(user.id, "debit")}
+                            className="bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] px-2.5 py-1.5 rounded-lg"
+                          >
+                            DEBIT
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
