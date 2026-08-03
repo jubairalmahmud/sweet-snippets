@@ -9773,18 +9773,17 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       setResellerMessage("Select a user first.");
       return;
     }
-    const diamonds = Math.max(0, Number(resellerDiamonds || 0));
-    const rCoins = Math.max(0, Number(resellerCoins || 0));
-    if (!diamonds && !rCoins) {
-      setResellerMessage("Enter coins or diamonds.");
+    const amountToCredit = Math.max(0, Number(resellerDiamonds || resellerCoins || 0));
+    if (!amountToCredit) {
+      setResellerMessage("Enter coins amount.");
       return;
     }
     setResellerMessage("");
     try {
       const res: any = await api.post("/api/reseller/transfer", {
         receiver_id: resellerSelectedUser.id,
-        diamonds,
-        r_coins: rCoins,
+        diamonds: amountToCredit,
+        r_coins: 0,
         note: "Reseller wallet top-up",
       });
       setResellerDashboard((prev) => ({
