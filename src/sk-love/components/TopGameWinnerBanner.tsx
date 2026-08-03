@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
+import RoyalGiftBanner from "./RoyalGiftBanner";
 
 export type GameWinEventDetail = {
   userId?: string;
@@ -123,34 +124,21 @@ export default function TopGameWinnerBanner() {
 
   return (
     <div
-      className="pointer-events-none fixed left-1/2 z-[9999] -translate-x-1/2 px-3"
+      className="pointer-events-none fixed left-1/2 z-[9999] -translate-x-1/2 px-2 w-full max-w-[460px]"
       style={{ top: "calc(env(safe-area-inset-top, 0px) + 10px)" }}
     >
-      <div
-        key={`${current.name}-${current.amount}-${current.ts}`}
-        className="pointer-events-auto flex items-center gap-2 rounded-full border border-yellow-300/60 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 px-3 py-1.5 shadow-[0_8px_24px_rgba(251,191,36,0.45)] animate-fade-in"
-      >
-        {current.avatar ? (
-          <img
-            src={current.avatar}
-            alt={current.name}
-            className="h-7 w-7 rounded-full border-2 border-white object-cover"
-          />
-        ) : (
-          <div className="grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-rose-500 text-[11px] font-black text-white">
-            {initial}
-          </div>
-        )}
-        <div className="flex items-center gap-1.5 text-[11.5px] font-extrabold leading-none text-[#3a1d00] whitespace-nowrap">
-          <span className="text-base leading-none">🏆</span>
-          <span className="max-w-[110px] truncate">{current.name}</span>
-          <span className="text-[#6a3a00]">won</span>
-          <span className="rounded-full bg-white/70 px-1.5 py-0.5 text-[11px] font-black text-amber-900">
-            🪙 {formatCoins(current.amount)}
-          </span>
-          <span className="text-[#6a3a00]">in</span>
-          <span className="text-[#3a1d00]">{current.game}</span>
-        </div>
+      <div key={`${current.name}-${current.amount}-${current.ts}`} className="pointer-events-auto">
+        <RoyalGiftBanner
+          giverName={current.name || "Player"}
+          giverAvatar={current.avatar}
+          giverBadge="Agency Holder"
+          iconEmoji="🍷"
+          mainActionText="WON"
+          amountText={formatCoins(current.amount)}
+          secondaryText="FROM"
+          giftName={current.game || "GREEDY KING"}
+          giftIcon="🎰"
+        />
       </div>
     </div>
   );

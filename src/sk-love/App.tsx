@@ -1,11 +1,12 @@
 // @ts-nocheck
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import PK from "./components/PK";
 import PKInviteListener from "./components/PKInviteListener";
 import PKWatchView from "./components/PKWatchView";
 import PKActiveBattlesPoller from "./components/PKActiveBattlesPoller";
 import LiveActionBar, { SafeStreamIcon } from "./components/LiveActionBar";
 import TopGameWinnerBanner from "./components/TopGameWinnerBanner";
+import RoyalGiftBanner from "./components/RoyalGiftBanner";
 
 import commentImg from "./assets/stream-icons/comment.png";
 import menuImg from "./assets/stream-icons/menu.png";
@@ -83,6 +84,9 @@ import {
   MessageCircle,
   Eye,
   EyeOff,
+  Reply,
+  CornerDownRight,
+  AtSign,
   Lock,
   Unlock,
   Upload,
@@ -494,7 +498,7 @@ export default function App() {
   // ---- হ্যান্ডলার: কমেন্ট (renderFormattedCommentText) ----
   const renderFormattedCommentText = (text: string) => {
     if (!text) return "";
-    const parts = text.split(/(@\w+)/g);
+    const parts = text.split(/(@[\w\u0980-\u09FF.-]+)/g);
     return (
       <>
         {parts.map((part, index) => {
@@ -502,7 +506,7 @@ export default function App() {
             return (
               <span
                 key={index}
-                className="text-blue-400 font-extrabold hover:underline cursor-pointer"
+                className="font-black text-cyan-300 bg-cyan-950/80 px-1 py-0.5 rounded text-[10px] mx-0.5 border border-cyan-400/40 shadow-sm"
               >
                 {part}
               </span>
@@ -1746,6 +1750,8 @@ export default function App() {
     until: number;
   } | null>(null);
   const partySeatMuteOverrideRef = useRef<Record<number, { muted: boolean; until: number }>>({});
+  const hostMutedPartyUserIdsRef = useRef<Set<number>>(new Set());
+  const hostMutedPartyUserNamesRef = useRef<Set<string>>(new Set());
   // FIX (host mic auto-on): after toggling self-mute, hold the muted intent
   // for a short window so any subsequent server poll / applyPartyRoomState
   // cannot flip the mic back on due to a race with the mute POST response.
@@ -3189,10 +3195,87 @@ export default function App() {
 
   // Simulated live chat scrolling
   const [comments, setComments] = useState<
-    Array<{ id: number; name: string; text: string; badge?: string }>
+    Array<{
+      id: number;
+      name: string;
+      text: string;
+      badge?: string;
+      avatar?: string;
+      replyTo?: { name: string; text: string };
+    }>
   >([]);
   const [draftComment, setDraftComment] = useState("");
+  const [replyingToComment, setReplyingToComment] = useState<{
+    id?: number;
+    name: string;
+    text: string;
+  } | null>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
+
+  const handleReplyToComment = (comment: { id?: number; name: string; text: string }) => {
+    const cleanName = comment.name.replace(/\s*\(User\)$/, "").trim();
+    setReplyingToComment({ id: comment.id, name: cleanName, text: comment.text });
+    setIsCommentInputPopupOpen(true);
+
+    const mentionTag = `@${cleanName.replace(/\s+/g, "")}`;
+    setDraftComment((prev) => {
+      if (prev.includes(mentionTag)) return prev;
+      return prev ? `${mentionTag} ${prev}` : `${mentionTag} `;
+    });
+
+    setTimeout(() => {
+      liveCommentInputRef.current?.focus();
+    }, 100);
+  };
+
+  const liveMentionSuggestions = useMemo(() => {
+    const usersMap = new Map<string, { name: string; avatar?: string }>();
+
+    // Add Streamer / Host
+    if (activeLiveRoom?.hostName || activeLiveRoom?.host?.name) {
+      const hName = (activeLiveRoom.hostName || activeLiveRoom.host?.name || "").trim();
+      if (hName) {
+        usersMap.set(hName, {
+          name: hName,
+          avatar: activeLiveRoom.hostAvatar || activeLiveRoom.host?.avatar,
+        });
+      }
+    }
+
+    // Add Live Cohosts
+    liveCohosts.forEach((c) => {
+      if (c.name) {
+        const cleanName = c.name.trim();
+        usersMap.set(cleanName, { name: cleanName, avatar: c.avatar });
+      }
+    });
+
+    // Add Previous Commenters
+    comments.forEach((cm) => {
+      if (cm.name) {
+        const cleanName = cm.name.replace(/\s*\(User\)$/, "").trim();
+        if (cleanName && cleanName !== (registerName || "Zubair")) {
+          usersMap.set(cleanName, { name: cleanName, avatar: cm.avatar });
+        }
+      }
+    });
+
+    return Array.from(usersMap.values());
+  }, [activeLiveRoom, liveCohosts, comments, registerName]);
+
+  const lastWordInDraft = (draftComment.split(" ").pop() || "").trim();
+  const isMentioningLiveUser = lastWordInDraft.startsWith("@");
+  const liveMentionQuery = isMentioningLiveUser ? lastWordInDraft.slice(1).toLowerCase() : "";
+
+  const filteredLiveMentionSuggestions = useMemo(() => {
+    if (!isMentioningLiveUser) return [];
+    if (!liveMentionQuery) return liveMentionSuggestions;
+    return liveMentionSuggestions.filter(
+      (u) =>
+        u.name.toLowerCase().includes(liveMentionQuery) ||
+        u.name.replace(/\s+/g, "").toLowerCase().includes(liveMentionQuery),
+    );
+  }, [isMentioningLiveUser, liveMentionQuery, liveMentionSuggestions]);
 
   // In-app messaging state variables
   const [selectedChatUser, setSelectedChatUser] = useState<any | null>(null);
@@ -3465,7 +3548,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   const [showGiftAnimation, setShowGiftAnimation] = useState<boolean>(false);
   const [recentGiftIcon, setRecentGiftIcon] = useState<string>("");
   const [recentGifterName, setRecentGifterName] = useState<string>("");
-  const [liveGiftBanner, setLiveGiftBanner] = useState<{ id: string; gifterName: string; giftIcon: string; giftText: string } | null>(null);
+  const [liveGiftBanner, setLiveGiftBanner] = useState<{
+    id: string;
+    gifterName: string;
+    giverAvatar?: string | null;
+    giftIcon: string;
+    giftText: string;
+  } | null>(null);
   const [streamGiftBoxRecipients, setStreamGiftBoxRecipients] = useState<
     Array<{ userId: number | null; name: string; avatar?: string | null }>
   >([]);
@@ -6725,39 +6814,48 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       .map((message) => ({
         id: Number(message.id),
         name: message.name || "SK Love User",
+        avatar: message.avatar || message.userAvatar || null,
         text: message.body || "",
         badge: message.kind === "gift" ? "Gift" : "Live",
       }));
     if (nextComments.length > 0) {
       setComments((prev) => [...prev, ...nextComments]);
-      const latestGift = nextComments.find((message) => message.badge === "Gift");
-      if (latestGift) {
+      const freshGifts = nextComments.filter((message) => message.badge === "Gift");
+      freshGifts.forEach((latestGift) => {
         const iconMatch = latestGift.text.match(/sent\s+(\S+)/i);
         const diamondMatch = latestGift.text.match(/\((\d+)\s+diamonds\)/i);
         const giftIcon = iconMatch?.[1] || "🎁";
         const gifterName = latestGift.name || "Viewer";
+        const giftCoins = Number(diamondMatch?.[1] || 1);
+
         setRecentGifterName(gifterName);
         setRecentGiftIcon(giftIcon);
-        if (streamRole === "streamer") {
-          setStreamStats((prev) => ({
-            ...prev,
-            rCoinsGained: prev.rCoinsGained + Number(diamondMatch?.[1] || 1),
-          }));
-        }
+
+        setStreamStats((prev) => ({
+          ...prev,
+          rCoinsGained: prev.rCoinsGained + giftCoins,
+        }));
+
+        setActiveLiveRoom((prev: any) =>
+          prev ? { ...prev, totalDiamonds: Number(prev.totalDiamonds || 0) + giftCoins } : prev
+        );
+
         setShowGiftAnimation(true);
         setTimeout(() => setShowGiftAnimation(false), 2000);
 
         const bId = String(Date.now() + Math.random());
+        const gifterAvatarUrl = getUserAvatarUrl({ name: gifterName, avatar: latestGift.avatar });
         setLiveGiftBanner({
           id: bId,
           gifterName,
+          giverAvatar: gifterAvatarUrl,
           giftIcon,
           giftText: latestGift.text,
         });
         setTimeout(() => {
           setLiveGiftBanner((prev) => (prev?.id === bId ? null : prev));
         }, 2000);
-      }
+      });
     }
   };
 
@@ -6808,11 +6906,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     if (!body) return;
     setDraftComment("");
 
+    const currentReply = replyingToComment;
+    setReplyingToComment(null);
+
     if (activeLiveRoom?.id && appSection === "stream") {
       try {
         const res: any = await api.post(`/api/live-rooms/${activeLiveRoom.id}/messages`, {
           body,
           kind: "text",
+          reply_to_name: currentReply?.name,
         });
         appendLiveRoomMessages(res?.data ? [res.data] : []);
       } catch (err: any) {
@@ -6829,6 +6931,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         name: nameToUse,
         text: body,
         badge: userWallet.vipLevel > 1 ? `VIP ${userWallet.vipLevel}` : "User",
+        avatar: profileAvatarImg,
+        replyTo: currentReply ? { name: currentReply.name, text: currentReply.text } : undefined,
       },
     ]);
   };
@@ -6856,7 +6960,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         enqueuePartyBroadcast({
           id: localId,
           kind: "gift",
-          giverName: registerName || "You",
+          giverName: registerName || "SK Love User",
           giverAvatar: profileAvatarImg || null,
           giftIcon: params.giftIcon || "🎁",
           giftImage: null,
@@ -6925,7 +7029,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
             : {
                 id: -Date.now(),
                 kind: "gift",
-                giverName: registerName || "You",
+                giverName: registerName || "SK Love User",
                 giverAvatar: profileAvatarImg || null,
                 giftIcon: params.giftIcon || "🎁",
                 giftImage: null,
@@ -7049,6 +7153,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       rCoinsGained: prev.rCoinsGained + totalCost,
     }));
 
+    setActiveLiveRoom((prev: any) =>
+      prev ? { ...prev, totalDiamonds: Number(prev.totalDiamonds || 0) + totalCost } : prev
+    );
+
     if (activePartyRoom?.id) {
       try {
         const data: any = await api.get(`/api/party-rooms/${activePartyRoom.id}`);
@@ -7060,6 +7168,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
     const gifterName = registerName || "SK Love User";
     const giftIcon = getGiftDisplayIcon(gift);
+    const gifterAvatarUrl = getUserAvatarUrl({ name: gifterName, avatar: profileAvatarImg });
     setRecentGifterName(gifterName);
     setRecentGiftIcon(giftIcon);
 
@@ -7068,12 +7177,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
     const bId = String(Date.now() + Math.random());
     const sendText = targets.length > 1
-      ? `sent ${gift.icon || "🎁"} ${gift.name} to ${targets.length} users (${recipientNames})`
-      : `sent ${gift.icon || "🎁"} ${gift.name} to ${targets[0]?.name || "Host"} (${gift.diamonds} diamonds)`;
+      ? `sent ${gift.icon || "🎁"} ${gift.name} to ${targets.length} users (${recipientNames}) (${totalCost} diamonds)`
+      : `sent ${gift.icon || "🎁"} ${gift.name} to ${targets[0]?.name || "Host"} (${gift.diamonds || 0} diamonds)`;
 
     setLiveGiftBanner({
       id: bId,
       gifterName,
+      giverAvatar: gifterAvatarUrl,
       giftIcon,
       giftText: sendText,
     });
@@ -7388,6 +7498,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           null;
         const normalizedMuted = Boolean(seat.muted ?? seat.is_muted ?? false);
         let localMuteOverrideValue: boolean | null = null;
+        const seatUid = normalizedUserId ? Number(normalizedUserId) : null;
+        const seatNameKey = normalizedOccupant ? String(normalizedOccupant).trim().toLowerCase() : null;
+        const isUserMutedByHost = Boolean(
+          (seatUid && hostMutedPartyUserIdsRef.current.has(seatUid)) ||
+          (seatNameKey && hostMutedPartyUserNamesRef.current.has(seatNameKey))
+        );
+
         if (normalizedOccupant || normalizedUserId) {
           const localMuteOverride = partySeatMuteOverrideRef.current[index];
           if (localMuteOverride && Date.now() < localMuteOverride.until) {
@@ -7398,10 +7515,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         }
         nextSeats[index] = {
           seatNum: index + 1,
-          userId: normalizedUserId ? Number(normalizedUserId) : null,
+          userId: seatUid,
           occupant: normalizedOccupant || null,
           icon: normalizedIcon || null,
-          muted: localMuteOverrideValue !== null ? localMuteOverrideValue : normalizedMuted,
+          muted: isUserMutedByHost ? true : (localMuteOverrideValue !== null ? localMuteOverrideValue : normalizedMuted),
           // Carry the frame so other viewers can render it (resolveUserFrameImg).
           frameId:
             seat.frameId ?? seat.frame ?? seat.frameCode ?? seat.frame_code ?? null,
@@ -7509,11 +7626,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         return [...serverMsgs.slice(-49), ...pendingLocal];
       });
     }
-    setHostMutedPartyUserIds(
-      nextSeats
-        .filter((seat) => seat.userId && seat.muted)
-        .map((seat) => Number(seat.userId)),
-    );
+    const currentMutedUserIds = nextSeats
+      .filter((seat) => seat.userId && seat.muted)
+      .map((seat) => Number(seat.userId));
+    setHostMutedPartyUserIds(currentMutedUserIds);
+    currentMutedUserIds.forEach((uid) => hostMutedPartyUserIdsRef.current.add(uid));
     const currentUserId = getCurrentUserId();
     partyHadSeatRef.current = nextSeats.some(
       (seat) => seat.userId && currentUserId && Number(seat.userId) === Number(currentUserId),
@@ -7628,7 +7745,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     // FIX (Batch 1): Second-level dedup — একই giver+giftName+coins ৫ সেকেন্ডে
     // দুবার এলে (server-poll + local-echo race) দ্বিতীয়টা drop করি যেন
     // animation ৩ বার play না হয়।
-    const fpKey = `${event.kind}|${event.giverName || ""}|${event.giftName || ""}|${event.coins || 0}`;
+    const fpKey = `${event.kind}|${(event.giftName || "").trim().toLowerCase()}|${event.coins || 0}|${event.receiverId || 0}`;
     const now = Date.now();
     const fpMap = (seenPartyBroadcastIdsRef as any).fpMap
       || ((seenPartyBroadcastIdsRef as any).fpMap = new Map<string, number>());
@@ -7935,6 +8052,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       const currentUserId = getCurrentUserId();
       const selfName = registerName || "You";
       const selfIcon = profileAvatarImg || null;
+      const isSelfMutedByHost = Boolean(
+        (currentUserId && hostMutedPartyUserIdsRef.current.has(Number(currentUserId))) ||
+        (selfName && hostMutedPartyUserNamesRef.current.has(String(selfName).trim().toLowerCase()))
+      );
       optimisticPartySeatRef.current = {
         roomId: activePartyRoom?.id ? Number(activePartyRoom.id) : null,
         seatIndex,
@@ -7952,7 +8073,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
             userId: currentUserId ? Number(currentUserId) : next[seatIndex].userId,
             occupant: selfName,
             icon: selfIcon || next[seatIndex].icon,
-            muted: false,
+            muted: isSelfMutedByHost,
           };
         }
         return next;
@@ -8016,6 +8137,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       userId: currentUserId ? Number(currentUserId) : null,
       until: Date.now() + 60000,
     };
+    const isSelfMutedByHost = Boolean(
+      (currentUserId && hostMutedPartyUserIdsRef.current.has(Number(currentUserId))) ||
+      (selfName && hostMutedPartyUserNamesRef.current.has(String(selfName).trim().toLowerCase()))
+    );
     partyHadSeatRef.current = true;
     setPendingPartySeatIndex(null);
     setPartySeats((prev) => {
@@ -8026,7 +8151,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           userId: currentUserId ? Number(currentUserId) : next[seatIndex].userId,
           occupant: selfName,
           icon: selfIcon,
-          muted: false,
+          muted: isSelfMutedByHost,
         };
       }
       return next;
@@ -8085,7 +8210,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               userId: currentUserId ? Number(currentUserId) : next[seatIndex].userId,
               occupant: selfName,
               icon: selfIcon,
-              muted: false,
+              muted: isSelfMutedByHost,
             };
           }
           return next;
@@ -8500,22 +8625,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       setShowGiftAnimation(false);
     }, 2000);
 
-    enqueuePartyBroadcast({
-      id: -Date.now(),
-      kind: "gift",
-      giverName: senderName,
-      giverAvatar: profileAvatarImg || null,
-      giftIcon: gift.icon,
-      giftImage: gift.image || null,
-      giftName: gift.name,
-      coins: Number(gift.diamonds || 0),
-      receiverName: activePartyRoom?.hostName || activePartyRoom?.title || null,
-      receiverId: activePartyRoom?.hostId ? Number(activePartyRoom.hostId) : null,
-      createdAt: Date.now(),
-    });
-
-    // The gifter counter / Top Gifter box is credited once via the broadcast
-    // poll (by gift id) — no direct recordPartyGifter here (avoids double-count).
+    // The gifter counter / Top Gifter box is credited once via sendGiftApi / broadcast
     const prevLeaderKey = topGifter?.name.trim().toLowerCase() || null;
     const nextLeader = (() => {
       let l: { name: string; totalSpent: number } | null = null;
@@ -8598,21 +8708,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       setShowGiftAnimation(false);
     }, 2000);
 
-    enqueuePartyBroadcast({
-      id: -Date.now(),
-      kind: "gift",
-      giverName: registerName || "SK Love User",
-      giverAvatar: profileAvatarImg || null,
-      giftIcon: gift.icon,
-      giftImage: gift.image || null,
-      giftName: gift.name,
-      coins: Number(gift.diamonds || 0),
-      receiverName: recipient.name,
-      receiverId: recipient.userId ? Number(recipient.userId) : null,
-      createdAt: Date.now(),
-    });
-    // NOTE: the gifter counter is credited once via the broadcast poll (by gift
-    // id) — no direct recordPartyGifter here, else the sender double-counts.
     triggerSystemAnnouncement(
       `Sent ${gift.icon} ${gift.name} to ${recipient.name}.`,
     );
@@ -8656,20 +8751,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         roomId: activePartyRoom?.id ? String(activePartyRoom.id) : undefined,
       });
 
-      enqueuePartyBroadcast({
-        id: -Date.now() - Math.floor(Math.random() * 100000),
-        kind: "gift",
-        giverName: registerName || "SK Love User",
-        giverAvatar: profileAvatarImg || null,
-        giftIcon: gift.icon,
-        giftImage: gift.image || null,
-        giftName: gift.name,
-        coins: Number(gift.diamonds || 0),
-        receiverName: recipient.name,
-        receiverId: recipient.userId ? Number(recipient.userId) : null,
-        createdAt: Date.now(),
-      });
-
       if (recipient.userId) {
         const rxId = Number(recipient.userId);
         setPartySeatSessionCoins((prev) => ({
@@ -8698,6 +8779,19 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // ---- হ্যান্ডলার: পার্টি সিট (handlePartySeatMute) ----
   const handlePartySeatMute = async (seatIndex: number, muted: boolean) => {
     if (!activePartyRoom?.id || !isActivePartyHost) return;
+    const targetSeat = partySeats[seatIndex];
+    const targetUid = targetSeat?.userId ? Number(targetSeat.userId) : null;
+    const targetName = targetSeat?.occupant ? String(targetSeat.occupant).trim().toLowerCase() : null;
+
+    if (targetUid) {
+      if (muted) hostMutedPartyUserIdsRef.current.add(targetUid);
+      else hostMutedPartyUserIdsRef.current.delete(targetUid);
+    }
+    if (targetName) {
+      if (muted) hostMutedPartyUserNamesRef.current.add(targetName);
+      else hostMutedPartyUserNamesRef.current.delete(targetName);
+    }
+
     partySeatMuteOverrideRef.current[seatIndex] = { muted, until: Date.now() + 24 * 60 * 60 * 1000 };
     setPartySeats((prev) => {
       const next = [...prev];
@@ -13528,101 +13622,21 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           key={partyBroadcastBanner.id}
         >
           <div
-            className="relative w-full max-w-[420px]"
-            style={{ animation: "partyBannerSlide 4.2s ease-in-out forwards", filter: "drop-shadow(0 8px 18px rgba(0,0,0,0.6))" }}
+            className="relative w-full max-w-[460px]"
+            style={{ animation: "partyBannerSlide 4.2s ease-in-out forwards" }}
           >
-            {/* Exact frame image as background */}
-            <img
-              src="/__l5e/assets-v1/f3eb5457-c612-4eac-9e39-7a6e319b1f8d/gift-banner-frame.png"
-              alt=""
-              aria-hidden
-              className="absolute inset-0 h-full w-full"
-              style={{ objectFit: "fill", pointerEvents: "none" }}
+            <RoyalGiftBanner
+              giverName={partyBroadcastBanner.giverName || "Gifter"}
+              giverAvatar={partyBroadcastBanner.giverAvatar}
+              giverBadge="Agency Holder"
+              iconEmoji="🍷"
+              mainActionText="WON"
+              amountText={Number(partyBroadcastBanner.coins || 0).toLocaleString()}
+              secondaryText="FROM"
+              giftName={partyBroadcastBanner.giftName || "GREEDY KING"}
+              giftIcon={partyBroadcastBanner.giftIcon || "🎁"}
+              giftImage={partyBroadcastBanner.giftImage}
             />
-
-
-            {/* HTML content overlay */}
-            <div className="relative flex items-center gap-2 px-[52px] py-[26px]" style={{ minHeight: 130 }}>
-              {/* Sender avatar with ornate gold ring */}
-              <div className="relative shrink-0 -ml-4">
-                <div
-                  className="flex h-14 w-14 items-center justify-center rounded-full"
-                  style={{
-                    background: "conic-gradient(from 0deg,#fff4b8,#f59e0b,#fde68a,#b45309,#fff4b8)",
-                    padding: 3,
-                    boxShadow: "0 0 12px rgba(245,158,11,0.85), inset 0 0 0 1px #7c2d12",
-                  }}
-                >
-                  <div className="h-full w-full overflow-hidden rounded-full bg-slate-900 ring-1 ring-amber-950">
-                    {partyBroadcastBanner.giverAvatar ? (
-                      <img
-                        src={partyBroadcastBanner.giverAvatar}
-                        alt={partyBroadcastBanner.giverName}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-sm font-black text-amber-200">
-                        {(partyBroadcastBanner.giverName || "?").slice(0, 1).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Center text */}
-              <div className="min-w-0 flex-1 text-center">
-                <p
-                  className="truncate text-[13px] font-black uppercase tracking-wide text-white"
-                  style={{ textShadow: "0 1px 2px rgba(0,0,0,0.95), 0 0 10px rgba(245,158,11,0.5)" }}
-                >
-                  <span className="mr-1">🍷</span>
-                  <span className="mr-1 inline-block rounded bg-red-600 px-[5px] py-[1px] text-[10px] leading-none text-white align-middle" style={{ boxShadow: "0 0 0 1px #fde68a" }}>
-                    {(partyBroadcastBanner.giverName || "?").slice(0, 1).toUpperCase()}
-                  </span>
-                  <span className="mx-[2px]">…</span>
-                  <span className="mx-1">WON</span>
-                  <span className="text-amber-300">
-                    {Number(partyBroadcastBanner.coins || 0).toLocaleString()}
-                  </span>
-                  <span className="ml-1">FROM</span>
-                </p>
-              </div>
-
-              {/* Gift image + label on right */}
-              <div className="relative shrink-0 -mr-4">
-                <div
-                  className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-md"
-                  style={{
-                    background: "linear-gradient(180deg,#fde68a,#f59e0b)",
-                    boxShadow: "0 0 0 2px #7c2d12, inset 0 0 0 2px #fff4b8",
-                  }}
-                >
-                  <div className="h-[calc(100%-4px)] w-[calc(100%-4px)] overflow-hidden rounded-sm bg-slate-900">
-                    {partyBroadcastBanner.giftImage ? (
-                      <img
-                        src={partyBroadcastBanner.giftImage}
-                        alt={partyBroadcastBanner.giftName}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-2xl">
-                        {partyBroadcastBanner.giftIcon}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <span
-                  className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded px-[6px] py-[2px] text-[8px] font-black uppercase leading-none text-white"
-                  style={{
-                    background: "linear-gradient(180deg,#22c55e,#14532d)",
-                    boxShadow: "0 0 0 1px #fde68a, 0 2px 4px rgba(0,0,0,0.5)",
-                    letterSpacing: "0.5px",
-                  }}
-                >
-                  {(partyBroadcastBanner.giftName || "GIFT").slice(0, 12)}
-                </span>
-              </div>
-            </div>
           </div>
           <style>{`
             @keyframes partyBannerSlide {
@@ -20551,20 +20565,18 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
                   {/* Top Sliding Animated Gift Banner (2 seconds duration) */}
                   {liveGiftBanner && !isLiveStreamMinimized && (
-                    <div className="pointer-events-none absolute top-14 left-1/2 z-[88] -translate-x-1/2 w-[92%] max-w-sm animate-bounce">
-                      <div className="flex items-center gap-2.5 rounded-full border-2 border-amber-300/90 bg-gradient-to-r from-amber-500/95 via-pink-600/95 to-rose-600/95 px-4 py-2 text-white shadow-[0_0_35px_rgba(245,158,11,0.85)] backdrop-blur-md">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/25 text-2xl border border-white/50 shadow-inner animate-pulse">
-                          {liveGiftBanner.giftIcon || "🎁"}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[10px] font-black uppercase tracking-wider text-amber-200">
-                            🎁 GIFT SENT!
-                          </p>
-                          <p className="truncate text-[11.5px] font-bold text-white">
-                            <span className="text-amber-300">{liveGiftBanner.gifterName}</span> {liveGiftBanner.giftText}
-                          </p>
-                        </div>
-                      </div>
+                    <div className="pointer-events-none absolute top-12 left-1/2 z-[88] -translate-x-1/2 w-full max-w-[460px] animate-bounce px-2">
+                      <RoyalGiftBanner
+                        giverName={liveGiftBanner.gifterName || "Gifter"}
+                        giverAvatar={liveGiftBanner.giverAvatar ? getUserAvatarUrl({ name: liveGiftBanner.gifterName, avatar: liveGiftBanner.giverAvatar }) : getUserAvatarUrl({ name: liveGiftBanner.gifterName })}
+                        giverBadge="VIP Gifter"
+                        iconEmoji="🎁"
+                        mainActionText="SENT"
+                        amountText={liveGiftBanner.giftText || "GIFT"}
+                        secondaryText=""
+                        giftName="GIFT"
+                        giftIcon={liveGiftBanner.giftIcon || "🎁"}
+                      />
                     </div>
                   )}
 
@@ -20621,7 +20633,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               }`}
                             />
                             {liveRemoteVideos.length > 0 && (
-                              <div className="absolute right-3 top-20 z-30 grid w-24 grid-cols-1 gap-1.5">
+                              <div className="absolute right-3 bottom-[72px] z-30 grid w-20 grid-cols-1 gap-1.5">
                                 {liveRemoteVideos.map(({ uid, track, name, avatar }) => (
                                   <div
                                     key={`host-remote-${uid}`}
@@ -20910,32 +20922,51 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
                             {/* Comments overlay */}
                             {isLiveCommentsOpen && comments.length > 0 && (
-                              <div className="max-h-32 max-w-[100%] space-y-1.5 overflow-y-auto p-1 scrollbar-none flex flex-col justify-end">
+                              <div className="max-h-36 max-w-[100%] space-y-1.5 overflow-y-auto p-1 scrollbar-none flex flex-col justify-end">
                                 {comments.slice(-8).map((comment, index) => {
                                   const isGift = comment.badge === "Gift" || comment.text.includes("sent ");
                                   const isJoin = comment.badge === "Join" || comment.text.includes("joined");
                                   return (
                                     <div
                                       key={`host-overlay-comment-${comment.id || index}`}
-                                      className={`backdrop-blur-md px-3 py-1 rounded-full border text-xs text-white flex items-center gap-1.5 w-fit max-w-[92%] shadow-md ${
+                                      className={`backdrop-blur-md px-2.5 py-1 rounded-2xl border text-xs text-white flex flex-col gap-0.5 w-fit max-w-[92%] shadow-md ${
                                         isGift
                                           ? "bg-gradient-to-r from-amber-600/90 via-pink-600/90 to-purple-600/90 border-amber-300/80 shadow-[0_0_12px_rgba(251,191,36,0.6)] font-bold animate-pulse"
                                           : isJoin
                                             ? "bg-gradient-to-r from-fuchsia-600/90 via-pink-500/90 to-rose-500/90 border-fuchsia-300/80 shadow-[0_0_12px_rgba(244,114,182,0.6)] font-bold"
-                                            : "bg-black/60 border-white/15"
+                                            : "bg-black/75 border-white/20"
                                       }`}
                                     >
-                                      <img
-                                        src={getUserAvatarUrl({ name: comment.name, avatar: comment.avatar })}
-                                        alt=""
-                                        className="h-5 w-5 rounded-full object-cover border border-amber-300/40 shrink-0"
-                                      />
-                                      <span className="font-bold text-amber-200 leading-tight truncate max-w-[90px] drop-shadow">
-                                        {comment.name}:
-                                      </span>
-                                      <span className="text-white font-medium leading-tight truncate drop-shadow">
-                                        {comment.text}
-                                      </span>
+                                      {comment.replyTo && (
+                                        <div className="flex items-center gap-1 text-[8.5px] text-fuchsia-300 font-semibold px-1 py-0.2 bg-fuchsia-950/70 rounded-md border border-fuchsia-500/30 max-w-full truncate">
+                                          <CornerDownRight className="w-2.5 h-2.5 shrink-0" />
+                                          <span className="truncate">Replying to @{comment.replyTo.name}: "{comment.replyTo.text}"</span>
+                                        </div>
+                                      )}
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <img
+                                          src={getUserAvatarUrl({ name: comment.name, avatar: comment.avatar })}
+                                          alt=""
+                                          className="h-5 w-5 rounded-full object-cover border border-amber-300/40 shrink-0"
+                                        />
+                                        <span className="font-bold text-amber-200 leading-tight truncate max-w-[85px] drop-shadow">
+                                          {comment.name}:
+                                        </span>
+                                        <span className="text-white font-medium leading-tight truncate drop-shadow flex-1">
+                                          {renderFormattedCommentText(comment.text)}
+                                        </span>
+                                        {!isGift && !isJoin && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleReplyToComment(comment)}
+                                            className="ml-1 text-[9px] font-bold text-fuchsia-300 hover:text-white bg-white/10 hover:bg-fuchsia-600 px-1.5 py-0.5 rounded-full transition active:scale-95 shrink-0 flex items-center gap-0.5 cursor-pointer"
+                                            title="Reply to comment"
+                                          >
+                                            <Reply className="w-2.5 h-2.5" />
+                                            <span>রিপ্লাই</span>
+                                          </button>
+                                        )}
+                                      </div>
                                     </div>
                                   );
                                 })}
@@ -20950,14 +20981,72 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                   <>
                                     <div
                                       className="fixed inset-0 z-[75] bg-black/30"
-                                      onClick={() => setIsCommentInputPopupOpen(false)}
+                                      onClick={() => {
+                                        setIsCommentInputPopupOpen(false);
+                                        setReplyingToComment(null);
+                                      }}
                                     />
                                     <div className="relative z-[80] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
+                                      {/* Replying Context Bar */}
+                                      {replyingToComment && (
+                                        <div className="flex items-center justify-between bg-fuchsia-950/90 border border-fuchsia-500/40 rounded-xl px-2.5 py-1 mb-1.5 text-[10px] text-fuchsia-200">
+                                          <span className="truncate flex items-center gap-1">
+                                            <CornerDownRight className="w-3 h-3 text-fuchsia-400 shrink-0" />
+                                            <span>Replying to <strong className="text-white">@{replyingToComment.name}</strong></span>
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => setReplyingToComment(null)}
+                                            className="text-slate-400 hover:text-white ml-2 text-xs font-bold cursor-pointer"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+                                      )}
+
+                                      {/* Auto-complete Mention Dropdown */}
+                                      {isMentioningLiveUser && filteredLiveMentionSuggestions.length > 0 && (
+                                        <div className="absolute left-0 right-0 bottom-full mb-1 bg-slate-950/98 border border-fuchsia-500/40 rounded-xl shadow-2xl z-[90] max-h-36 overflow-y-auto p-1 flex flex-col gap-1 backdrop-blur-md">
+                                          <div className="flex items-center justify-between px-2 py-0.5 border-b border-slate-800/80">
+                                            <span className="text-[8px] text-fuchsia-300 font-black uppercase tracking-wider flex items-center gap-1">
+                                              <AtSign className="w-2.5 h-2.5" /> Mention Participants
+                                            </span>
+                                            <span className="text-[7.5px] text-slate-400">
+                                              {filteredLiveMentionSuggestions.length} found
+                                            </span>
+                                          </div>
+                                          {filteredLiveMentionSuggestions.slice(0, 6).map((user) => {
+                                            const cleanName = user.name.replace(/\s+/g, "");
+                                            return (
+                                              <button
+                                                key={`host-mention-user-${user.name}`}
+                                                type="button"
+                                                onClick={() => {
+                                                  const words = draftComment.split(" ");
+                                                  words[words.length - 1] = `@${cleanName}`;
+                                                  setDraftComment(words.join(" ") + " ");
+                                                  setTimeout(() => liveCommentInputRef.current?.focus(), 50);
+                                                }}
+                                                className="flex items-center gap-2 px-2 py-1 rounded-lg text-left text-xs text-slate-200 hover:bg-fuchsia-900/50 hover:text-white transition cursor-pointer"
+                                              >
+                                                <img
+                                                  src={getUserAvatarUrl({ name: user.name, avatar: user.avatar })}
+                                                  alt=""
+                                                  className="w-5 h-5 rounded-full object-cover border border-fuchsia-400/40 shrink-0"
+                                                />
+                                                <span className="truncate font-semibold text-[11px]">{user.name}</span>
+                                                <span className="ml-auto text-[9px] text-fuchsia-400 font-mono">@{cleanName}</span>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+
                                       <div className="relative flex items-center">
                                         <input
                                           ref={liveCommentInputRef}
                                           type="text"
-                                          placeholder="মেসেজ পাঠান..."
+                                          placeholder="মেসেজ পাঠান... (@ দিয়ে মেনশন করুন)"
                                           className="w-full bg-slate-900/90 text-xs rounded-xl pl-3 pr-10 py-2.5 focus:outline-none border border-fuchsia-500/50 text-slate-100 placeholder-slate-400 font-medium shadow-inner"
                                           value={draftComment}
                                           onChange={(e) => setDraftComment(e.target.value)}
@@ -21234,63 +21323,229 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                             )}
 
                             {/* ---- Block list popup ---- */}
-                            {/* Gift Panel Modal for Host / Viewer */}
-                            {isStreamGiftPanelOpen && (
-                              <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 pointer-events-auto" onClick={() => setIsStreamGiftPanelOpen(false)}>
-                                <div className="w-full max-w-md rounded-3xl bg-gradient-to-br from-[#1a0b2e] via-[#2a0f3f] to-[#0f0a1f] border border-pink-400/40 p-4 shadow-[0_20px_60px_-10px_rgba(236,72,153,0.5)] relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                  <div className="pointer-events-none absolute -top-16 -left-16 w-48 h-48 rounded-full bg-pink-500/20 blur-3xl" />
-                                  <div className="pointer-events-none absolute -bottom-16 -right-16 w-48 h-48 rounded-full bg-amber-400/20 blur-3xl" />
-                                  <div className="relative flex items-center justify-between mb-3">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xl">🎁</span>
-                                      <h4 className="text-transparent bg-clip-text bg-gradient-to-r from-pink-300 via-fuchsia-300 to-amber-300 font-black text-sm">
-                                        Stream Gifts
-                                      </h4>
+                            {/* Gift Panel Modal for Host / Viewer — Multi-User Recipient Selection */}
+                            {isStreamGiftPanelOpen && (() => {
+                              const liveCandidates = [
+                                {
+                                  userId: activeLiveRoom?.hostId ? Number(activeLiveRoom.hostId) : null,
+                                  name: activeLiveRoom?.hostName || activeLiveRoom?.title || "Host",
+                                  avatar: activeLiveRoom?.hostAvatar,
+                                  isHost: true,
+                                },
+                                ...(liveCohosts || []).map((c) => ({
+                                  userId: c.userId ? Number(c.userId) : null,
+                                  name: c.name || "Guest",
+                                  avatar: c.avatar,
+                                  isHost: false,
+                                })),
+                              ];
+
+                              const allSelected =
+                                liveCandidates.length > 0 &&
+                                streamGiftBoxRecipients.length === liveCandidates.length;
+
+                              return (
+                                <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 pointer-events-auto" onClick={() => setIsStreamGiftPanelOpen(false)}>
+                                  <div className="w-full max-w-md max-h-[85vh] flex flex-col rounded-3xl bg-gradient-to-br from-[#1a0b2e] via-[#2a0f3f] to-[#0f0a1f] border border-pink-400/50 p-4 shadow-[0_20px_60px_-10px_rgba(236,72,153,0.6)] relative overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                    <div className="pointer-events-none absolute -top-16 -left-16 w-48 h-48 rounded-full bg-pink-500/20 blur-3xl" />
+                                    <div className="pointer-events-none absolute -bottom-16 -right-16 w-48 h-48 rounded-full bg-amber-400/20 blur-3xl" />
+                                    
+                                    {/* Header */}
+                                    <div className="relative flex items-center justify-between mb-3 shrink-0">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xl">🎁</span>
+                                        <div>
+                                          <h4 className="text-transparent bg-clip-text bg-gradient-to-r from-pink-300 via-fuchsia-300 to-amber-300 font-black text-sm">
+                                            {streamGiftBoxRecipients.length === 0 || allSelected
+                                              ? "Send Gift to Everyone"
+                                              : streamGiftBoxRecipients.length === 1
+                                              ? `Send Gift to ${streamGiftBoxRecipients[0].name}`
+                                              : `Send Gift to ${streamGiftBoxRecipients.length} Selected Users`}
+                                          </h4>
+                                          <p className="text-[9px] text-pink-300/80 font-bold">
+                                            Multi-Select Active • {streamGiftBoxRecipients.length === 0 ? "All On-Stage" : `${streamGiftBoxRecipients.length} User(s)`}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <button
+                                        onClick={() => {
+                                          setIsStreamGiftPanelOpen(false);
+                                          setStreamGiftBoxRecipients([]);
+                                        }}
+                                        className="text-slate-200 bg-slate-800/70 hover:bg-slate-700/70 rounded-full p-1.5 transition cursor-pointer"
+                                        aria-label="Close"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
                                     </div>
-                                    <button
-                                      onClick={() => setIsStreamGiftPanelOpen(false)}
-                                      className="text-slate-200 bg-slate-800/70 hover:bg-slate-700/70 rounded-full p-1.5 transition cursor-pointer"
-                                      aria-label="Close"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
-                                  </div>
-                                  <p className="relative text-[9px] text-slate-300/90 mb-3 leading-relaxed">
-                                    ✨ Select a gift from the catalog.
-                                  </p>
-                                  <div className="relative grid grid-cols-5 gap-2 max-h-80 overflow-y-auto pr-1">
-                                    {configurableGifts.map((gift, idx) => {
-                                      const palettes = [
-                                        "from-pink-500/25 via-rose-500/15 to-fuchsia-500/25 border-pink-400/40 shadow-pink-500/20",
-                                        "from-amber-400/25 via-orange-500/15 to-yellow-400/25 border-amber-400/40 shadow-amber-500/20",
-                                        "from-sky-400/25 via-cyan-500/15 to-blue-500/25 border-sky-400/40 shadow-sky-500/20",
-                                        "from-emerald-400/25 via-green-500/15 to-teal-500/25 border-emerald-400/40 shadow-emerald-500/20",
-                                        "from-violet-500/25 via-purple-500/15 to-indigo-500/25 border-violet-400/40 shadow-violet-500/20",
-                                      ];
-                                      const palette = palettes[idx % palettes.length];
-                                      return (
+
+                                    {/* Recipient Selection Bar */}
+                                    <div className="relative mb-3 shrink-0">
+                                      <div className="flex items-center justify-between mb-1.5">
+                                        <p className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                                          Select Recipients ({streamGiftBoxRecipients.length}/{liveCandidates.length})
+                                        </p>
+                                        {streamGiftBoxRecipients.length > 0 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => setStreamGiftBoxRecipients([])}
+                                            className="text-[8.5px] font-bold text-pink-400 hover:underline cursor-pointer"
+                                          >
+                                            Clear Selection
+                                          </button>
+                                        )}
+                                      </div>
+
+                                      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                                        {/* Everyone Button */}
                                         <button
-                                          key={`host-panel-gift-${gift.id}`}
                                           type="button"
-                                          onClick={() => { void handleLiveGiftSend(gift); setIsStreamGiftPanelOpen(false); }}
-                                          className={`group bg-gradient-to-br ${palette} hover:brightness-125 border rounded-xl p-2 flex flex-col items-center justify-center transition-all duration-200 active:scale-90 hover:-translate-y-0.5 hover:shadow-lg text-center cursor-pointer`}
+                                          onClick={() => {
+                                            if (allSelected) {
+                                              setStreamGiftBoxRecipients([]);
+                                            } else {
+                                              setStreamGiftBoxRecipients(
+                                                liveCandidates.map((c) => ({
+                                                  userId: c.userId,
+                                                  name: c.name,
+                                                  avatar: c.avatar,
+                                                }))
+                                              );
+                                            }
+                                          }}
+                                          className={`shrink-0 flex flex-col items-center gap-1 rounded-2xl border px-3 py-1.5 transition relative cursor-pointer ${
+                                            streamGiftBoxRecipients.length === 0 || allSelected
+                                              ? "border-pink-400/80 bg-gradient-to-br from-pink-500/30 to-fuchsia-600/30 shadow-[0_0_12px_rgba(236,72,153,0.5)] scale-105"
+                                              : "border-slate-800 bg-slate-950 hover:border-slate-700 opacity-80"
+                                          }`}
                                         >
-                                          <span className="text-2xl drop-shadow-[0_2px_6px_rgba(255,255,255,0.35)] group-hover:scale-110 transition-transform" style={{ filter: "saturate(1.4)" }}>
-                                            {getGiftDisplayIcon(gift)}
+                                          <span className="grid h-9 w-9 place-items-center rounded-full bg-fuchsia-500/20 text-lg relative">
+                                            🎉
+                                            {(streamGiftBoxRecipients.length === 0 || allSelected) && (
+                                              <span className="absolute -top-1 -right-1 bg-pink-500 text-white rounded-full p-0.5 text-[8px]">
+                                                <Check className="w-2.5 h-2.5" />
+                                              </span>
+                                            )}
                                           </span>
-                                          <span className="text-[8px] text-white/95 font-black truncate max-w-full mt-1 drop-shadow">
-                                            {gift.name}
-                                          </span>
-                                          <span className="text-[7.5px] text-amber-200 font-mono font-bold mt-0.5">
-                                            🪙 {gift.diamonds}
+                                          <span className="text-[8.5px] font-black text-white max-w-[62px] truncate">
+                                            Everyone ({liveCandidates.length})
                                           </span>
                                         </button>
-                                      );
-                                    })}
+
+                                        {/* Candidate User Pills */}
+                                        {liveCandidates.map((candidate, idx) => {
+                                          const isSelected = streamGiftBoxRecipients.some(
+                                            (r) =>
+                                              (r.userId && candidate.userId && r.userId === candidate.userId) ||
+                                              r.name === candidate.name
+                                          );
+                                          return (
+                                            <button
+                                              key={`host-stream-gift-user-${idx}`}
+                                              type="button"
+                                              onClick={() => {
+                                                if (isSelected) {
+                                                  setStreamGiftBoxRecipients((prev) =>
+                                                    prev.filter(
+                                                      (r) =>
+                                                        !(
+                                                          (r.userId && candidate.userId && r.userId === candidate.userId) ||
+                                                          r.name === candidate.name
+                                                        )
+                                                    )
+                                                  );
+                                                } else {
+                                                  setStreamGiftBoxRecipients((prev) => [
+                                                    ...prev,
+                                                    {
+                                                      userId: candidate.userId,
+                                                      name: candidate.name,
+                                                      avatar: candidate.avatar,
+                                                    },
+                                                  ]);
+                                                }
+                                              }}
+                                              className={`shrink-0 flex flex-col items-center gap-1 rounded-2xl border px-2.5 py-1.5 transition relative cursor-pointer ${
+                                                isSelected
+                                                  ? "border-amber-400/90 bg-gradient-to-br from-amber-500/30 to-pink-500/30 shadow-[0_0_12px_rgba(251,191,36,0.5)] scale-105"
+                                                  : "border-slate-800 bg-slate-950/80 hover:border-slate-700 opacity-75"
+                                              }`}
+                                            >
+                                              <span className="relative h-9 w-9 overflow-hidden rounded-full border border-white/30 bg-slate-800 shrink-0">
+                                                <img
+                                                  src={getUserAvatarUrl({ name: candidate.name, avatar: candidate.avatar })}
+                                                  alt=""
+                                                  className="h-full w-full object-cover"
+                                                />
+                                                {isSelected && (
+                                                  <span className="absolute -top-0.5 -right-0.5 bg-amber-400 text-slate-950 rounded-full p-0.5 text-[7px] font-black">
+                                                    <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                                  </span>
+                                                )}
+                                                {candidate.isHost && (
+                                                  <span className="absolute bottom-0 inset-x-0 bg-amber-500 text-[6.5px] font-black uppercase text-slate-950 text-center leading-tight">
+                                                    Host
+                                                  </span>
+                                                )}
+                                              </span>
+                                              <span className="text-[8.5px] font-bold text-slate-200 max-w-[55px] truncate">
+                                                {candidate.name}
+                                              </span>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+
+                                    <p className="relative text-[9.5px] text-slate-300/90 mb-2 leading-relaxed shrink-0">
+                                      {streamGiftBoxRecipients.length === 0 || allSelected
+                                        ? "✨ Send any gift to everyone active in the stream."
+                                        : streamGiftBoxRecipients.length === 1
+                                        ? `✨ ${streamGiftBoxRecipients[0].name} will receive your gift directly.`
+                                        : `✨ Sending gift to ${streamGiftBoxRecipients.length} users (${streamGiftBoxRecipients.map((r) => r.name.split(" ")[0]).join(", ")}).`}
+                                    </p>
+
+                                    {/* Gifts Grid */}
+                                    <div className="relative flex-1 overflow-y-auto max-h-[45vh] pr-1 py-1 grid grid-cols-5 gap-2" style={{ scrollbarWidth: "thin" }}>
+                                      {configurableGifts.map((gift, idx) => {
+                                        const palettes = [
+                                          "from-pink-500/25 via-rose-500/15 to-fuchsia-500/25 border-pink-400/40 shadow-pink-500/20",
+                                          "from-amber-400/25 via-orange-500/15 to-yellow-400/25 border-amber-400/40 shadow-amber-500/20",
+                                          "from-sky-400/25 via-cyan-500/15 to-blue-500/25 border-sky-400/40 shadow-sky-500/20",
+                                          "from-emerald-400/25 via-green-500/15 to-teal-500/25 border-emerald-400/40 shadow-emerald-500/20",
+                                          "from-violet-500/25 via-purple-500/15 to-indigo-500/25 border-violet-400/40 shadow-violet-500/20",
+                                        ];
+                                        const palette = palettes[idx % palettes.length];
+                                        const activeCount = streamGiftBoxRecipients.length || liveCandidates.length || 1;
+                                        const totalCost = (gift.diamonds || 0) * activeCount;
+
+                                        return (
+                                          <button
+                                            key={`host-panel-gift-${gift.id}`}
+                                            type="button"
+                                            onClick={() => {
+                                              void handleLiveGiftSend(gift);
+                                              setIsStreamGiftPanelOpen(false);
+                                            }}
+                                            className={`group bg-gradient-to-br ${palette} hover:brightness-125 border rounded-xl p-2 flex flex-col items-center justify-center transition-all duration-200 active:scale-90 hover:-translate-y-0.5 hover:shadow-lg text-center cursor-pointer`}
+                                          >
+                                            <span className="text-2xl drop-shadow-[0_2px_6px_rgba(255,255,255,0.35)] group-hover:scale-110 transition-transform" style={{ filter: "saturate(1.4)" }}>
+                                              {getGiftDisplayIcon(gift)}
+                                            </span>
+                                            <span className="text-[8px] text-white/95 font-black truncate max-w-full mt-1 drop-shadow">
+                                              {gift.name}
+                                            </span>
+                                            <span className="text-[7.5px] text-amber-200 font-mono font-bold mt-0.5">
+                                              🪙 {totalCost}
+                                            </span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            )}
+                              );
+                            })()}
 
                             {/* ---- Gift history — হোস্টের gift আইকন থেকে খোলে ---- */}
                             {isHostGiftHistoryOpen && (
@@ -21770,7 +22025,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               <button
                                 type="button"
                                 onClick={() => setIsLiveCohostTrayOpen((current) => !current)}
-                                className="absolute right-[10px] bottom-[118px] z-30 flex h-6 w-6 items-center justify-center rounded-full border border-white/20 bg-black/75 text-white shadow-xl backdrop-blur active:scale-95 transition"
+                                className="absolute right-3 bottom-[160px] z-30 flex h-6 w-6 items-center justify-center rounded-full border border-white/20 bg-black/75 text-white shadow-xl backdrop-blur active:scale-95 transition cursor-pointer"
                                 aria-label="Toggle guest video grid"
                                 title="Toggle Guest Video"
                               >
@@ -21778,10 +22033,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               </button>
                               {isLiveCohostTrayOpen && (
                                 <div
-                                  className="absolute z-30 grid w-[68px] grid-cols-1 gap-1 rounded-xl bg-black/60 p-1 shadow-2xl backdrop-blur border border-white/20"
+                                  className="absolute z-30 grid w-20 grid-cols-1 gap-1.5 rounded-xl bg-black/60 p-1 shadow-2xl backdrop-blur border border-white/20"
                                   style={{
-                                    right: `${8 + liveCohostTrayPos.x}px`,
-                                    bottom: `${56 + liveCohostTrayPos.y}px`,
+                                    right: `${12 + liveCohostTrayPos.x}px`,
+                                    bottom: `${72 + liveCohostTrayPos.y}px`,
                                   }}
 
                                   onPointerDown={(event) => {
@@ -21804,30 +22059,48 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                     <div
                                       key="mini-remote-self"
                                       ref={attachLiveLocalVideoElement}
-                                      className="relative h-[52px] w-full overflow-hidden rounded-lg bg-slate-950"
+                                      className="relative h-20 w-full overflow-hidden rounded-xl bg-slate-950 border border-white/20 shadow-md"
                                     >
                                       {isStreamCameraOff && (
-                                        <img
-                                          src={getUserAvatarUrl({ name: registerName || "You", avatar: profileAvatarImg })}
-                                          alt="You"
-                                          className="absolute inset-0 h-full w-full object-cover"
-                                        />
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 text-center p-1">
+                                          <img
+                                            src={getUserAvatarUrl({ name: registerName || "You", avatar: profileAvatarImg })}
+                                            alt="You"
+                                            className="h-8 w-8 rounded-full object-cover"
+                                          />
+                                          <span className="mt-0.5 max-w-[64px] truncate text-[8px] font-black text-white">
+                                            You
+                                          </span>
+                                        </div>
                                       )}
-                                      <span className="absolute bottom-0.5 left-0.5 rounded bg-black/70 px-1 py-0.5 text-[6px] font-black text-white">
+                                      <span className="absolute bottom-0.5 left-0.5 rounded bg-black/70 px-1 py-0.5 text-[6px] font-black text-white z-10">
                                         You
                                       </span>
                                     </div>
                                   )}
-                                  {otherCohostVideos.slice(0, showSelf ? 3 : 4).map(({ uid }, index) => (
+                                  {otherCohostVideos.slice(0, showSelf ? 3 : 4).map(({ uid, name, avatar, track }, index) => (
                                     <div
                                       key={`mini-remote-${uid}`}
-                                      ref={(element) => {
-                                        liveRemoteVideoRefs.current[uid] = element;
-                                      }}
-                                      className="relative h-[52px] w-full overflow-hidden rounded-lg bg-slate-950"
+                                      className="relative h-20 w-full overflow-hidden rounded-xl bg-slate-950 border border-white/20 shadow-md"
                                     >
-                                      <span className="absolute bottom-0.5 left-0.5 rounded bg-black/70 px-1 py-0.5 text-[6px] font-black text-white">
-                                        +{index + 1}
+                                      <div
+                                        ref={(element) => {
+                                          liveRemoteVideoRefs.current[uid] = element;
+                                          if (element) playLiveRemoteVideoTrack(uid, track);
+                                        }}
+                                        className="absolute inset-0"
+                                      />
+                                      {!track && (
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 text-center p-1">
+                                          <img
+                                            src={getUserAvatarUrl({ name: name || "Co-host", avatar })}
+                                            alt={name || "Co-host"}
+                                            className="h-8 w-8 rounded-full object-cover"
+                                          />
+                                        </div>
+                                      )}
+                                      <span className="absolute bottom-0.5 left-0.5 rounded bg-black/70 px-1 py-0.5 text-[6px] font-black text-white z-10">
+                                        {name || `Co-host ${index + 1}`}
                                       </span>
                                     </div>
                                   ))}
@@ -22118,14 +22391,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
                           {/* Comments Feed Overlay (when open) */}
                           {isLiveCommentsOpen && (
-                            <div className="max-h-32 max-w-[100%] space-y-1.5 overflow-y-auto p-1 scrollbar-none flex flex-col justify-end">
+                            <div className="max-h-36 max-w-[100%] space-y-1.5 overflow-y-auto p-1 scrollbar-none flex flex-col justify-end">
                               {comments.map((comment, index) => {
                                 const isGift = comment.badge === "Gift" || comment.text.includes("sent ");
                                 const isJoin = comment.badge === "Join" || comment.text.includes("joined");
                                 return (
                                   <div
                                     key={comment.id || index}
-                                    className={`backdrop-blur-md px-3 py-1 rounded-full border text-xs text-white flex items-center gap-1.5 w-fit max-w-[92%] shadow-md ${
+                                    className={`backdrop-blur-md px-2.5 py-1 rounded-2xl border text-xs text-white flex flex-col gap-0.5 w-fit max-w-[92%] shadow-md ${
                                       isGift
                                         ? "bg-gradient-to-r from-amber-600/90 via-pink-600/90 to-purple-600/90 border-amber-300/80 shadow-[0_0_12px_rgba(251,191,36,0.6)] font-bold animate-pulse"
                                         : isJoin
@@ -22133,17 +22406,36 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                           : "bg-black/75 border-white/20"
                                     }`}
                                   >
-                                    <img
-                                      src={getUserAvatarUrl({ name: comment.name, avatar: comment.avatar })}
-                                      alt=""
-                                      className="h-5 w-5 rounded-full object-cover border border-amber-300/40 shrink-0"
-                                    />
-                                    <span className="font-bold text-amber-200 leading-tight truncate max-w-[90px] drop-shadow">
-                                      {comment.name}:
-                                    </span>
-                                    <span className="text-white font-medium leading-tight truncate drop-shadow">
-                                      {comment.text}
-                                    </span>
+                                    {comment.replyTo && (
+                                      <div className="flex items-center gap-1 text-[8.5px] text-fuchsia-300 font-semibold px-1 py-0.2 bg-fuchsia-950/70 rounded-md border border-fuchsia-500/30 max-w-full truncate">
+                                        <CornerDownRight className="w-2.5 h-2.5 shrink-0" />
+                                        <span className="truncate">Replying to @{comment.replyTo.name}: "{comment.replyTo.text}"</span>
+                                      </div>
+                                    )}
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <img
+                                        src={getUserAvatarUrl({ name: comment.name, avatar: comment.avatar })}
+                                        alt=""
+                                        className="h-5 w-5 rounded-full object-cover border border-amber-300/40 shrink-0"
+                                      />
+                                      <span className="font-bold text-amber-200 leading-tight truncate max-w-[85px] drop-shadow">
+                                        {comment.name}:
+                                      </span>
+                                      <span className="text-white font-medium leading-tight truncate drop-shadow flex-1">
+                                        {renderFormattedCommentText(comment.text)}
+                                      </span>
+                                      {!isGift && !isJoin && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleReplyToComment(comment)}
+                                          className="ml-1 text-[9px] font-bold text-fuchsia-300 hover:text-white bg-white/10 hover:bg-fuchsia-600 px-1.5 py-0.5 rounded-full transition active:scale-95 shrink-0 flex items-center gap-0.5 cursor-pointer"
+                                          title="Reply to comment"
+                                        >
+                                          <Reply className="w-2.5 h-2.5" />
+                                          <span>রিপ্লাই</span>
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                 );
                               })}
@@ -22157,14 +22449,72 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 <>
                                   <div
                                     className="fixed inset-0 z-[75] bg-black/30"
-                                    onClick={() => setIsCommentInputPopupOpen(false)}
+                                    onClick={() => {
+                                      setIsCommentInputPopupOpen(false);
+                                      setReplyingToComment(null);
+                                    }}
                                   />
                                   <div className="relative z-[80] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
+                                    {/* Replying Context Bar */}
+                                    {replyingToComment && (
+                                      <div className="flex items-center justify-between bg-fuchsia-950/90 border border-fuchsia-500/40 rounded-xl px-2.5 py-1 mb-1.5 text-[10px] text-fuchsia-200">
+                                        <span className="truncate flex items-center gap-1">
+                                          <CornerDownRight className="w-3 h-3 text-fuchsia-400 shrink-0" />
+                                          <span>Replying to <strong className="text-white">@{replyingToComment.name}</strong></span>
+                                        </span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setReplyingToComment(null)}
+                                          className="text-slate-400 hover:text-white ml-2 text-xs font-bold cursor-pointer"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    )}
+
+                                    {/* Auto-complete Mention Dropdown */}
+                                    {isMentioningLiveUser && filteredLiveMentionSuggestions.length > 0 && (
+                                      <div className="absolute left-0 right-0 bottom-full mb-1 bg-slate-950/98 border border-fuchsia-500/40 rounded-xl shadow-2xl z-[90] max-h-36 overflow-y-auto p-1 flex flex-col gap-1 backdrop-blur-md">
+                                        <div className="flex items-center justify-between px-2 py-0.5 border-b border-slate-800/80">
+                                          <span className="text-[8px] text-fuchsia-300 font-black uppercase tracking-wider flex items-center gap-1">
+                                            <AtSign className="w-2.5 h-2.5" /> Mention Participants
+                                          </span>
+                                          <span className="text-[7.5px] text-slate-400">
+                                            {filteredLiveMentionSuggestions.length} found
+                                          </span>
+                                        </div>
+                                        {filteredLiveMentionSuggestions.slice(0, 6).map((user) => {
+                                          const cleanName = user.name.replace(/\s+/g, "");
+                                          return (
+                                            <button
+                                              key={`audience-mention-user-${user.name}`}
+                                              type="button"
+                                              onClick={() => {
+                                                const words = draftComment.split(" ");
+                                                words[words.length - 1] = `@${cleanName}`;
+                                                setDraftComment(words.join(" ") + " ");
+                                                setTimeout(() => liveCommentInputRef.current?.focus(), 50);
+                                              }}
+                                              className="flex items-center gap-2 px-2 py-1 rounded-lg text-left text-xs text-slate-200 hover:bg-fuchsia-900/50 hover:text-white transition cursor-pointer"
+                                            >
+                                              <img
+                                                src={getUserAvatarUrl({ name: user.name, avatar: user.avatar })}
+                                                alt=""
+                                                className="w-5 h-5 rounded-full object-cover border border-fuchsia-400/40 shrink-0"
+                                              />
+                                              <span className="truncate font-semibold text-[11px]">{user.name}</span>
+                                              <span className="ml-auto text-[9px] text-fuchsia-400 font-mono">@{cleanName}</span>
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+
                                     <div className="relative flex items-center">
                                       <input
                                         ref={liveCommentInputRef}
                                         type="text"
-                                        placeholder="মেসেজ পাঠান..."
+                                        placeholder="মেসেজ পাঠান... (@ দিয়ে মেনশন করুন)"
                                         className="w-full bg-slate-900/90 text-xs rounded-xl pl-3 pr-10 py-2.5 focus:outline-none border border-fuchsia-500/50 text-slate-100 placeholder-slate-400 font-medium shadow-inner"
                                         value={draftComment}
                                         onChange={(e) => setDraftComment(e.target.value)}
