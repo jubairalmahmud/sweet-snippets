@@ -7066,6 +7066,49 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
 
 
+  const getLiveCandidates = () => {
+    const hostIdNum = activeLiveRoom?.hostId ? Number(activeLiveRoom.hostId) : null;
+    const candidatesMap = new Map<number, { userId: number; name: string; avatar?: string | null; isHost: boolean }>();
+
+    if (hostIdNum) {
+      candidatesMap.set(hostIdNum, {
+        userId: hostIdNum,
+        name: activeLiveRoom?.hostName || activeLiveRoom?.title || "Host",
+        avatar: activeLiveRoom?.hostAvatar,
+        isHost: true,
+      });
+    }
+
+    (liveCohosts || []).forEach((c) => {
+      const uid = c?.userId ?? c?.user_id ?? c?.id ?? c?.user?.id;
+      if (uid) {
+        const numUid = Number(uid);
+        if (!candidatesMap.has(numUid)) {
+          candidatesMap.set(numUid, {
+            userId: numUid,
+            name: c.name || c.user?.name || `Guest ${numUid}`,
+            avatar: c.avatar || c.user?.avatar,
+            isHost: false,
+          });
+        }
+      }
+    });
+
+    (liveRemoteVideos || []).forEach((v) => {
+      const numUid = Number(v.uid);
+      if (numUid && numUid !== hostIdNum && !candidatesMap.has(numUid)) {
+        candidatesMap.set(numUid, {
+          userId: numUid,
+          name: v.name || `Guest ${numUid}`,
+          avatar: v.avatar,
+          isHost: false,
+        });
+      }
+    });
+
+    return Array.from(candidatesMap.values());
+  };
+
   // ---- হ্যান্ডলার: গিফট পাঠানো / রিসিভ (handleLiveGiftSend) ----
   const handleLiveGiftSend = async (gift: GiftItem) => {
     if (!activeLiveRoom?.id) {
@@ -7073,22 +7116,28 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       return;
     }
 
-    // Candidate list
-    const hostCandidate = {
-      userId: activeLiveRoom.hostId ? Number(activeLiveRoom.hostId) : null,
-      name: activeLiveRoom.hostName || activeLiveRoom.title || "Host",
-    };
+    const liveCandidates = getLiveCandidates();
+    const hostIdNum = activeLiveRoom.hostId ? Number(activeLiveRoom.hostId) : null;
+
     let targets: Array<{ userId: number | null; name: string }> = [];
     if (streamGiftBoxRecipients.length > 0) {
-      targets = streamGiftBoxRecipients.map((r) => ({ userId: r.userId, name: r.name }));
+      targets = streamGiftBoxRecipients.map((r) => {
+        const uid = r.userId ?? (r as any).user_id ?? (r as any).id;
+        return {
+          userId: uid ? Number(uid) : null,
+          name: r.name,
+        };
+      });
     } else {
-      targets = [hostCandidate];
-      if (liveCohosts && liveCohosts.length > 0) {
-        liveCohosts.forEach((c) => {
-          if (c?.userId && String(c.userId) !== String(activeLiveRoom.hostId)) {
-            targets.push({ userId: Number(c.userId), name: c.name || "Guest" });
-          }
-        });
+      if (liveCandidates.length > 0) {
+        targets = liveCandidates.map((c) => ({ userId: c.userId, name: c.name }));
+      } else {
+        targets = [
+          {
+            userId: hostIdNum,
+            name: activeLiveRoom.hostName || activeLiveRoom.title || "Host",
+          },
+        ];
       }
     }
 
@@ -7100,15 +7149,23 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     const recipientNames = targets.map((t) => t.name).join(", ");
 
     for (const target of targets) {
+      const rxUserId = target.userId ? Number(target.userId) : (hostIdNum || undefined);
       await sendGiftApi({
         giftName: gift.name,
         giftIcon: gift.icon,
         diamonds: gift.diamonds,
         rCoins: gift.rCoins,
-        receiverId: target.userId || Number(activeLiveRoom.hostId || 0) || undefined,
+        receiverId: rxUserId,
         roomType: "live",
         roomId: String(activeLiveRoom.id),
       });
+
+      if (rxUserId) {
+        setPartySeatSessionCoins((prev) => ({
+          ...prev,
+          [rxUserId]: (prev[rxUserId] || 0) + Number(gift.diamonds || 0),
+        }));
+      }
     }
 
     // PK Battle wiring
@@ -20634,37 +20691,54 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                             />
                             {liveRemoteVideos.length > 0 && (
                               <div className="absolute right-3 bottom-[72px] z-30 grid w-20 grid-cols-1 gap-1.5">
-                                {liveRemoteVideos.map(({ uid, track, name, avatar }) => (
-                                  <div
-                                    key={`host-remote-${uid}`}
-                                    onClick={() => setIsLiveStageControlsOpen((current) => !current)}
-                                    role="button"
-                                    tabIndex={0}
-                                    aria-label="Manage co-host"
-                                    title="Tap to manage co-host"
-                                    className="relative h-24 overflow-hidden rounded-xl bg-slate-950 cursor-pointer"
-                                  >
+                                {liveRemoteVideos.map(({ uid, track, name, avatar }) => {
+                                  const cohostCoins = partySeatSessionCoins[Number(uid)] || 0;
+                                  return (
                                     <div
-                                      ref={(element) => {
-                                        liveRemoteVideoRefs.current[uid] = element;
-                                        if (element) playLiveRemoteVideoTrack(uid, track);
+                                      key={`host-remote-${uid}`}
+                                      onClick={() => {
+                                        const gId = Number(uid);
+                                        setStreamGiftBoxRecipients([
+                                          { userId: gId, name: name || `Guest ${gId}`, avatar: avatar || null },
+                                        ]);
+                                        setIsStreamGiftPanelOpen(true);
                                       }}
-                                      className="absolute inset-0"
-                                    />
-                                    {!track && (
-                                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 text-center">
-                                        <img
-                                          src={getUserAvatarUrl({ name: name || "Co-host", avatar })}
-                                          alt={name || "Co-host"}
-                                          className="h-10 w-10 rounded-full object-cover"
-                                        />
-                                        <span className="mt-1 max-w-[76px] truncate text-[8px] font-black text-white">
-                                          {name || "Co-host"}
+                                      role="button"
+                                      tabIndex={0}
+                                      aria-label="Manage or gift co-host"
+                                      title="Tap to send gift or manage co-host"
+                                      className="relative h-24 overflow-hidden rounded-xl bg-slate-950 cursor-pointer border border-white/20 shadow-md"
+                                    >
+                                      <div
+                                        ref={(element) => {
+                                          liveRemoteVideoRefs.current[uid] = element;
+                                          if (element) playLiveRemoteVideoTrack(uid, track);
+                                        }}
+                                        className="absolute inset-0"
+                                      />
+                                      {!track && (
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 text-center">
+                                          <img
+                                            src={getUserAvatarUrl({ name: name || "Co-host", avatar })}
+                                            alt={name || "Co-host"}
+                                            className="h-10 w-10 rounded-full object-cover"
+                                          />
+                                          <span className="mt-1 max-w-[76px] truncate text-[8px] font-black text-white">
+                                            {name || "Co-host"}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {cohostCoins > 0 && (
+                                        <span className="absolute top-1 right-1 z-10 flex items-center gap-0.5 rounded-full bg-amber-500/90 border border-amber-300/80 px-1.5 py-0.5 text-[7px] font-black text-slate-950 shadow-md">
+                                          🪙 {cohostCoins}
                                         </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
+                                      )}
+                                      <span className="absolute bottom-0.5 left-0.5 z-10 rounded bg-black/70 px-1 py-0.5 text-[6px] font-black text-white">
+                                        {name || `Guest ${uid}`}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                             {isStreamCameraOff && (
@@ -21325,20 +21399,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                             {/* ---- Block list popup ---- */}
                             {/* Gift Panel Modal for Host / Viewer — Multi-User Recipient Selection */}
                             {isStreamGiftPanelOpen && (() => {
-                              const liveCandidates = [
-                                {
-                                  userId: activeLiveRoom?.hostId ? Number(activeLiveRoom.hostId) : null,
-                                  name: activeLiveRoom?.hostName || activeLiveRoom?.title || "Host",
-                                  avatar: activeLiveRoom?.hostAvatar,
-                                  isHost: true,
-                                },
-                                ...(liveCohosts || []).map((c) => ({
-                                  userId: c.userId ? Number(c.userId) : null,
-                                  name: c.name || "Guest",
-                                  avatar: c.avatar,
-                                  isHost: false,
-                                })),
-                              ];
+                              const liveCandidates = getLiveCandidates();
 
                               const allSelected =
                                 liveCandidates.length > 0 &&
@@ -22078,32 +22139,48 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                       </span>
                                     </div>
                                   )}
-                                  {otherCohostVideos.slice(0, showSelf ? 3 : 4).map(({ uid, name, avatar, track }, index) => (
-                                    <div
-                                      key={`mini-remote-${uid}`}
-                                      className="relative h-20 w-full overflow-hidden rounded-xl bg-slate-950 border border-white/20 shadow-md"
-                                    >
+                                  {otherCohostVideos.slice(0, showSelf ? 3 : 4).map(({ uid, name, avatar, track }, index) => {
+                                    const cohostCoins = partySeatSessionCoins[Number(uid)] || 0;
+                                    return (
                                       <div
-                                        ref={(element) => {
-                                          liveRemoteVideoRefs.current[uid] = element;
-                                          if (element) playLiveRemoteVideoTrack(uid, track);
+                                        key={`mini-remote-${uid}`}
+                                        onClick={() => {
+                                          const gId = Number(uid);
+                                          setStreamGiftBoxRecipients([
+                                            { userId: gId, name: name || `Guest ${gId}`, avatar: avatar || null },
+                                          ]);
+                                          setIsStreamGiftPanelOpen(true);
                                         }}
-                                        className="absolute inset-0"
-                                      />
-                                      {!track && (
-                                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 text-center p-1">
-                                          <img
-                                            src={getUserAvatarUrl({ name: name || "Co-host", avatar })}
-                                            alt={name || "Co-host"}
-                                            className="h-8 w-8 rounded-full object-cover"
-                                          />
-                                        </div>
-                                      )}
-                                      <span className="absolute bottom-0.5 left-0.5 rounded bg-black/70 px-1 py-0.5 text-[6px] font-black text-white z-10">
-                                        {name || `Co-host ${index + 1}`}
-                                      </span>
-                                    </div>
-                                  ))}
+                                        className="relative h-20 w-full overflow-hidden rounded-xl bg-slate-950 border border-white/20 shadow-md cursor-pointer hover:border-pink-400/60 transition"
+                                        title="Tap to send gift"
+                                      >
+                                        <div
+                                          ref={(element) => {
+                                            liveRemoteVideoRefs.current[uid] = element;
+                                            if (element) playLiveRemoteVideoTrack(uid, track);
+                                          }}
+                                          className="absolute inset-0"
+                                        />
+                                        {!track && (
+                                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 text-center p-1">
+                                            <img
+                                              src={getUserAvatarUrl({ name: name || "Co-host", avatar })}
+                                              alt={name || "Co-host"}
+                                              className="h-8 w-8 rounded-full object-cover"
+                                            />
+                                          </div>
+                                        )}
+                                        {cohostCoins > 0 && (
+                                          <span className="absolute top-0.5 right-0.5 z-10 flex items-center gap-0.5 rounded-full bg-amber-500/90 border border-amber-300/80 px-1 py-0.5 text-[6.5px] font-black text-slate-950 shadow-md">
+                                            🪙 {cohostCoins}
+                                          </span>
+                                        )}
+                                        <span className="absolute bottom-0.5 left-0.5 rounded bg-black/70 px-1 py-0.5 text-[6px] font-black text-white z-10">
+                                          {name || `Co-host ${index + 1}`}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
@@ -22114,20 +22191,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
                           {/* Gift Panel Modal — Multi-User Recipient Selection (Audio / Party Room style) */}
                           {isStreamGiftPanelOpen && (() => {
-                            const liveCandidates = [
-                              {
-                                userId: activeLiveRoom?.hostId ? Number(activeLiveRoom.hostId) : null,
-                                name: activeLiveRoom?.hostName || activeLiveRoom?.title || "Host",
-                                avatar: activeLiveRoom?.hostAvatar,
-                                isHost: true,
-                              },
-                              ...(liveCohosts || []).map((c) => ({
-                                userId: c.userId ? Number(c.userId) : null,
-                                name: c.name || "Guest",
-                                avatar: c.avatar,
-                                isHost: false,
-                              })),
-                            ];
+                            const liveCandidates = getLiveCandidates();
 
                             const allSelected =
                               liveCandidates.length > 0 &&
