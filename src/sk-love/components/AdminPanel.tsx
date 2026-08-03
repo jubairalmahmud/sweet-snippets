@@ -633,19 +633,19 @@ export default function AdminPanel({
 
   const creditUserWallet = async (userId: number) => {
     const entry = walletCredit[userId] || { diamonds: "", rCoins: "" };
-    const diamonds = Math.max(0, Number(entry.diamonds || 0));
-    const rCoins = Math.max(0, Number(entry.rCoins || 0));
-    if (!diamonds && !rCoins) {
-      setRoleMsg("Enter diamonds or coins first.");
+    // If coins entered in entry.diamonds or entry.rCoins, credit as Top Up coins (diamonds)
+    const amountToCredit = Math.max(0, Number(entry.diamonds || entry.rCoins || 0));
+    if (!amountToCredit) {
+      setRoleMsg("Enter coins amount first.");
       return;
     }
     setRoleMsg("");
     try {
       const res: any = await api.post("/api/admin/wallet-transfer", {
         receiver_id: userId,
-        diamonds,
-        r_coins: rCoins,
-        note: "Admin to reseller/user wallet credit",
+        diamonds: amountToCredit,
+        r_coins: 0,
+        note: "Admin to user Top Up wallet credit",
       });
       const updated = res?.user || {};
       setRoleUsers((prev) =>
@@ -653,14 +653,14 @@ export default function AdminPanel({
           Number(user.id) === Number(userId)
             ? {
                 ...user,
-                diamonds: updated.diamonds ?? Number(user.diamonds || 0) + diamonds,
-                r_coins: updated.r_coins ?? Number(user.r_coins || 0) + rCoins,
+                diamonds: updated.diamonds ?? Number(user.diamonds || 0) + amountToCredit,
+                coins: updated.coins ?? Number(user.coins || 0) + amountToCredit,
               }
             : user,
         ),
       );
       setWalletCredit((prev) => ({ ...prev, [userId]: { diamonds: "", rCoins: "" } }));
-      setRoleMsg("Wallet credited.");
+      setRoleMsg("Top Up coins credited successfully.");
     } catch (e: any) {
       setRoleMsg(e?.message || "Wallet credit failed");
     }
@@ -1317,8 +1317,9 @@ export default function AdminPanel({
                       <td className="px-4 py-3">
                         <div className="font-bold text-white">{user.name}</div>
                         <div className="text-[10px] text-slate-500">{user.email || `ID ${user.id}`}</div>
-                        <div className="text-[9px] text-slate-500 mt-1">
-                          🪙 {Number(user.r_coins || 0).toLocaleString()}
+                        <div className="text-[9px] text-slate-400 mt-1 flex flex-col gap-0.5">
+                          <span>🪙 Top Up: {Number(user.diamonds ?? user.coins ?? 0).toLocaleString()}</span>
+                          <span className="text-slate-500">🪙 C-Coin: {Number(user.r_coins || 0).toLocaleString()}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -1345,19 +1346,18 @@ export default function AdminPanel({
                       </td>
                       <td className="px-4 py-3">
                         <div className="grid grid-cols-1 gap-1 min-w-[170px]">
-                          {/* Diamonds input removed */}
                           <input
                             type="number"
                             min="0"
-                            value={entry.rCoins}
+                            value={entry.diamonds || entry.rCoins || ""}
                             onChange={(e) =>
                               setWalletCredit((prev) => ({
                                 ...prev,
-                                [user.id]: { ...entry, rCoins: e.target.value },
+                                [user.id]: { diamonds: e.target.value, rCoins: "" },
                               }))
                             }
-                            placeholder="Coins"
-                            className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-[10px] text-white"
+                            placeholder="Top Up Coins"
+                            className="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-[10px] text-white focus:border-amber-400 outline-none"
                           />
                         </div>
                       </td>
