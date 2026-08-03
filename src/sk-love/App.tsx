@@ -2906,8 +2906,8 @@ export default function App() {
     };
 
     setActivePartyEntryAnimation({
-      userName: userName || registerName || "Host",
-      userAvatar: userAvatar || profileAvatarImg || null,
+      userName: userName || "User",
+      userAvatar: userAvatar !== undefined ? (userAvatar || null) : (profileAvatarImg || null),
       rideId: rideItem.id,
       rideName: rideItem.name,
       rideEmoji: rideItem.emoji,
@@ -7561,23 +7561,27 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       room && (
         "roomTheme" in room || "room_theme" in room ||
         "activeThemeCode" in room || "active_theme_code" in room ||
-        (room.settings && ("roomTheme" in room.settings || "room_theme" in room.settings)) ||
-        (room.meta && ("roomTheme" in room.meta || "room_theme" in room.meta))
+        "theme" in room ||
+        (room.settings && ("roomTheme" in room.settings || "room_theme" in room.settings || "theme" in room.settings)) ||
+        (room.meta && ("roomTheme" in room.meta || "room_theme" in room.meta || "theme" in room.meta))
       );
     const themeCode =
       room.roomTheme ??
       room.room_theme ??
       room.activeThemeCode ??
       room.active_theme_code ??
+      room.theme ??
       room.settings?.roomTheme ??
       room.settings?.room_theme ??
+      room.settings?.theme ??
       room.meta?.roomTheme ??
       room.meta?.room_theme ??
+      room.meta?.theme ??
       null;
     // Only update local theme when:
     //  - server actually returned a non-empty theme, OR
     //  - server explicitly cleared the theme AND we are past the hold window.
-    if (themeCode) {
+    if (themeCode && themeCode !== "NONE" && themeCode !== "null") {
       setActiveRoomThemeCode(String(themeCode));
     } else if (hasThemeField && Date.now() >= partyRoomThemeHoldUntilRef.current) {
       setActiveRoomThemeCode(null);
@@ -7806,27 +7810,55 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         replyToName: m.replyToName ?? m.reply_to_name ?? undefined,
       }));
 
-      // Trigger entry animation and seat mute broadcasts on viewers' devices
+      // Trigger entry animation, room theme, and seat mute broadcasts on viewers' devices
       serverMsgs.forEach((m) => {
         if (!m.text) return;
 
-        // 1. ENTRY ANIMATION BROADCAST
+        // 1. ENTRY ANIMATION BROADCAST ACROSS ALL DEVICES
         if (m.text.includes("[ENTRY:")) {
-          const match = m.text.match(/\[ENTRY:([^:]+):([^:]*):([^\]]*)\]/);
-          if (match) {
-            const entryRideId = match[1];
-            const entryUserName = match[2] || m.name;
-            const entryAvatar = match[3] || null;
-            const msgIdKey = m.id && Number(m.id) > 0 ? String(m.id) : `${entryUserName}-${entryRideId}-${m.text}`;
-            const eventKey = `entry-msg-${msgIdKey}`;
-            if (!seenPartyBroadcastIdsRef.current.has(eventKey)) {
-              seenPartyBroadcastIdsRef.current.add(eventKey);
-              triggerPartyEntryAnimation(entryUserName, entryAvatar, entryRideId);
+          const startIdx = m.text.indexOf("[ENTRY:");
+          const endIdx = m.text.indexOf("]", startIdx);
+          if (startIdx !== -1 && endIdx !== -1) {
+            const tagContent = m.text.slice(startIdx + 7, endIdx);
+            const parts = tagContent.split(":");
+            if (parts.length >= 1) {
+              const entryRideId = parts[0];
+              let entryUserName = parts[1] || m.name;
+              try { entryUserName = decodeURIComponent(entryUserName); } catch {}
+              let entryAvatar = parts.slice(2).join(":") || null;
+              try { if (entryAvatar) entryAvatar = decodeURIComponent(entryAvatar); } catch {}
+
+              if (entryRideId && entryRideId !== "default" && entryRideId !== "none" && entryRideId !== "null") {
+                const msgIdKey = m.id && Number(m.id) > 0 ? String(m.id) : `${entryUserName}-${entryRideId}-${m.text}`;
+                const eventKey = `entry-msg-${msgIdKey}`;
+                if (!seenPartyBroadcastIdsRef.current.has(eventKey)) {
+                  seenPartyBroadcastIdsRef.current.add(eventKey);
+                  triggerPartyEntryAnimation(entryUserName, entryAvatar, entryRideId);
+                }
+              }
             }
           }
         }
 
-        // 2. SEAT MUTE BROADCAST ACROSS ALL DEVICES
+        // 2. ROOM THEME BROADCAST ACROSS ALL DEVICES
+        if (m.text.includes("[THEME:")) {
+          const themeMatch = m.text.match(/\[THEME:([^\]]+)\]/);
+          if (themeMatch) {
+            const newThemeCode = themeMatch[1];
+            const msgIdKey = m.id && Number(m.id) > 0 ? String(m.id) : `theme-${newThemeCode}-${m.text}`;
+            const eventKey = `theme-msg-${msgIdKey}`;
+            if (!seenPartyBroadcastIdsRef.current.has(eventKey)) {
+              seenPartyBroadcastIdsRef.current.add(eventKey);
+              if (newThemeCode === "NONE" || newThemeCode === "null") {
+                setActiveRoomThemeCode(null);
+              } else {
+                setActiveRoomThemeCode(newThemeCode);
+              }
+            }
+          }
+        }
+
+        // 3. SEAT MUTE BROADCAST ACROSS ALL DEVICES
         if (m.text.includes("[SEATMUTE:")) {
           const muteMatch = m.text.match(/\[SEATMUTE:(-?\d+):([01])\]/);
           if (muteMatch) {
@@ -15060,6 +15092,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   const cleanText = trimmed
                     .replace(/\[ENTRY:[^\]]+\]\s*/g, "")
                     .replace(/\[SEATMUTE:[^\]]+\]\s*/g, "")
+                    .replace(/\[THEME:[^\]]+\]\s*/g, "")
                     .trim();
                   if (!cleanText) return null;
                   const emojiUrl = notoAnimatedUrl(cleanText);
@@ -16119,6 +16152,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                       void api
                         .post(`/api/party-rooms/${activePartyRoom?.id}/theme`, { theme: theme.id })
                         .catch(() => {});
+                      if (activePartyRoom?.id) {
+                        void api
+                          .post(`/api/party-rooms/${activePartyRoom.id}/chat`, {
+                            text: `[THEME:${theme.id}]`,
+                          })
+                          .catch(() => {});
+                      }
                     } else {
                       setEquippedPartyTheme(theme.id);
                     }
@@ -16145,6 +16185,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   partyRoomThemeHoldUntilRef.current = 0;
                   setActiveRoomThemeCode(null);
                   void api.post(`/api/party-rooms/${activePartyRoom?.id}/theme`, { theme: null }).catch(() => {});
+                  if (activePartyRoom?.id) {
+                    void api
+                      .post(`/api/party-rooms/${activePartyRoom.id}/chat`, {
+                        text: `[THEME:NONE]`,
+                      })
+                      .catch(() => {});
+                  }
                   setIsPartyThemeGalleryOpen(false);
                 }}
                 className="col-span-full rounded-xl border border-rose-500/30 bg-rose-500/10 py-2 text-[10px] font-black uppercase text-rose-300"
@@ -26727,6 +26774,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                   setEquippedRide(selected.id);
                                   triggerSystemAnnouncement(`🚗 Entry Effect "${selected.name}" equipped!`);
                                   triggerPartyEntryAnimation(registerName || "User", profileAvatarImg, selected.id);
+                                  if (activePartyRoom?.id) {
+                                    const nameForEntry = encodeURIComponent(registerName || "User");
+                                    const avatarForEntry = encodeURIComponent(profileAvatarImg || "");
+                                    void api
+                                      .post(`/api/party-rooms/${activePartyRoom.id}/chat`, {
+                                        text: `[ENTRY:${selected.id}:${nameForEntry}:${avatarForEntry}] ✨ ${registerName || "User"} equipped ${selected.name}!`,
+                                      })
+                                      .catch(() => undefined);
+                                  }
                                 }}
                                 className="bg-gradient-to-r from-emerald-500 to-green-500 text-white font-bold text-[13px] px-8 py-2.5 rounded-full border-none cursor-pointer shadow-md hover:opacity-90"
                               >
@@ -26757,6 +26813,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 setEquippedRide(selected.id);
                                 triggerSystemAnnouncement(`🎉 Purchased & Equipped "${selected.name}" Entry Effect for 1 Month!`);
                                 triggerPartyEntryAnimation(registerName || "User", profileAvatarImg, selected.id);
+                                if (activePartyRoom?.id) {
+                                  const nameForEntry = encodeURIComponent(registerName || "User");
+                                  const avatarForEntry = encodeURIComponent(profileAvatarImg || "");
+                                  void api
+                                    .post(`/api/party-rooms/${activePartyRoom.id}/chat`, {
+                                      text: `[ENTRY:${selected.id}:${nameForEntry}:${avatarForEntry}] ✨ ${registerName || "User"} equipped ${selected.name}!`,
+                                    })
+                                    .catch(() => undefined);
+                                }
                               }}
                               className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 text-white font-bold text-[13px] px-8 py-2.5 rounded-full border-none cursor-pointer shadow-md hover:opacity-90 flex items-center gap-1.5"
                             >
