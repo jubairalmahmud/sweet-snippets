@@ -5279,25 +5279,22 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       });
 
       // COHOST-TILE-FIX: show a placeholder tile the moment a remote user joins,
-      // so the host sees the co-host slot immediately even before their video
+      // so all viewers & host see the co-host slot immediately even before their video
       // track finishes negotiating. The tile ref will attach the track later.
       client.on("user-joined", (user) => {
         if (cancelled) return;
         const uid = String(user.uid);
-        if (streamRole === "streamer") {
-          upsertLiveRemoteVideoTile(uid, { ...getRemoteCohostMeta(uid), track: null });
-        }
+        upsertLiveRemoteVideoTile(uid, { ...getRemoteCohostMeta(uid), track: null });
       });
 
       client.on("user-unpublished", (user, mediaType) => {
         if (mediaType === "video") {
           const uid = String(user.uid);
           delete liveRemoteVideoTracksRef.current[uid];
+          upsertLiveRemoteVideoTile(uid, { ...getRemoteCohostMeta(uid), track: null });
           if (streamRole === "streamer") {
-            upsertLiveRemoteVideoTile(uid, { ...getRemoteCohostMeta(uid), track: null });
             setAgoraStatus("Co-host video paused.");
           } else {
-            setLiveRemoteVideos((current) => current.filter((item) => item.uid !== uid));
             setAgoraStatus("Host video paused.");
           }
         }
@@ -5329,7 +5326,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
       try {
         await client.setClientRole(streamRole === "viewer" ? "audience" : "host");
-        const agoraUid = /^\d+$/.test(String(agora.uid)) ? Number(agora.uid) : String(agora.uid);
+        const myUserId = getCurrentUserId();
+        const rawUid = myUserId
+          ? String(myUserId)
+          : agora?.uid
+          ? String(agora.uid)
+          : String(Math.floor(100000 + Math.floor(Math.random() * 899999)));
+        const agoraUid = /^\d+$/.test(rawUid) ? Number(rawUid) : rawUid;
         await client.join(agora.appId, agora.channelName, agora.token, agoraUid);
 
         if (cancelled) return;
@@ -5403,9 +5406,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       client.remoteUsers.forEach((remoteUser: any) => {
         if (!remoteUser) return;
         const uid = String(remoteUser.uid);
-        if (streamRole === "streamer") {
-          upsertLiveRemoteVideoTile(uid, getRemoteCohostMeta(uid));
-        }
+        upsertLiveRemoteVideoTile(uid, getRemoteCohostMeta(uid));
         if (remoteUser.hasVideo && !remoteUser.videoTrack) {
           try {
             void subscribeRemoteUserMedia(client, remoteUser, "video").then(() => {
@@ -22540,14 +22541,46 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                           {(() => {
                             const hostIdNum = Number(activeLiveRoom?.hostId ?? 0);
                             const myIdNum = Number(getCurrentUserId() ?? 0);
-                            const otherCohostVideos = liveRemoteVideos.filter(
-                              (v) => {
-                                const vid = Number(v.uid);
-                                if (hostIdNum && vid === hostIdNum) return false;
-                                if (myIdNum && vid === myIdNum) return false;
-                                return true;
+
+                            // Build merged list of other co-hosts from backend liveCohosts state + Agora liveRemoteVideos
+                            const map = new Map<string, { uid: string; name: string; avatar: string | null; track: any | null }>();
+
+                            (liveCohosts || []).forEach((c: any) => {
+                              const uidStr = String(c?.userId ?? c?.id ?? "").trim();
+                              const uidNum = Number(uidStr);
+                              if (!uidStr) return;
+                              if (hostIdNum && uidNum === hostIdNum) return;
+                              if (myIdNum && uidNum === myIdNum) return;
+                              map.set(uidStr, {
+                                uid: uidStr,
+                                name: c.name || `Guest ${uidStr}`,
+                                avatar: c.avatar || null,
+                                track: liveRemoteVideoTracksRef.current[uidStr] || null,
+                              });
+                            });
+
+                            (liveRemoteVideos || []).forEach((v) => {
+                              const uidStr = String(v.uid ?? "").trim();
+                              const uidNum = Number(uidStr);
+                              if (!uidStr) return;
+                              if (hostIdNum && uidNum === hostIdNum) return;
+                              if (myIdNum && uidNum === myIdNum) return;
+                              if (!map.has(uidStr)) {
+                                map.set(uidStr, {
+                                  uid: uidStr,
+                                  name: v.name || getRemoteCohostMeta(uidStr).name,
+                                  avatar: v.avatar || getRemoteCohostMeta(uidStr).avatar,
+                                  track: v.track || liveRemoteVideoTracksRef.current[uidStr] || null,
+                                });
+                              } else {
+                                const existing = map.get(uidStr)!;
+                                if (v.track && !existing.track) {
+                                  existing.track = v.track;
+                                }
                               }
-                            );
+                            });
+
+                            const otherCohostVideos = Array.from(map.values());
                             const showSelf = streamRole === "cohost";
                             if (!showSelf && otherCohostVideos.length === 0) return null;
                             return (
