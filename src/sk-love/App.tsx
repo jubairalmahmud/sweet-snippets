@@ -6946,6 +6946,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     diamonds: number;
     rCoins: number;
     receiverId?: number;
+    receiverName?: string;
     roomType?: string;
     roomId?: string;
   }): Promise<null | {
@@ -6967,7 +6968,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           giftImage: null,
           giftName: params.giftName,
           coins: Number(params.diamonds || 0),
-          receiverName: null,
+          receiverName: params.receiverName || null,
           receiverId: params.receiverId ? Number(params.receiverId) : null,
           createdAt: Date.now(),
         });
@@ -7036,6 +7037,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 kind: serverEvent.kind === "seat" ? "seat" : "gift",
                 giftIcon: serverEvent.giftIcon || params.giftIcon || "🎁",
                 coins: Number(serverEvent.coins || params.diamonds || 0),
+                receiverName: serverEvent.receiverName || params.receiverName || null,
+                receiverId: serverEvent.receiverId || params.receiverId || null,
               }
             : {
                 id: -Date.now(),
@@ -7046,7 +7049,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 giftImage: null,
                 giftName: params.giftName,
                 coins: Number(params.diamonds || 0),
-                receiverName: null,
+                receiverName: params.receiverName || null,
                 receiverId: params.receiverId ? Number(params.receiverId) : null,
                 createdAt: Date.now(),
               },
@@ -7572,7 +7575,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           seatUser?.avatar ??
           seatUser?.avatar_url ??
           null;
-        const normalizedMuted = Boolean(seat.muted ?? seat.is_muted ?? false);
+        const normalizedMuted = Boolean(
+          seat.muted ?? seat.is_muted ?? seat.isMuted ?? seat.is_mute ?? false
+        );
         let localMuteOverrideValue: boolean | null = null;
         const seatUid = normalizedUserId ? Number(normalizedUserId) : null;
         const seatNameKey = normalizedOccupant ? String(normalizedOccupant).trim().toLowerCase() : null;
@@ -7641,14 +7646,19 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     }
     const currentUserIdForPartyState = getCurrentUserId();
     const selfNameForPartyState = (registerName || "").trim();
-    const localSelfMuted = getEffectivePartyMicMuted();
-    if (localSelfMuted) {
-      nextSeats.forEach((seat) => {
-        const isSelfSeat =
-          (seat.userId && currentUserIdForPartyState && Number(seat.userId) === Number(currentUserIdForPartyState)) ||
-          (selfNameForPartyState && seat.occupant && String(seat.occupant).trim() === selfNameForPartyState);
-        if (isSelfSeat) seat.muted = true;
-      });
+    const holdActive = partyMicMuteHoldRef.current && Date.now() < partyMicMuteHoldRef.current.until;
+    if (!holdActive) {
+      const mySeat = nextSeats.find((seat) =>
+        (seat.userId && currentUserIdForPartyState && Number(seat.userId) === Number(currentUserIdForPartyState)) ||
+        (selfNameForPartyState && seat.occupant && String(seat.occupant).trim() === selfNameForPartyState)
+      );
+      if (mySeat) {
+        const serverIsMuted = Boolean(mySeat.muted);
+        if (isPartyMicMutedRef.current !== serverIsMuted) {
+          isPartyMicMutedRef.current = serverIsMuted;
+          setIsPartyMicMuted(serverIsMuted);
+        }
+      }
     }
     partySeatsRef.current = nextSeats;
     setPartySeats(nextSeats);
@@ -7720,11 +7730,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         return [...serverMsgs.slice(-49), ...pendingLocal];
       });
     }
-    const currentMutedUserIds = nextSeats
-      .filter((seat) => seat.userId && seat.muted)
-      .map((seat) => Number(seat.userId));
-    setHostMutedPartyUserIds(currentMutedUserIds);
-    currentMutedUserIds.forEach((uid) => hostMutedPartyUserIdsRef.current.add(uid));
     const currentUserId = getCurrentUserId();
     partyHadSeatRef.current = nextSeats.some(
       (seat) => seat.userId && currentUserId && Number(seat.userId) === Number(currentUserId),
@@ -7766,38 +7771,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
             (iAmHost && ev.kind !== "seat"))
         ) {
           void fetchUserWalletData();
-        }
-        // FIX: accumulate broadcast gift totals locally on every viewer
-        // (host + other guests) so the coin counter / top-gifter reflects
-        // gifts sent by anyone, not only the local sender.
-        // Credit the gifter counter + seat ⭐ badge exactly once per backend gift
-        // event id — decoupled from the banner's fingerprint dedup so it never
-        // double-counts (sender was recording via both a direct call and this).
-        const _evId = Number(ev.id || 0);
-        const _alreadyCredited = _evId > 0 && creditedGiftIdsRef.current.has(_evId);
-        if (_evId > 0 && !_alreadyCredited && ev.kind !== "seat" && Number(ev.coins || 0) > 0) {
-          creditedGiftIdsRef.current.add(_evId);
-          recordPartyGifter(
-            String(ev.giverName || "Guest"),
-            String(ev.giverAvatar || ev.giftIcon || "🎁"),
-            Number(ev.coins || 0),
-          );
-          // Attribute coins to the RECEIVER (keyed by user id, not seat index),
-          // so the ⭐ badge follows the user even when they change seats.
-          const coins = Number(ev.coins || 0);
-          let rxUserId = ev.receiverId ? Number(ev.receiverId) : null;
-          if (!rxUserId && ev.receiverName) {
-            const s = nextSeats.find(
-              (x) => x.occupant && x.occupant === String(ev.receiverName),
-            );
-            if (s?.userId) rxUserId = Number(s.userId);
-          }
-          if (rxUserId) {
-            setPartySeatSessionCoins((prev) => ({
-              ...prev,
-              [rxUserId as number]: (prev[rxUserId as number] || 0) + coins,
-            }));
-          }
         }
       });
   };
@@ -7844,24 +7817,36 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     const fpMap = (seenPartyBroadcastIdsRef as any).fpMap
       || ((seenPartyBroadcastIdsRef as any).fpMap = new Map<string, number>());
     const lastAt = fpMap.get(fpKey) || 0;
-    if (now - lastAt < 5000) return false;
+    if (now - lastAt < 5000) {
+      const _evId = Number(event.id || 0);
+      if (_evId > 0) {
+        creditedGiftIdsRef.current.add(_evId);
+        seenPartyBroadcastIdsRef.current.add(eventKey);
+      }
+      return false;
+    }
     fpMap.set(fpKey, now);
     seenPartyBroadcastIdsRef.current.add(eventKey);
 
     // Auto-update onboard gift & coin balances immediately without needing a pill click
     if (event.kind === "gift" && Number(event.coins || 0) > 0) {
       const coins = Number(event.coins || 0);
-      recordPartyGifter(
-        String(event.giverName || "Guest"),
-        String(event.giverAvatar || event.giftIcon || "🎁"),
-        coins,
-      );
-      if (event.receiverId) {
-        const rxId = Number(event.receiverId);
-        setPartySeatSessionCoins((prev) => ({
-          ...prev,
-          [rxId]: (prev[rxId] || 0) + coins,
-        }));
+      const _evId = Number(event.id || 0);
+      const _alreadyCredited = _evId > 0 && creditedGiftIdsRef.current.has(_evId);
+      if (!_alreadyCredited) {
+        if (_evId > 0) creditedGiftIdsRef.current.add(_evId);
+        recordPartyGifter(
+          String(event.giverName || "Guest"),
+          String(event.giverAvatar || event.giftIcon || "🎁"),
+          coins,
+        );
+        if (event.receiverId) {
+          const rxId = Number(event.receiverId);
+          setPartySeatSessionCoins((prev) => ({
+            ...prev,
+            [rxId]: (prev[rxId] || 0) + coins,
+          }));
+        }
       }
       void fetchUserWalletData();
     }
@@ -7976,6 +7961,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         maxGuestSeats,
         privacy: nextPrivacy,
       });
+      partyMicMuteHoldRef.current = null;
+      isPartyMicMutedRef.current = false;
+      setIsPartyMicMuted(false);
+      hostMutedPartyUserIdsRef.current.clear();
+      hostMutedPartyUserNamesRef.current.clear();
+      partySeatMuteOverrideRef.current = {};
       if (data?.data?.id) {
         locallyHostedPartyRoomIdsRef.current.add(Number(data.data.id));
       }
@@ -7992,15 +7983,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           data.data,
           ...current.filter((room) => Number(room.id) !== createdRoomId),
         ]);
-        if (equippedRide) {
-          const rideInfo = RIDES_CATALOG.find((r) => r.id === equippedRide);
-          const rideLabel = rideInfo ? `${rideInfo.name} ${rideInfo.emoji}` : "VIP Ride 🏎️";
-          void api
-            .post(`/api/party-rooms/${createdRoomId}/chat`, {
-              text: `[ENTRY:${equippedRide}:${registerName || "Host"}:${profileAvatarImg || ""}] ✨ ${registerName || "Host"} opened the party room with ${rideLabel}!`,
-            })
-            .catch(() => undefined);
-        }
+        const rideIdToUse = equippedRide || "default";
+        const rideInfo = RIDES_CATALOG.find((r) => r.id === equippedRide);
+        const rideLabel = rideInfo ? `${rideInfo.name} ${rideInfo.emoji}` : "VIP Ride 🏎️";
+        void api
+          .post(`/api/party-rooms/${createdRoomId}/chat`, {
+            text: `[ENTRY:${rideIdToUse}:${registerName || "Host"}:${profileAvatarImg || ""}] ✨ ${registerName || "Host"} opened the party room ${equippedRide ? `with ${rideLabel}` : ""}!`,
+          })
+          .catch(() => undefined);
       }
       setPartyRoomStatus("Party room created.");
       // FIX (host mic): reset per-room top-gifter accumulator.
@@ -8025,6 +8015,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // ---- হ্যান্ডলার: রুম ম্যানেজমেন্ট (joinBackendPartyRoom) ----
   const joinBackendPartyRoom = async (room: any) => {
     isClosingPartyRoomRef.current = false;
+    partyMicMuteHoldRef.current = null;
+    isPartyMicMutedRef.current = false;
+    setIsPartyMicMuted(false);
+    hostMutedPartyUserIdsRef.current.clear();
+    hostMutedPartyUserNamesRef.current.clear();
+    partySeatMuteOverrideRef.current = {};
     setPartyRoomStatus("Joining party room...");
     try {
       const data: any = await api.post(`/api/party-rooms/${room.id}/join`);
@@ -8041,12 +8037,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       setHomeSubTab("party");
       setAppSection("home");
       triggerPartyEntryAnimation(registerName || "User", profileAvatarImg, equippedRide);
-      if (equippedRide && joinedRoomId) {
+      if (joinedRoomId) {
+        const rideIdToUse = equippedRide || "default";
         const rideInfo = RIDES_CATALOG.find((r) => r.id === equippedRide);
         const rideLabel = rideInfo ? `${rideInfo.name} ${rideInfo.emoji}` : "VIP Ride 🏎️";
         void api
           .post(`/api/party-rooms/${joinedRoomId}/chat`, {
-            text: `[ENTRY:${equippedRide}:${registerName || "User"}:${profileAvatarImg || ""}] ✨ ${registerName || "User"} entered the party room with ${rideLabel}!`,
+            text: `[ENTRY:${rideIdToUse}:${registerName || "User"}:${profileAvatarImg || ""}] ✨ ${registerName || "User"} entered ${equippedRide ? `with ${rideLabel}` : "the room"}!`,
           })
           .catch(() => undefined);
       }
@@ -8177,6 +8174,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         userId: currentUserId ? Number(currentUserId) : null,
         until: Date.now() + 60000,
       };
+      partyMicMuteHoldRef.current = null;
+      isPartyMicMutedRef.current = isSelfMutedByHost;
+      setIsPartyMicMuted(isSelfMutedByHost);
       partyHadSeatRef.current = true;
       setPartySeats((prev) => {
         const next = [...prev];
@@ -8254,6 +8254,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       (currentUserId && hostMutedPartyUserIdsRef.current.has(Number(currentUserId))) ||
       (selfName && hostMutedPartyUserNamesRef.current.has(String(selfName).trim().toLowerCase()))
     );
+    delete partySeatMuteOverrideRef.current[seatIndex];
+    partyMicMuteHoldRef.current = null;
+    isPartyMicMutedRef.current = isSelfMutedByHost;
+    setIsPartyMicMuted(isSelfMutedByHost);
     partyHadSeatRef.current = true;
     setPendingPartySeatIndex(null);
     setPartySeats((prev) => {
@@ -8379,7 +8383,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       userId: currentUserId ? Number(currentUserId) : null,
       until: Date.now() + 60000,
     };
+    delete partySeatMuteOverrideRef.current[seatIndex];
     partyHadSeatRef.current = true;
+    partyMicMuteHoldRef.current = null;
+    const isSelfMutedByHost = Boolean(
+      (currentUserId && hostMutedPartyUserIdsRef.current.has(Number(currentUserId))) ||
+      (selfName && hostMutedPartyUserNamesRef.current.has(String(selfName).trim().toLowerCase()))
+    );
+    isPartyMicMutedRef.current = isSelfMutedByHost;
+    setIsPartyMicMuted(isSelfMutedByHost);
     setPendingPartySeatIndex(null);
     setPartySeats((prev) => {
       const next = [...prev];
@@ -8493,7 +8505,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     const idx = pendingLeaveSeatIndex;
     setPendingLeaveSeatIndex(null);
     if (idx === null) return;
-    // FIX: clear sticky optimistic seat when the user leaves.
+    delete partySeatMuteOverrideRef.current[idx];
+    partyMicMuteHoldRef.current = null;
+    isPartyMicMutedRef.current = false;
+    setIsPartyMicMuted(false);
     if (optimisticPartySeatRef.current?.seatIndex === idx) {
       optimisticPartySeatRef.current = null;
     }
@@ -8713,9 +8728,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       triggerSystemAnnouncement("Low recharge coins — sending gift anyway.");
     }
 
-
     const senderName = registerName || "Zubayer";
-    const senderAvatar = "😎";
+    const hostName = activePartyRoom?.hostName || activePartyRoom?.name || "Host";
 
     const ok = await sendGiftApi({
       giftName: gift.name,
@@ -8723,6 +8737,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       diamonds: gift.diamonds,
       rCoins: gift.rCoins,
       receiverId: activePartyRoom?.hostId ? Number(activePartyRoom.hostId) : undefined,
+      receiverName: hostName,
       roomType: "party",
       roomId: activePartyRoom?.id ? String(activePartyRoom.id) : undefined,
     });
@@ -8762,15 +8777,25 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       nextLeader.name.trim().toLowerCase() !== prevLeaderKey;
 
     // Append chat comment
+    const giftMsgText = `Sent ${gift.icon || "🎁"} ${gift.name} to the party space! 🎉`;
     setComments((c) => [
       ...c,
       {
         id: generateUniqueNumberId(),
         name: senderName,
-        text: `Sent ${gift.icon} ${gift.name} to the party space! 🎉`,
+        text: giftMsgText,
         badge: "Top VIP",
       },
     ]);
+    const chatMsg: PartyChatMsg = {
+      id: -(Date.now() + Math.floor(Math.random() * 1000)),
+      name: senderName,
+      text: `🎁 ${giftMsgText}`,
+    };
+    setPartyChatMessages((prev) => [...prev.slice(-49), chatMsg]);
+    if (activePartyRoom?.id) {
+      api.post(`/api/party-rooms/${activePartyRoom.id}/chat`, { text: `🎁 ${giftMsgText}` }).catch(() => null);
+    }
 
     triggerSystemAnnouncement(
       `🎁 Sent ${gift.icon} ${gift.name} successfully! ${becameTopGifter ? "👑 You are now the Top Gifter!" : ""}`,
@@ -8797,6 +8822,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       triggerSystemAnnouncement("Low recharge coins — sending gift anyway.");
     }
 
+    const senderName = registerName || "SK Love User";
 
     const ok = await sendGiftApi({
       giftName: gift.name,
@@ -8806,13 +8832,24 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       receiverId: recipient.userId
         ? Number(recipient.userId)
         : undefined,
-
+      receiverName: recipient.name,
       roomType: "party",
       roomId: activePartyRoom?.id ? String(activePartyRoom.id) : undefined,
     });
     // FIX: sendGiftApi degrades gracefully; always show banner + animation.
     void ok;
 
+    // Append gift comment to party chat feed
+    const giftChatText = `🎁 Sent ${gift.icon || "🎁"} ${gift.name} to ${recipient.name}! 🎉`;
+    const chatMsg: PartyChatMsg = {
+      id: -(Date.now() + Math.floor(Math.random() * 1000)),
+      name: senderName,
+      text: giftChatText,
+    };
+    setPartyChatMessages((prev) => [...prev.slice(-49), chatMsg]);
+    if (activePartyRoom?.id) {
+      api.post(`/api/party-rooms/${activePartyRoom.id}/chat`, { text: giftChatText }).catch(() => null);
+    }
 
     if (activePartyRoom?.id) {
       try {
@@ -8823,7 +8860,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       }
     }
 
-    setRecentGifterName(registerName || "SK Love User");
+    setRecentGifterName(senderName);
     setRecentGiftIcon(getGiftDisplayIcon(gift));
     setShowGiftAnimation(true);
     setTimeout(() => {
@@ -8840,49 +8877,70 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   const handleSendGiftToSelectedRecipients = async (gift: GiftItem) => {
     setIsPartyGiftPopupOpen(false);
 
-    if (partyGiftBoxRecipients.length === 0) {
+    // Get all active occupants on guest seats + host seat
+    const activeOccupants = partySeats
+      .slice(0, maxGuestSeats + 1)
+      .map((s, si) => ({ s, si }))
+      .filter(({ s }) => s?.occupant)
+      .map(({ s, si }) => ({
+        userId: s.userId || null,
+        name: s.occupant!,
+        avatar: s.icon,
+        seatIndex: si,
+      }));
+
+    const targets = partyGiftBoxRecipients.length > 0 ? partyGiftBoxRecipients : activeOccupants;
+
+    if (targets.length === 0) {
       handlePartyGiftSend(gift);
       return;
     }
 
-    if (partyGiftBoxRecipients.length === 1) {
-      await handlePartyGiftToRecipient(gift, partyGiftBoxRecipients[0]);
+    if (targets.length === 1) {
+      await handlePartyGiftToRecipient(gift, targets[0]);
       setPartyGiftBoxRecipients([]);
       setPartyGiftBoxRecipient(null);
       return;
     }
 
-    // Multiple recipients selected
-    const count = partyGiftBoxRecipients.length;
+    // Multiple recipients selected (or "Everyone")
+    const count = targets.length;
     const totalCost = (gift.diamonds || 0) * count;
 
     if (userWallet.diamonds < totalCost) {
       triggerSystemAnnouncement(`Low recharge coins — sending ${gift.name} to ${count} users anyway.`);
     }
 
-    const recipientNames = partyGiftBoxRecipients.map((r) => r.name).join(", ");
+    const recipientNames = targets.map((r) => r.name).join(", ");
+    const senderName = registerName || "SK Love User";
+    const coinsPerRecipient = Number(gift.diamonds || 0);
 
-    for (const recipient of partyGiftBoxRecipients) {
+    for (const recipient of targets) {
       await sendGiftApi({
         giftName: gift.name,
         giftIcon: gift.icon,
         diamonds: gift.diamonds,
         rCoins: gift.rCoins,
         receiverId: recipient.userId ? Number(recipient.userId) : undefined,
+        receiverName: recipient.name,
         roomType: "party",
         roomId: activePartyRoom?.id ? String(activePartyRoom.id) : undefined,
       });
-
-      if (recipient.userId) {
-        const rxId = Number(recipient.userId);
-        setPartySeatSessionCoins((prev) => ({
-          ...prev,
-          [rxId]: (prev[rxId] || 0) + Number(gift.diamonds || 0),
-        }));
-      }
     }
 
-    setRecentGifterName(registerName || "SK Love User");
+    // Append gift comment to party chat feed
+    const giftChatText = `🎁 Sent ${gift.icon || "🎁"} ${gift.name} to ${count} users (${recipientNames})! 🎉`;
+    const chatMsg: PartyChatMsg = {
+      id: -(Date.now() + Math.floor(Math.random() * 1000)),
+      name: senderName,
+      text: giftChatText,
+    };
+    setPartyChatMessages((prev) => [...prev.slice(-49), chatMsg]);
+    if (activePartyRoom?.id) {
+      api.post(`/api/party-rooms/${activePartyRoom.id}/chat`, { text: giftChatText }).catch(() => null);
+    }
+
+    setRecentGifterName(senderName);
     setRecentGiftIcon(getGiftDisplayIcon(gift));
     setShowGiftAnimation(true);
     setTimeout(() => {
@@ -8914,20 +8972,24 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       else hostMutedPartyUserNamesRef.current.delete(targetName);
     }
 
-    partySeatMuteOverrideRef.current[seatIndex] = { muted, until: Date.now() + 24 * 60 * 60 * 1000 };
+    partySeatMuteOverrideRef.current[seatIndex] = { muted, until: Date.now() + 10000 };
     setPartySeats((prev) => {
       const next = [...prev];
       if (next[seatIndex]?.occupant) {
         next[seatIndex] = { ...next[seatIndex], muted };
       }
+      partySeatsRef.current = next;
       return next;
     });
     try {
       const seatNum = seatIndex + 1;
       const data: any = await api.post(`/api/party-rooms/${activePartyRoom.id}/seats/${seatNum}/mute`, {
         muted,
+        is_muted: muted,
       });
-      applyPartyRoomState(data?.data);
+      if (data?.data) {
+        applyPartyRoomState(data.data);
+      }
       triggerSystemAnnouncement(muted ? "Guest microphone muted by host." : "Guest microphone unmuted by host.");
     } catch (err: any) {
       setPartyRoomStatus(err?.message || "Could not update guest microphone.");
@@ -8938,6 +9000,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
   // ---- হ্যান্ডলার: পার্টি সিট (handleKickSeat) ----
   const handleKickSeat = async (seatIndex: number) => {
+    delete partySeatMuteOverrideRef.current[seatIndex];
     const updated = [...partySeats];
     const occupantName = updated[seatIndex].occupant;
     if (!occupantName) return;
@@ -9028,31 +9091,49 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
   // #10: Self-mute toggles the user's OWN seat mute so everyone can see it.
   const toggleSelfMute = async () => {
+    let myIdx = getMyPartySeatIndex();
+    if (myIdx < 0 && isActivePartyHost) myIdx = 0;
+    const mySeat = myIdx >= 0 ? partySeats[myIdx] : null;
+    const myUid = mySeat?.userId ? Number(mySeat.userId) : getCurrentUserId();
+    const myName = (registerName || "").trim().toLowerCase();
+    const isMutedByHost = Boolean(
+      (myUid && hostMutedPartyUserIdsRef.current.has(Number(myUid))) ||
+      (myName && hostMutedPartyUserNamesRef.current.has(myName))
+    );
+
     const next = !isPartyMicMuted;
-    // Set a hold window so delayed Agora publish retries / seat polls cannot
-    // race-flip the mic back on right after the user tapped Mute.
-    partyMicMuteHoldRef.current = { muted: next, until: Date.now() + 15000 };
+    if (!next && isMutedByHost) {
+      triggerSystemAnnouncement("The host has muted your microphone. You cannot unmute yourself.");
+      return;
+    }
+
+    partyMicMuteHoldRef.current = { muted: next, until: Date.now() + 10000 };
     isPartyMicMutedRef.current = next;
     setIsPartyMicMuted(next);
     if (next) {
       void disablePartyMicrophoneTrack(partyAgoraClientRef.current, partyAgoraAudioTrackRef.current);
+    } else {
+      void publishPreparedPartyMicrophone();
     }
-    const myIdx = getMyPartySeatIndex();
     if (myIdx < 0) return; // not seated — just a local mic toggle
     setPartySeats((prev) => {
       const arr = [...prev];
-      if (arr[myIdx]?.occupant) arr[myIdx] = { ...arr[myIdx], muted: next };
+      if (arr[myIdx] || myIdx === 0) {
+        arr[myIdx] = { ...arr[myIdx], muted: next };
+      }
       partySeatsRef.current = arr;
       return arr;
     });
-    partySeatMuteOverrideRef.current[myIdx] = { muted: next, until: Date.now() + 24 * 60 * 60 * 1000 };
+    partySeatMuteOverrideRef.current[myIdx] = { muted: next, until: Date.now() + 10000 };
     if (activePartyRoom?.id) {
       try {
         const data: any = await api.post(
           `/api/party-rooms/${activePartyRoom.id}/seats/${myIdx + 1}/mute`,
-          { muted: next },
+          { muted: next, is_muted: next },
         );
-        applyPartyRoomState(data?.data);
+        if (data?.data) {
+          applyPartyRoomState(data.data);
+        }
       } catch {
         /* keep optimistic local state */
       }
