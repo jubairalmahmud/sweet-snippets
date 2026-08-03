@@ -210,3 +210,23 @@
   display: none;
 }
 
+@keyframes float-up {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(0.8) rotate(0deg);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translateY(-160px) scale(1.25) rotate(-12deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-320px) scale(1.4) rotate(12deg);
+  }
+}
+
+.animate-float-up {
+  animation: float-up 2.5s ease-out forwards;
+}
+
+
