@@ -2890,7 +2890,7 @@ export default function App() {
     seatIndex?: number
   ) => {
     const rideId = rideIdOverride !== undefined ? rideIdOverride : equippedRide;
-    if (!rideId) return;
+    if (!rideId || rideId === "default" || rideId === "none" || rideId === "null") return;
     if (rideIdOverride === undefined && !ownedRides[rideId]) return;
 
     const rideItem = RIDES_CATALOG.find((r) => r.id === rideId) || {
@@ -12250,6 +12250,173 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       {renderAudioPrivacyPicker()}
       {renderPartyJoinRequestsPopup()}
 
+      {/* Royal Entry Effect Animation Portal — 10s Bottom Screen Custom Ride Entrance & Red Carpet Track */}
+      {activePartyEntryAnimation && typeof document !== "undefined" && createPortal(
+        <div className="pointer-events-none fixed bottom-12 left-0 right-0 z-[10000] flex flex-col items-center justify-end overflow-hidden h-80 pb-2">
+          <style>{`
+            @keyframes partyRide10sAcross {
+              0% {
+                transform: translateX(110vw) scale(0.85);
+                opacity: 0;
+              }
+              8% {
+                transform: translateX(12vw) scale(0.98);
+                opacity: 1;
+              }
+              20% {
+                transform: translateX(0vw) scale(1.05);
+                opacity: 1;
+              }
+              80% {
+                transform: translateX(-4vw) scale(1.05);
+                opacity: 1;
+              }
+              92% {
+                transform: translateX(-18vw) scale(0.95);
+                opacity: 1;
+              }
+              100% {
+                transform: translateX(-120vw) scale(0.8);
+                opacity: 0;
+              }
+            }
+            @keyframes balloonFloat {
+              0%, 100% { transform: translateY(0px) rotate(-3deg); }
+              50% { transform: translateY(-8px) rotate(3deg); }
+            }
+            @keyframes wheelSpin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
+            @keyframes auraPulse {
+              0%, 100% { transform: scale(1); opacity: 0.8; }
+              50% { transform: scale(1.1); opacity: 1; }
+            }
+          `}</style>
+
+          <div
+            className="relative flex flex-col items-center justify-center max-w-[420px]"
+            style={{ animation: "partyRide10sAcross 10s cubic-bezier(0.25, 1, 0.5, 1) forwards" }}
+          >
+            {/* 1. Floating Metallic Heart & Sparkle Balloons */}
+            <div
+              className="relative flex items-center justify-center gap-3 mb-1.5"
+              style={{ animation: "balloonFloat 2.5s ease-in-out infinite" }}
+            >
+              {[
+                { letter: "L", color: "from-pink-500 via-rose-400 to-fuchsia-600" },
+                { letter: "O", color: "from-rose-400 via-pink-400 to-purple-600" },
+                { letter: "V", color: "from-fuchsia-500 via-pink-500 to-rose-500" },
+                { letter: "E", color: "from-pink-400 via-rose-500 to-purple-500" },
+              ].map((b, idx) => (
+                <div key={idx} className="relative flex flex-col items-center">
+                  <div className={`relative h-10 w-10 rounded-full bg-gradient-to-tr ${b.color} border border-pink-200/80 shadow-[0_0_15px_rgba(236,72,153,0.9)] flex items-center justify-center font-black text-amber-200 text-base drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]`}>
+                    <span className="absolute -top-1 right-0 text-[8px]">✨</span>
+                    {b.letter}
+                  </div>
+                  <div className="w-[1px] h-5 bg-gradient-to-b from-pink-300/80 to-transparent" />
+                </div>
+              ))}
+            </div>
+
+            {/* 2. VIP Driver Badge Card */}
+            <div className="relative mb-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-purple-950/95 via-pink-950/95 to-slate-950/95 border border-pink-400/80 shadow-[0_0_25px_rgba(236,72,153,0.8)] backdrop-blur-md flex items-center gap-2.5">
+              <div className="relative h-9 w-9 rounded-full p-0.5 bg-gradient-to-tr from-amber-300 via-yellow-200 to-amber-500 shadow-md shrink-0">
+                <img
+                  src={getUserAvatarUrl({
+                    name: activePartyEntryAnimation.userName,
+                    avatar: activePartyEntryAnimation.userAvatar || undefined,
+                  })}
+                  alt={activePartyEntryAnimation.userName}
+                  className="h-full w-full rounded-full object-cover"
+                />
+              </div>
+              <div className="text-left min-w-0 pr-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-black uppercase text-amber-300 tracking-wider truncate">
+                    👑 {activePartyEntryAnimation.userName}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-gradient-to-r from-pink-500 to-amber-500 text-[8px] font-black text-slate-950 shadow-sm border border-amber-200/60">
+                    VIP RECHARGE ENTRY
+                  </span>
+                </div>
+                <p className="text-[9.5px] font-bold text-pink-100 truncate">
+                  Joined with {activePartyEntryAnimation.rideName} {activePartyEntryAnimation.rideEmoji}
+                </p>
+              </div>
+            </div>
+
+            {/* 3. Custom Designed Luxury Vehicle / Creature with Realistic Avatar */}
+            <div className="relative w-80 h-28 flex items-center justify-center">
+              {/* Headlight cone glow */}
+              <div className="absolute -left-12 top-10 w-28 h-8 bg-gradient-to-l from-pink-200/80 via-cyan-200/40 to-transparent blur-md transform -rotate-6 rounded-full pointer-events-none" />
+
+              {/* Dynamic Ride Body based on rideId */}
+              <div className={`relative w-72 h-20 rounded-3xl bg-gradient-to-r ${activePartyEntryAnimation.bannerBg} border-2 border-amber-300/80 shadow-[0_0_40px_rgba(236,72,153,0.9)] flex items-center justify-between px-3 overflow-hidden`}>
+                {/* Windshield / Aura Overlay */}
+                <div className="absolute -top-3 left-16 w-36 h-12 bg-gradient-to-b from-slate-900/90 via-purple-950/80 to-transparent rounded-t-3xl border-t border-amber-300/60 transform -skew-x-12" />
+
+                {/* Ride Avatar Portrait & Name Badge */}
+                <div className="relative z-10 flex items-center gap-2">
+                  <div className="relative h-14 w-14 rounded-2xl p-0.5 bg-gradient-to-tr from-amber-300 via-yellow-200 to-amber-500 shadow-md shrink-0 overflow-hidden">
+                    {activePartyEntryAnimation.avatarImg ? (
+                      <img
+                        src={activePartyEntryAnimation.avatarImg}
+                        alt={activePartyEntryAnimation.rideName}
+                        className="h-full w-full rounded-xl object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div className="h-full w-full bg-slate-900 flex items-center justify-center text-2xl">
+                        {activePartyEntryAnimation.rideEmoji}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-left min-w-0 pr-1">
+                    <div className="text-[11px] font-black text-amber-200 uppercase tracking-wide truncate">
+                      {activePartyEntryAnimation.rideName}
+                    </div>
+                    <span className="inline-block px-1.5 py-0.5 mt-0.5 rounded-full bg-amber-400/20 text-[7.5px] font-black text-amber-300 border border-amber-300/40">
+                      {activePartyEntryAnimation.badgeText || "VIP ENTRY"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Sparkling Nitro line */}
+                <div className="absolute inset-x-0 bottom-2 h-[2.5px] bg-gradient-to-r from-amber-300 via-pink-400 to-cyan-300 shadow-[0_0_12px_#f59e0b] animate-pulse" />
+
+                {/* VIP Plate */}
+                <div className="relative z-10 px-2 py-0.5 bg-amber-950/90 border border-amber-300/80 rounded text-[9px] font-black text-amber-300 tracking-tighter shadow-sm">
+                  ROYAL • 777
+                </div>
+              </div>
+
+              {/* Spinning Wheels / Particles */}
+              <div className="absolute bottom-1 left-8 w-11 h-11 rounded-full bg-slate-900 border-2 border-amber-300/90 shadow-[0_0_15px_rgba(245,158,11,0.8)] flex items-center justify-center z-20">
+                <div className="w-8 h-8 rounded-full border-2 border-amber-300 flex items-center justify-center text-amber-300 text-xs font-bold" style={{ animation: "wheelSpin 0.4s linear infinite" }}>
+                  ⚙️
+                </div>
+              </div>
+
+              <div className="absolute bottom-1 right-10 w-11 h-11 rounded-full bg-slate-900 border-2 border-amber-300/90 shadow-[0_0_15px_rgba(245,158,11,0.8)] flex items-center justify-center z-20">
+                <div className="w-8 h-8 rounded-full border-2 border-amber-300 flex items-center justify-center text-amber-300 text-xs font-bold" style={{ animation: "wheelSpin 0.4s linear infinite" }}>
+                  ⚙️
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Rolling Red Carpet Track */}
+            <div className="relative -mt-3 w-80 h-6 rounded-full bg-gradient-to-r from-red-700 via-amber-600 to-red-800 border-y-2 border-amber-300/90 shadow-[0_0_25px_rgba(245,158,11,0.9)] flex items-center justify-between px-6 text-amber-200 text-[10px] font-black tracking-widest overflow-hidden">
+              <span>✨</span>
+              <span>🌟 ROYAL RECHARGE ENTRY TRACK 🌟</span>
+              <span>✨</span>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+
       {/* FIX (Private mode): portal toast so fullscreen room/overflow layers cannot hide it */}
       {partyToast && typeof document !== "undefined" && createPortal(
         <div
@@ -14031,174 +14198,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         </div>,
         document.body,
       )}
-
-      {/* Royal Entry Effect Animation Portal — 10s Bottom Screen Custom Ride Entrance & Red Carpet Track */}
-      {activePartyEntryAnimation && typeof document !== "undefined" && createPortal(
-        <div className="pointer-events-none fixed bottom-12 left-0 right-0 z-[10000] flex flex-col items-center justify-end overflow-hidden h-80 pb-2">
-          <style>{`
-            @keyframes partyRide10sAcross {
-              0% {
-                transform: translateX(110vw) scale(0.85);
-                opacity: 0;
-              }
-              8% {
-                transform: translateX(12vw) scale(0.98);
-                opacity: 1;
-              }
-              20% {
-                transform: translateX(0vw) scale(1.05);
-                opacity: 1;
-              }
-              80% {
-                transform: translateX(-4vw) scale(1.05);
-                opacity: 1;
-              }
-              92% {
-                transform: translateX(-18vw) scale(0.95);
-                opacity: 1;
-              }
-              100% {
-                transform: translateX(-120vw) scale(0.8);
-                opacity: 0;
-              }
-            }
-            @keyframes balloonFloat {
-              0%, 100% { transform: translateY(0px) rotate(-3deg); }
-              50% { transform: translateY(-8px) rotate(3deg); }
-            }
-            @keyframes wheelSpin {
-              from { transform: rotate(0deg); }
-              to { transform: rotate(360deg); }
-            }
-            @keyframes auraPulse {
-              0%, 100% { transform: scale(1); opacity: 0.8; }
-              50% { transform: scale(1.1); opacity: 1; }
-            }
-          `}</style>
-
-          <div
-            className="relative flex flex-col items-center justify-center max-w-[420px]"
-            style={{ animation: "partyRide10sAcross 10s cubic-bezier(0.25, 1, 0.5, 1) forwards" }}
-          >
-            {/* 1. Floating Metallic Heart & Sparkle Balloons */}
-            <div
-              className="relative flex items-center justify-center gap-3 mb-1.5"
-              style={{ animation: "balloonFloat 2.5s ease-in-out infinite" }}
-            >
-              {[
-                { letter: "L", color: "from-pink-500 via-rose-400 to-fuchsia-600" },
-                { letter: "O", color: "from-rose-400 via-pink-400 to-purple-600" },
-                { letter: "V", color: "from-fuchsia-500 via-pink-500 to-rose-500" },
-                { letter: "E", color: "from-pink-400 via-rose-500 to-purple-500" },
-              ].map((b, idx) => (
-                <div key={idx} className="relative flex flex-col items-center">
-                  <div className={`relative h-10 w-10 rounded-full bg-gradient-to-tr ${b.color} border border-pink-200/80 shadow-[0_0_15px_rgba(236,72,153,0.9)] flex items-center justify-center font-black text-amber-200 text-base drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]`}>
-                    <span className="absolute -top-1 right-0 text-[8px]">✨</span>
-                    {b.letter}
-                  </div>
-                  <div className="w-[1px] h-5 bg-gradient-to-b from-pink-300/80 to-transparent" />
-                </div>
-              ))}
-            </div>
-
-            {/* 2. VIP Driver Badge Card */}
-            <div className="relative mb-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-purple-950/95 via-pink-950/95 to-slate-950/95 border border-pink-400/80 shadow-[0_0_25px_rgba(236,72,153,0.8)] backdrop-blur-md flex items-center gap-2.5">
-              <div className="relative h-9 w-9 rounded-full p-0.5 bg-gradient-to-tr from-amber-300 via-yellow-200 to-amber-500 shadow-md shrink-0">
-                <img
-                  src={getUserAvatarUrl({
-                    name: activePartyEntryAnimation.userName,
-                    avatar: activePartyEntryAnimation.userAvatar || undefined,
-                  })}
-                  alt={activePartyEntryAnimation.userName}
-                  className="h-full w-full rounded-full object-cover"
-                />
-              </div>
-              <div className="text-left min-w-0 pr-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-black uppercase text-amber-300 tracking-wider truncate">
-                    👑 {activePartyEntryAnimation.userName}
-                  </span>
-                  <span className="px-2 py-0.5 rounded bg-gradient-to-r from-pink-500 to-amber-500 text-[8px] font-black text-slate-950 shadow-sm border border-amber-200/60">
-                    VIP RECHARGE ENTRY
-                  </span>
-                </div>
-                <p className="text-[9.5px] font-bold text-pink-100 truncate">
-                  Joined with {activePartyEntryAnimation.rideName} {activePartyEntryAnimation.rideEmoji}
-                </p>
-              </div>
-            </div>
-
-            {/* 3. Custom Designed Luxury Vehicle / Creature with Realistic Avatar */}
-            <div className="relative w-80 h-28 flex items-center justify-center">
-              {/* Headlight cone glow */}
-              <div className="absolute -left-12 top-10 w-28 h-8 bg-gradient-to-l from-pink-200/80 via-cyan-200/40 to-transparent blur-md transform -rotate-6 rounded-full pointer-events-none" />
-
-              {/* Dynamic Ride Body based on rideId */}
-              <div className={`relative w-72 h-20 rounded-3xl bg-gradient-to-r ${activePartyEntryAnimation.bannerBg} border-2 border-amber-300/80 shadow-[0_0_40px_rgba(236,72,153,0.9)] flex items-center justify-between px-3 overflow-hidden`}>
-                {/* Windshield / Aura Overlay */}
-                <div className="absolute -top-3 left-16 w-36 h-12 bg-gradient-to-b from-slate-900/90 via-purple-950/80 to-transparent rounded-t-3xl border-t border-amber-300/60 transform -skew-x-12" />
-
-                {/* Ride Avatar Portrait & Name Badge */}
-                <div className="relative z-10 flex items-center gap-2">
-                  <div className="relative h-14 w-14 rounded-2xl p-0.5 bg-gradient-to-tr from-amber-300 via-yellow-200 to-amber-500 shadow-md shrink-0 overflow-hidden">
-                    {activePartyEntryAnimation.avatarImg ? (
-                      <img
-                        src={activePartyEntryAnimation.avatarImg}
-                        alt={activePartyEntryAnimation.rideName}
-                        className="h-full w-full rounded-xl object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : (
-                      <div className="h-full w-full bg-slate-900 flex items-center justify-center text-2xl">
-                        {activePartyEntryAnimation.rideEmoji}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="text-left min-w-0 pr-1">
-                    <div className="text-[11px] font-black text-amber-200 uppercase tracking-wide truncate">
-                      {activePartyEntryAnimation.rideName}
-                    </div>
-                    <span className="inline-block px-1.5 py-0.5 mt-0.5 rounded-full bg-amber-400/20 text-[7.5px] font-black text-amber-300 border border-amber-300/40">
-                      {activePartyEntryAnimation.badgeText || "VIP ENTRY"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Sparkling Nitro line */}
-                <div className="absolute inset-x-0 bottom-2 h-[2.5px] bg-gradient-to-r from-amber-300 via-pink-400 to-cyan-300 shadow-[0_0_12px_#f59e0b] animate-pulse" />
-
-                {/* VIP Plate */}
-                <div className="relative z-10 px-2 py-0.5 bg-amber-950/90 border border-amber-300/80 rounded text-[9px] font-black text-amber-300 tracking-tighter shadow-sm">
-                  ROYAL • 777
-                </div>
-              </div>
-
-              {/* Spinning Wheels / Particles */}
-              <div className="absolute bottom-1 left-8 w-11 h-11 rounded-full bg-slate-900 border-2 border-amber-300/90 shadow-[0_0_15px_rgba(245,158,11,0.8)] flex items-center justify-center z-20">
-                <div className="w-8 h-8 rounded-full border-2 border-amber-300 flex items-center justify-center text-amber-300 text-xs font-bold" style={{ animation: "wheelSpin 0.4s linear infinite" }}>
-                  ⚙️
-                </div>
-              </div>
-
-              <div className="absolute bottom-1 right-10 w-11 h-11 rounded-full bg-slate-900 border-2 border-amber-300/90 shadow-[0_0_15px_rgba(245,158,11,0.8)] flex items-center justify-center z-20">
-                <div className="w-8 h-8 rounded-full border-2 border-amber-300 flex items-center justify-center text-amber-300 text-xs font-bold" style={{ animation: "wheelSpin 0.4s linear infinite" }}>
-                  ⚙️
-                </div>
-              </div>
-            </div>
-
-            {/* 4. Rolling Red Carpet Track */}
-            <div className="relative -mt-3 w-80 h-6 rounded-full bg-gradient-to-r from-red-700 via-amber-600 to-red-800 border-y-2 border-amber-300/90 shadow-[0_0_25px_rgba(245,158,11,0.9)] flex items-center justify-between px-6 text-amber-200 text-[10px] font-black tracking-widest overflow-hidden">
-              <span>✨</span>
-              <span>🌟 ROYAL RECHARGE ENTRY TRACK 🌟</span>
-              <span>✨</span>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )}
-
 
       {/* #7: party gift full-screen animation disabled — the top banner is the only notification */}
       {false && partyBroadcastAnim && typeof document !== "undefined" && createPortal(
@@ -26727,6 +26726,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 onClick={() => {
                                   setEquippedRide(selected.id);
                                   triggerSystemAnnouncement(`🚗 Entry Effect "${selected.name}" equipped!`);
+                                  triggerPartyEntryAnimation(registerName || "User", profileAvatarImg, selected.id);
                                 }}
                                 className="bg-gradient-to-r from-emerald-500 to-green-500 text-white font-bold text-[13px] px-8 py-2.5 rounded-full border-none cursor-pointer shadow-md hover:opacity-90"
                               >
@@ -26756,6 +26756,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 }));
                                 setEquippedRide(selected.id);
                                 triggerSystemAnnouncement(`🎉 Purchased & Equipped "${selected.name}" Entry Effect for 1 Month!`);
+                                triggerPartyEntryAnimation(registerName || "User", profileAvatarImg, selected.id);
                               }}
                               className="bg-gradient-to-r from-purple-600 via-fuchsia-600 to-pink-600 text-white font-bold text-[13px] px-8 py-2.5 rounded-full border-none cursor-pointer shadow-md hover:opacity-90 flex items-center gap-1.5"
                             >
