@@ -3428,8 +3428,28 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   const [isPartyThemeGalleryOpen, setIsPartyThemeGalleryOpen] = useState<boolean>(false);
   // (activeRoomThemeCode declared earlier to avoid TDZ)
 
-  // Batch 2: Session-scoped coins received per seat (resets on room open/close).
+  // Batch 2: Session-scoped coins received per seat (persisted per room ID so re-joining the same room restores coins).
   const [partySeatSessionCoins, setPartySeatSessionCoins] = useState<Record<number, number>>({});
+  const activePartyRoomIdRef = useRef<number | string | null>(null);
+
+  const getStoredPartyRoomCoins = (roomId: number | string): Record<number, number> => {
+    if (!roomId) return {};
+    try {
+      const raw = localStorage.getItem(`sk_party_room_coins_${roomId}`);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const saveStoredPartyRoomCoins = (roomId: number | string, coinsMap: Record<number, number>) => {
+    if (!roomId) return;
+    try {
+      localStorage.setItem(`sk_party_room_coins_${roomId}`, JSON.stringify(coinsMap));
+    } catch {
+      /* ignore */
+    }
+  };
   const [partyGifterTick, setPartyGifterTick] = useState<number>(0);
   // Gift event ids already credited to seat ⭐ badges — prevents double-counting
   // (e.g. gift to the host showing 200 for a 100 gift) across re-processed polls.
@@ -3483,11 +3503,17 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       seatIndex: number;
     }>
   >([]);
-  // Batch 2: reset per-session seat coin totals when the room opens/closes or changes.
+  // Batch 2: Load room-specific seat coin totals when joining a room (or reset when leaving).
   // Also clear chat comments + emoji overlays so a previous session's messages
   // never linger into a new room / new session.
   useEffect(() => {
-    setPartySeatSessionCoins({});
+    activePartyRoomIdRef.current = activePartyRoom?.id ?? null;
+    if (isPartyRoomOpen && activePartyRoom?.id) {
+      const stored = getStoredPartyRoomCoins(activePartyRoom.id);
+      setPartySeatSessionCoins(stored);
+    } else {
+      setPartySeatSessionCoins({});
+    }
     setPartyChatMessages([]);
     setPartyChatReplyTo(null);
     setSeatEmojiOverlay({});
@@ -7184,10 +7210,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       });
 
       if (rxUserId) {
-        setPartySeatSessionCoins((prev) => ({
-          ...prev,
-          [rxUserId]: (prev[rxUserId] || 0) + Number(gift.diamonds || 0),
-        }));
+        setPartySeatSessionCoins((prev) => {
+          const nextCoins = (prev[rxUserId] || 0) + Number(gift.diamonds || 0);
+          const nextMap = { ...prev, [rxUserId]: nextCoins };
+          const rId = activePartyRoomIdRef.current || activePartyRoom?.id;
+          if (rId) {
+            saveStoredPartyRoomCoins(rId, nextMap);
+          }
+          return nextMap;
+        });
       }
     }
 
@@ -7843,10 +7874,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         );
         if (event.receiverId) {
           const rxId = Number(event.receiverId);
-          setPartySeatSessionCoins((prev) => ({
-            ...prev,
-            [rxId]: (prev[rxId] || 0) + coins,
-          }));
+          setPartySeatSessionCoins((prev) => {
+            const nextCoins = (prev[rxId] || 0) + coins;
+            const nextMap = { ...prev, [rxId]: nextCoins };
+            const rId = activePartyRoomIdRef.current || activePartyRoom?.id;
+            if (rId) {
+              saveStoredPartyRoomCoins(rId, nextMap);
+            }
+            return nextMap;
+          });
         }
       }
       void fetchUserWalletData();
