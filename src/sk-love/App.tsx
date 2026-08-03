@@ -12204,11 +12204,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         }
 
         /* Dark slate/hex backgrounds -> soft light pink surface outside sk-preserve-dark */
-        .sk-light-theme :not(.sk-preserve-dark):not(.sk-preserve-dark *)[class*="bg-[#0"]:not([class*="bg-black/"]):not([class*="bg-pink"]):not([class*="bg-rose"]):not([class*="bg-fuchsia"]):not([class*="bg-gradient"]),
-        .sk-light-theme :not(.sk-preserve-dark):not(.sk-preserve-dark *)[class*="bg-[#1"]:not([class*="bg-black/"]):not([class*="bg-pink"]):not([class*="bg-rose"]):not([class*="bg-fuchsia"]):not([class*="bg-gradient"]),
-        .sk-light-theme :not(.sk-preserve-dark):not(.sk-preserve-dark *)[class*="bg-[#2"]:not([class*="bg-black/"]):not([class*="bg-pink"]):not([class*="bg-rose"]):not([class*="bg-fuchsia"]):not([class*="bg-gradient"]),
-        .sk-light-theme :not(.sk-preserve-dark):not(.sk-preserve-dark *)[class*="bg-slate-8"]:not([class*="bg-pink"]):not([class*="bg-rose"]):not([class*="bg-gradient"]),
-        .sk-light-theme :not(.sk-preserve-dark):not(.sk-preserve-dark *)[class*="bg-slate-9"]:not([class*="bg-pink"]):not([class*="bg-rose"]):not([class*="bg-gradient"]),
+        .sk-light-theme :not(.sk-preserve-dark):not(.sk-preserve-dark *)[class*="bg-[#0"]:not([class*="bg-black/"]):not([class*="bg-pink"]):not([class*="bg-rose"]):not([class*="bg-fuchsia"]):not([class*="bg-gradient"]):not([style*="background"]),
+        .sk-light-theme :not(.sk-preserve-dark):not(.sk-preserve-dark *)[class*="bg-[#1"]:not([class*="bg-black/"]):not([class*="bg-pink"]):not([class*="bg-rose"]):not([class*="bg-fuchsia"]):not([class*="bg-gradient"]):not([style*="background"]),
+        .sk-light-theme :not(.sk-preserve-dark):not(.sk-preserve-dark *)[class*="bg-[#2"]:not([class*="bg-black/"]):not([class*="bg-pink"]):not([class*="bg-rose"]):not([class*="bg-fuchsia"]):not([class*="bg-gradient"]):not([style*="background"]),
+        .sk-light-theme :not(.sk-preserve-dark):not(.sk-preserve-dark *)[class*="bg-slate-8"]:not([class*="bg-pink"]):not([class*="bg-rose"]):not([class*="bg-gradient"]):not([style*="background"]),
+        .sk-light-theme :not(.sk-preserve-dark):not(.sk-preserve-dark *)[class*="bg-slate-9"]:not([class*="bg-pink"]):not([class*="bg-rose"]):not([class*="bg-gradient"]):not([style*="background"]),
         .sk-light-theme :not(.sk-preserve-dark):not(.sk-preserve-dark *)[class*="bg-zinc-8"],
         .sk-light-theme :not(.sk-preserve-dark):not(.sk-preserve-dark *)[class*="bg-zinc-9"],
         .sk-light-theme :not(.sk-preserve-dark):not(.sk-preserve-dark *)[class*="bg-neutral-8"],
@@ -14079,8 +14079,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   <div
     className={
       isPartyRoomOpen && !isPartyRoomMinimized
-        ? "fixed inset-y-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] z-[80] bg-[#0b091c] text-slate-100 p-2.5 pb-0 overflow-y-auto flex flex-col shadow-[0_0_60px_rgba(0,0,0,0.6)] ring-1 ring-white/5"
-        : "bg-[#0b091c] border border-slate-850 p-3 rounded-2xl text-slate-100 flex flex-col relative overflow-hidden"
+        ? `fixed inset-y-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] z-[80] bg-[#0b091c] text-slate-100 p-2.5 pb-0 overflow-y-auto flex flex-col shadow-[0_0_60px_rgba(0,0,0,0.6)] ring-1 ring-white/5 ${activePartyThemeImg ? "sk-preserve-dark" : ""}`
+        : `bg-[#0b091c] border border-slate-850 p-3 rounded-2xl text-slate-100 flex flex-col relative overflow-hidden ${activePartyThemeImg ? "sk-preserve-dark" : ""}`
     }
     style={
       isPartyRoomOpen && activePartyThemeImg
