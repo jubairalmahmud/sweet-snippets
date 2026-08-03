@@ -3451,6 +3451,30 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       /* ignore */
     }
   };
+
+  const getStoredPartyRoomGifters = (
+    roomId: number | string
+  ): Array<{ name: string; avatar: string; totalSpent: number }> => {
+    if (!roomId) return [];
+    try {
+      const raw = localStorage.getItem(`sk_party_room_gifters_${roomId}`);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const saveStoredPartyRoomGifters = (
+    roomId: number | string,
+    gifters: Array<{ name: string; avatar: string; totalSpent: number }>
+  ) => {
+    if (!roomId) return;
+    try {
+      localStorage.setItem(`sk_party_room_gifters_${roomId}`, JSON.stringify(gifters));
+    } catch {
+      /* ignore */
+    }
+  };
   const [partyGifterTick, setPartyGifterTick] = useState<number>(0);
   // Gift event ids already credited to seat ⭐ badges — prevents double-counting
   // (e.g. gift to the host showing 200 for a 100 gift) across re-processed polls.
@@ -3510,8 +3534,22 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   useEffect(() => {
     activePartyRoomIdRef.current = activePartyRoom?.id ?? null;
     if (isPartyRoomOpen && activePartyRoom?.id) {
-      const stored = getStoredPartyRoomCoins(activePartyRoom.id);
-      setPartySeatSessionCoins(stored);
+      const storedCoins = getStoredPartyRoomCoins(activePartyRoom.id);
+      setPartySeatSessionCoins(storedCoins);
+
+      const storedGifters = getStoredPartyRoomGifters(activePartyRoom.id);
+      const gifterMap = new Map<string, { name: string; avatar: string; totalSpent: number }>();
+      storedGifters.forEach((g) => {
+        if (g && g.name) gifterMap.set(g.name.trim().toLowerCase(), g);
+      });
+      partyGifterTotalsRef.current = gifterMap;
+
+      let leader: { name: string; avatar: string; totalSpent: number } | null = null;
+      gifterMap.forEach((entry) => {
+        if (!leader || entry.totalSpent > leader.totalSpent) leader = entry;
+      });
+      setTopGifter(leader);
+      setPartyGifterTick((t) => t + 1);
     } else {
       setPartySeatSessionCoins({});
     }
@@ -7930,6 +7968,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       totalSpent: (prev?.totalSpent || 0) + coins,
     };
     totals.set(key, nextEntry);
+    const rId = activePartyRoomIdRef.current || activePartyRoom?.id;
+    if (rId) {
+      saveStoredPartyRoomGifters(rId, Array.from(totals.values()));
+    }
     let leader = nextEntry;
     totals.forEach((entry) => {
       if (entry.totalSpent > leader.totalSpent) leader = entry;
@@ -11913,10 +11955,17 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   }, [partyAgoraReadyTick, isPartyCoinLeaderboardOpen, activePartyRoom?.totalCoins, partyGifterTick]);
 
   const partyEarnedCoins = React.useMemo(() => {
-    const local = partyGifterList.reduce((sum, g) => sum + (g.totalSpent || 0), 0);
-    const backend = Number((activePartyRoom as any)?.totalCoins || 0);
-    return Math.max(local, backend);
-  }, [partyGifterList, activePartyRoom, partyGifterTick]);
+    const localGiftersSum = partyGifterList.reduce((sum, g) => sum + (g.totalSpent || 0), 0);
+    const seatCoinsSum = Object.values(partySeatSessionCoins).reduce((sum, c) => sum + (c || 0), 0);
+    const backend = Number(
+      (activePartyRoom as any)?.totalCoins ??
+      (activePartyRoom as any)?.total_coins ??
+      (activePartyRoom as any)?.roomCoins ??
+      (activePartyRoom as any)?.room_coins ??
+      0
+    );
+    return Math.max(localGiftersSum, seatCoinsSum, backend);
+  }, [partyGifterList, partySeatSessionCoins, activePartyRoom, partyGifterTick]);
   const defaultPartySeatAvatars: GiftItem[] = [
     { id: "seat-unicorn", name: "Unicorn", diamonds: 100, rCoins: 100, icon: "🦄", category: "seat_avatar" },
     { id: "seat-car", name: "Car", diamonds: 300, rCoins: 300, icon: "🏎️", category: "seat_avatar" },
@@ -13821,7 +13870,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 </h4>
                 <span className="flex items-center gap-1 text-[11px] font-black text-white shrink-0">
                   <span className="text-amber-300">🪙</span>
-                  {formatCompact(Number((user as any).totalCoins || 0))}
+                  {formatCompact(
+                    Math.max(
+                      Number((user as any).totalCoins || 0),
+                      Object.values(getStoredPartyRoomCoins(user.id)).reduce((a, b) => a + (b || 0), 0),
+                      getStoredPartyRoomGifters(user.id).reduce((a, b) => a + (b.totalSpent || 0), 0),
+                    )
+                  )}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 mt-1">
