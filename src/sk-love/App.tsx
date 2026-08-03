@@ -1775,6 +1775,7 @@ export default function App() {
   } | null>(null);
   const [isLiveStreamMinimized, setIsLiveStreamMinimized] = useState<boolean>(false);
   const [isPartyRoomMinimized, setIsPartyRoomMinimized] = useState<boolean>(false);
+  const [isPartyExitMenuOpen, setIsPartyExitMenuOpen] = useState<boolean>(false);
   // FIX: New popups & host summary state for party room premium redesign
   const [isPartyGamesPopupOpen, setIsPartyGamesPopupOpen] = useState<boolean>(false);
   const [isFullGamesOpen, setIsFullGamesOpen] = useState<boolean>(false);
@@ -14372,21 +14373,50 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 )}
               </span>
             </button>
-            <button
-              type="button"
-              onClick={() => void closeActivePartyRoom()}
-              title="Exit room"
-              aria-label="Exit room"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-white transition hover:brightness-110"
-              style={{
-                background:
-                  "radial-gradient(circle at 30% 30%,#ff6b6b 0%,#e11d48 55%,#8b0d28 100%)",
-                boxShadow:
-                  "0 2px 8px rgba(225,29,72,0.55), inset 0 1px 2px rgba(255,255,255,0.35)",
-              }}
-            >
-              <X className="h-4 w-4" strokeWidth={3} />
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsPartyExitMenuOpen((prev) => !prev)}
+                title="Exit / Minimize"
+                aria-label="Exit or Minimize party room"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-white transition hover:brightness-110 active:scale-95 cursor-pointer"
+                style={{
+                  background:
+                    "radial-gradient(circle at 30% 30%,#ff6b6b 0%,#e11d48 55%,#8b0d28 100%)",
+                  boxShadow:
+                    "0 2px 8px rgba(225,29,72,0.55), inset 0 1px 2px rgba(255,255,255,0.35)",
+                }}
+              >
+                <X className="h-4 w-4" strokeWidth={3} />
+              </button>
+
+              {isPartyExitMenuOpen && (
+                <div className="absolute top-full right-0 mt-2 z-[90] w-36 rounded-xl border border-white/15 bg-slate-950/95 p-1.5 shadow-2xl backdrop-blur-md flex flex-col gap-1.5 animate-fadeIn">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPartyExitMenuOpen(false);
+                      setIsPartyRoomMinimized(true);
+                    }}
+                    className="flex items-center gap-2 rounded-lg bg-black/60 border border-slate-700/60 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800/80 active:scale-95 transition cursor-pointer"
+                  >
+                    <Minus className="h-4 w-4 text-cyan-400" />
+                    <span>MINIMIZE</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPartyExitMenuOpen(false);
+                      void closeActivePartyRoom();
+                    }}
+                    className="flex items-center gap-2 rounded-lg bg-rose-600/30 border border-rose-500/50 px-3 py-2 text-xs font-bold text-rose-200 hover:bg-rose-600/50 active:scale-95 transition cursor-pointer"
+                  >
+                    <LogOut className="h-4 w-4 text-rose-400" />
+                    <span>EXIT</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* R coin metallic pill (below header, left aligned per reference) */}
@@ -27919,6 +27949,24 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         >
           <span className="absolute -top-1 -right-1 rounded-full bg-white px-1.5 py-0.5 text-[8px] font-black text-rose-600 shadow">LIVE</span>
           <Video className="h-6 w-6" />
+        </button>
+      )}
+
+      {/* Floating "Return to Party Room" indicator — when party room is open and minimized or navigated away */}
+      {isPartyRoomOpen && (isPartyRoomMinimized || appSection !== "home" || homeSubTab !== "party") && (
+        <button
+          type="button"
+          onClick={() => {
+            setIsPartyRoomMinimized(false);
+            setHomeSubTab("party");
+            setAppSection("home");
+          }}
+          className="fixed bottom-24 left-4 z-[90] flex h-14 w-14 items-center justify-center rounded-full border-2 border-emerald-400/50 bg-gradient-to-br from-emerald-600 to-teal-800 text-white shadow-2xl shadow-emerald-500/40 active:scale-95 transition animate-pulse"
+          aria-label="Return to party room"
+          title="Return to party room"
+        >
+          <span className="absolute -top-1 -right-1 rounded-full bg-white px-1.5 py-0.5 text-[8px] font-black text-emerald-700 shadow">PARTY</span>
+          <Maximize2 className="h-6 w-6" />
         </button>
       )}
 
