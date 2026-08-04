@@ -15232,32 +15232,43 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 <div className="pointer-events-none absolute -bottom-16 -right-16 w-48 h-48 rounded-full bg-amber-400/20 blur-3xl" />
 
                 {/* Header */}
-                <div className="relative flex items-center justify-between mb-3 shrink-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">🎁</span>
-                    <div>
-                      <h4 className="text-transparent bg-clip-text bg-gradient-to-r from-pink-300 via-fuchsia-300 to-amber-300 font-black text-sm">
+                <div className="relative flex items-center justify-between mb-3 shrink-0 gap-2">
+                  <div className="flex items-center gap-2 min-w-0 shrink">
+                    <span className="text-xl shrink-0">🎁</span>
+                    <div className="min-w-0">
+                      <h4 className="text-transparent bg-clip-text bg-gradient-to-r from-pink-300 via-fuchsia-300 to-amber-300 font-black text-xs sm:text-sm truncate">
                         {partyGiftBoxRecipients.length === 0
                           ? "Send Gift to Everyone"
                           : partyGiftBoxRecipients.length === 1
                           ? `Send Gift to ${partyGiftBoxRecipients[0].name}`
                           : `Send Gift to ${partyGiftBoxRecipients.length} Selected Users`}
                       </h4>
-                      <p className="text-[9px] text-pink-300/80 font-bold">
+                      <p className="text-[9px] text-pink-300/80 font-bold truncate">
                         Multi-Select Active • {partyGiftBoxRecipients.length === 0 ? "All Seats" : `${partyGiftBoxRecipients.length} User(s)`}
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setIsPartyGiftPopupOpen(false);
-                      setPartyGiftBoxRecipients([]);
-                      setPartyGiftBoxRecipient(null);
-                    }}
-                    className="text-slate-200 bg-slate-800/70 hover:bg-slate-700/70 rounded-full p-1.5 transition cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-950/80 border border-amber-400/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                      <span className="text-xs">💎</span>
+                      <span className="text-xs font-black text-amber-300 tracking-tight">
+                        {(userWallet.diamonds || 0).toLocaleString()}
+                      </span>
+                      <span className="text-[10px] text-pink-400/90 font-bold ml-1 flex items-center gap-0.5">
+                        🪙 {(userWallet.rCoins || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setIsPartyGiftPopupOpen(false);
+                        setPartyGiftBoxRecipients([]);
+                        setPartyGiftBoxRecipient(null);
+                      }}
+                      className="text-slate-200 bg-slate-800/70 hover:bg-slate-700/70 rounded-full p-1.5 transition cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Recipient Selection Bar */}
@@ -22191,32 +22202,43 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                     <div className="pointer-events-none absolute -bottom-16 -right-16 w-48 h-48 rounded-full bg-amber-400/20 blur-3xl" />
                                     
                                     {/* Header */}
-                                    <div className="relative flex items-center justify-between mb-3 shrink-0">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xl">🎁</span>
-                                        <div>
-                                          <h4 className="text-transparent bg-clip-text bg-gradient-to-r from-pink-300 via-fuchsia-300 to-amber-300 font-black text-sm">
+                                    <div className="relative flex items-center justify-between mb-3 shrink-0 gap-2">
+                                      <div className="flex items-center gap-2 min-w-0 shrink">
+                                        <span className="text-xl shrink-0">🎁</span>
+                                        <div className="min-w-0">
+                                          <h4 className="text-transparent bg-clip-text bg-gradient-to-r from-pink-300 via-fuchsia-300 to-amber-300 font-black text-xs sm:text-sm truncate">
                                             {streamGiftBoxRecipients.length === 0 || allSelected
                                               ? "Send Gift to Everyone"
                                               : streamGiftBoxRecipients.length === 1
                                               ? `Send Gift to ${streamGiftBoxRecipients[0].name}`
                                               : `Send Gift to ${streamGiftBoxRecipients.length} Selected Users`}
                                           </h4>
-                                          <p className="text-[9px] text-pink-300/80 font-bold">
+                                          <p className="text-[9px] text-pink-300/80 font-bold truncate">
                                             Multi-Select Active • {streamGiftBoxRecipients.length === 0 ? "All On-Stage" : `${streamGiftBoxRecipients.length} User(s)`}
                                           </p>
                                         </div>
                                       </div>
-                                      <button
-                                        onClick={() => {
-                                          setIsStreamGiftPanelOpen(false);
-                                          setStreamGiftBoxRecipients([]);
-                                        }}
-                                        className="text-slate-200 bg-slate-800/70 hover:bg-slate-700/70 rounded-full p-1.5 transition cursor-pointer"
-                                        aria-label="Close"
-                                      >
-                                        <X className="w-4 h-4" />
-                                      </button>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-950/80 border border-amber-400/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                                          <span className="text-xs">💎</span>
+                                          <span className="text-xs font-black text-amber-300 tracking-tight">
+                                            {(userWallet.diamonds || 0).toLocaleString()}
+                                          </span>
+                                          <span className="text-[10px] text-pink-400/90 font-bold ml-1 flex items-center gap-0.5">
+                                            🪙 {(userWallet.rCoins || 0).toLocaleString()}
+                                          </span>
+                                        </div>
+                                        <button
+                                          onClick={() => {
+                                            setIsStreamGiftPanelOpen(false);
+                                            setStreamGiftBoxRecipients([]);
+                                          }}
+                                          className="text-slate-200 bg-slate-800/70 hover:bg-slate-700/70 rounded-full p-1.5 transition cursor-pointer"
+                                          aria-label="Close"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      </div>
                                     </div>
 
                                     {/* Recipient Selection Bar */}
@@ -22994,32 +23016,43 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                   <div className="pointer-events-none absolute -bottom-16 -right-16 w-48 h-48 rounded-full bg-amber-400/20 blur-3xl" />
                                   
                                   {/* Header */}
-                                  <div className="relative flex items-center justify-between mb-3 shrink-0">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xl">🎁</span>
-                                      <div>
-                                        <h4 className="text-transparent bg-clip-text bg-gradient-to-r from-pink-300 via-fuchsia-300 to-amber-300 font-black text-sm">
+                                  <div className="relative flex items-center justify-between mb-3 shrink-0 gap-2">
+                                    <div className="flex items-center gap-2 min-w-0 shrink">
+                                      <span className="text-xl shrink-0">🎁</span>
+                                      <div className="min-w-0">
+                                        <h4 className="text-transparent bg-clip-text bg-gradient-to-r from-pink-300 via-fuchsia-300 to-amber-300 font-black text-xs sm:text-sm truncate">
                                           {streamGiftBoxRecipients.length === 0 || allSelected
                                             ? "Send Gift to Everyone"
                                             : streamGiftBoxRecipients.length === 1
                                             ? `Send Gift to ${streamGiftBoxRecipients[0].name}`
                                             : `Send Gift to ${streamGiftBoxRecipients.length} Selected Users`}
                                         </h4>
-                                        <p className="text-[9px] text-pink-300/80 font-bold">
+                                        <p className="text-[9px] text-pink-300/80 font-bold truncate">
                                           Multi-Select Active • {streamGiftBoxRecipients.length === 0 ? "All On-Stage" : `${streamGiftBoxRecipients.length} User(s)`}
                                         </p>
                                       </div>
                                     </div>
-                                    <button
-                                      onClick={() => {
-                                        setIsStreamGiftPanelOpen(false);
-                                        setStreamGiftBoxRecipients([]);
-                                      }}
-                                      className="text-slate-200 bg-slate-800/70 hover:bg-slate-700/70 rounded-full p-1.5 transition cursor-pointer"
-                                      aria-label="Close"
-                                    >
-                                      <X className="w-4 h-4" />
-                                    </button>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-950/80 border border-amber-400/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                                        <span className="text-xs">💎</span>
+                                        <span className="text-xs font-black text-amber-300 tracking-tight">
+                                          {(userWallet.diamonds || 0).toLocaleString()}
+                                        </span>
+                                        <span className="text-[10px] text-pink-400/90 font-bold ml-1 flex items-center gap-0.5">
+                                          🪙 {(userWallet.rCoins || 0).toLocaleString()}
+                                        </span>
+                                      </div>
+                                      <button
+                                        onClick={() => {
+                                          setIsStreamGiftPanelOpen(false);
+                                          setStreamGiftBoxRecipients([]);
+                                        }}
+                                        className="text-slate-200 bg-slate-800/70 hover:bg-slate-700/70 rounded-full p-1.5 transition cursor-pointer"
+                                        aria-label="Close"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    </div>
                                   </div>
 
                                   {/* Recipient Selection Bar */}
