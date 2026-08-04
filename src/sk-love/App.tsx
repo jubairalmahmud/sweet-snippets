@@ -15323,9 +15323,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                       <span className="text-xs font-black text-amber-300 tracking-tight">
                         {(userWallet.diamonds || 0).toLocaleString()}
                       </span>
-                      <span className="text-[10px] text-pink-400/90 font-bold ml-1 flex items-center gap-0.5">
+                      {/* <span className="text-[10px] text-pink-400/90 font-bold ml-1 flex items-center gap-0.5">
                         🪙 {(userWallet.rCoins || 0).toLocaleString()}
-                      </span>
+                      </span> */}
                     </div>
                     <button
                       onClick={() => {
@@ -22399,9 +22399,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                           <span className="text-xs font-black text-amber-300 tracking-tight">
                                             {(userWallet.diamonds || 0).toLocaleString()}
                                           </span>
-                                          <span className="text-[10px] text-pink-400/90 font-bold ml-1 flex items-center gap-0.5">
+                                          {/* <span className="text-[10px] text-pink-400/90 font-bold ml-1 flex items-center gap-0.5">
                                             🪙 {(userWallet.rCoins || 0).toLocaleString()}
-                                          </span>
+                                          </span> */}
                                         </div>
                                         <button
                                           onClick={() => {
@@ -23213,9 +23213,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                         <span className="text-xs font-black text-amber-300 tracking-tight">
                                           {(userWallet.diamonds || 0).toLocaleString()}
                                         </span>
-                                        <span className="text-[10px] text-pink-400/90 font-bold ml-1 flex items-center gap-0.5">
+                                        {/* <span className="text-[10px] text-pink-400/90 font-bold ml-1 flex items-center gap-0.5">
                                           🪙 {(userWallet.rCoins || 0).toLocaleString()}
-                                        </span>
+                                        </span> */}
                                       </div>
                                       <button
                                         onClick={() => {
