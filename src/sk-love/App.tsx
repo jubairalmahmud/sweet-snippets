@@ -320,6 +320,19 @@ const cleanHeaderLogoText = (value?: string | null) => {
   return withoutBrokenEmoji.toUpperCase().includes("SK LOVE") ? "SK LOVE" : withoutBrokenEmoji || "SK LOVE";
 };
 
+export const formatCoinValue = (val: number): string => {
+  if (!val || isNaN(val)) return "0";
+  if (val >= 1000000) {
+    const m = val / 1000000;
+    return m % 1 === 0 ? `${m}M` : `${parseFloat(m.toFixed(1))}M`;
+  }
+  if (val >= 1000) {
+    const k = val / 1000;
+    return k % 1 === 0 ? `${k}K` : `${parseFloat(k.toFixed(1))}K`;
+  }
+  return val.toString();
+};
+
 // Premium luxury gift catalog — 28 tiers from 1K → 10M diamonds.
 // icon = single emoji (rendered as text). Replace with PNG URLs from admin
 // panel if you want branded artwork later.
@@ -14708,7 +14721,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                       </div>
                       <p className="truncate text-[8.5px] font-black text-white">{gift.name}</p>
                       <p className="mt-0.5 text-[7.5px] font-black text-amber-300">
-                        {gift.diamonds} coins
+                        🪙 {formatCoinValue(gift.diamonds)}
                       </p>
                     </button>
                   ))}
@@ -15504,7 +15517,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                           {gift.name}
                         </span>
                         <span className="text-[7.5px] text-amber-200 font-mono font-bold mt-0.5">
-                          🪙 {totalCoins}
+                          🪙 {formatCoinValue(totalCoins)}
                         </span>
                       </button>
                     );
@@ -16016,7 +16029,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                       {gift.name}
                     </span>
                     <span className="text-[7px] text-amber-400 font-mono mt-0.5">
-                      {gift.diamonds} coins
+                      🪙 {formatCoinValue(gift.diamonds)}
                     </span>
                   </button>
                 ))}
@@ -21392,7 +21405,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                   {gift.label}
                                 </span>
                                 <span className="text-[7px] text-pink-400 font-mono font-bold leading-none mt-0.5">
-                                  {gift.price}🪙
+                                  🪙 {formatCoinValue(gift.price)}
                                 </span>
                               </button>
                             ))}
@@ -22573,7 +22586,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                               {gift.name}
                                             </span>
                                             <span className="text-[7.5px] text-amber-200 font-mono font-bold mt-0.5">
-                                              🪙 {totalCost}
+                                              🪙 {formatCoinValue(totalCost)}
                                             </span>
                                           </button>
                                         );
@@ -23387,7 +23400,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                             {gift.name}
                                           </span>
                                           <span className="text-[7.5px] text-amber-200 font-mono font-bold mt-0.5">
-                                            🪙 {totalCost}
+                                            🪙 {formatCoinValue(totalCost)}
                                           </span>
                                         </button>
                                       );
@@ -27117,7 +27130,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 {gift.name}
                               </p>
                               <p className="text-[#e91e63] text-[8px] font-mono font-black mt-0.5">
-                                ⚡ {gift.price} 🪙
+                                🪙 {formatCoinValue(gift.price)}
                               </p>
                             </button>
                           ))}

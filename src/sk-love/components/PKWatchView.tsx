@@ -44,6 +44,19 @@ type ActiveBattle = {
   to_wins?: number;
 };
 
+const formatCoinValue = (val: number): string => {
+  if (!val || isNaN(val)) return "0";
+  if (val >= 1000000) {
+    const m = val / 1000000;
+    return m % 1 === 0 ? `${m}M` : `${parseFloat(m.toFixed(1))}M`;
+  }
+  if (val >= 1000) {
+    const k = val / 1000;
+    return k % 1 === 0 ? `${k}K` : `${parseFloat(k.toFixed(1))}K`;
+  }
+  return val.toString();
+};
+
 type PKComment = {
   id: number;
   user_id: number;
@@ -1133,7 +1146,7 @@ export default function PKWatchView({
                   >
                     <span className="text-2xl">{g.icon}</span>
                     <span className="text-[9px] font-bold text-white mt-1 truncate">{g.name}</span>
-                    <span className="text-[8px] text-amber-300 font-mono">💎 {g.diamonds}</span>
+                    <span className="text-[8px] text-amber-300 font-mono">🪙 {formatCoinValue(g.diamonds)}</span>
                   </button>
                 ))}
               </div>
