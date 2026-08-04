@@ -157,6 +157,8 @@ import frameFairImg from "./assets/frames/fair.png";
 import frameKingImg from "./assets/frames/king.png";
 import frameQueenImg from "./assets/frames/queen.png";
 import frameAgencyPremiumImg from "./assets/frames/agency-premium.png";
+import frameHostPremiumImg from "./assets/frames/host-premium.png";
+import frameResellerPremiumImg from "./assets/frames/reseller-premium.png";
 import partyTheme1Img from "./assets/party-themes/theme-1.jpg";
 import partyTheme2Img from "./assets/party-themes/theme-2.jpg";
 import partyTheme3Img from "./assets/party-themes/theme-3.jpg";
@@ -185,8 +187,10 @@ const AVATAR_FRAME_CATALOG: Array<{
   { id: "avatar-fair", dbId: 2, name: "Fair", image: frameFairImg || "/frames/fair.png", price: 500000, durationDays: 30 },
   { id: "avatar-king", dbId: 3, name: "KING", image: frameKingImg || "/frames/king.png", price: 500000, durationDays: 30 },
   { id: "avatar-queen", dbId: 4, name: "QUEEN", image: frameQueenImg || "/frames/queen.png", price: 500000, durationDays: 30 },
-  // Admin-granted only — awarded to approved agency owners via Admin Dashboard.
-  { id: "avatar-agency-premium", dbId: 5, name: "AGENCY", image: frameAgencyPremiumImg || "/frames/agency-premium.png", price: 0, durationDays: 3650, adminOnly: true },
+  // Official Role Badge Frames
+  { id: "avatar-agency-premium", dbId: 5, name: "AGENCY", image: frameAgencyPremiumImg || "/frames/agency-premium.png", price: 0, durationDays: 3650 },
+  { id: "avatar-host-premium", dbId: 6, name: "HOST", image: frameHostPremiumImg || "/frames/host-premium.png", price: 0, durationDays: 3650 },
+  { id: "avatar-reseller-premium", dbId: 7, name: "RESELLER", image: frameResellerPremiumImg || "/frames/reseller-premium.png", price: 0, durationDays: 3650 },
 ];
 
 export function getFrameCatalogItem(frameId: string | number | null | undefined) {
@@ -27208,8 +27212,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                     name: f.name,
                     emoji: "",
                     image: f.image,
-                    price: `${(f.price / 1000).toLocaleString()}K/${f.durationDays} d`,
-                    gradient: "from-purple-100 to-pink-50",
+                    price: f.price > 0 ? `${(f.price / 1000).toLocaleString()}K/${f.durationDays} d` : "OFFICIAL",
+                    gradient: f.price === 0 ? "from-amber-100 to-yellow-50" : "from-purple-100 to-pink-50",
                   })),
 
 
@@ -27588,9 +27592,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 );
                                 return;
                               }
-                              const ok = window.confirm(
-                                `"${catItem.name}" ফ্রেমটি কিনতে চান?\n\nমূল্য: 🪙 ${catItem.price.toLocaleString()}\nমেয়াদ: ${catItem.durationDays} দিন`,
-                              );
+                              const confirmMsg = catItem.price > 0
+                                ? `"${catItem.name}" ফ্রেমটি কিনতে চান?\n\nমূল্য: 🪙 ${catItem.price.toLocaleString()}\nমেয়াদ: ${catItem.durationDays} দিন`
+                                : `"${catItem.name}" অফিসিয়াল ফ্রেমটি ফ্রিতে যুক্ত এবং সক্রিয় করতে চান?`;
+                              const ok = window.confirm(confirmMsg);
                               if (!ok) return;
                               const expiry = Date.now() + catItem.durationDays * 24 * 60 * 60 * 1000;
                               setUserWallet((prev) => ({
