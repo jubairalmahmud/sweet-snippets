@@ -19657,46 +19657,51 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                           {/* Avatar overlaps cover photo */}
                           <div className="flex flex-col items-center text-center -mt-12 relative z-10 px-4">
                             <div className="relative">
-                              <div
-                                className="w-24 h-24 rounded-full bg-[#131024] p-[3px] ring-4 ring-[#e91e63] flex items-center justify-center shadow-2xl relative overflow-hidden cursor-pointer"
-                                onClick={() => {
-                                  const isSelf = isOwnSelectedProfile;
-                                  const computedName = isSelf
-                                    ? registerName || "SK Love User"
-                                    : selectedProfileUser.name;
-                                  setEditLocation(
-                                    isSelf
-                                      ? profileLocation
-                                      : selectedProfileUser.id === 41828
-                                        ? "Narail, Dhaka, Bangladesh"
-                                        : "Dhaka, Bangladesh",
-                                  );
-                                  setEditHometown(
-                                    isSelf
-                                      ? profileHometown
-                                      : selectedProfileUser.id === 41828
-                                        ? "Narail, Dhaka, Bangladesh"
-                                        : "Dhaka, Bangladesh",
-                                  );
-                                  setEditBirthday(isSelf ? profileBirthday : "September 18");
-                                  setEditWebsite(
-                                    isSelf
-                                      ? profileWebsite
-                                      : `${selectedProfileUser.username || "user"}.com`,
-                                  );
-                                  setEditWork(isSelf ? profileWork : "Host Creator on SK Love");
-                                  setEditEducation(isSelf ? profileEducation : "Dhaka University");
-                                  setEditBloodGroup(isSelf ? profileBloodGroup : "O+");
-                                  setIsDetailedProfileOpen(true);
-                                  triggerSystemAnnouncement(`Opening View User Profile for ${computedName}`);
-                                }}
-                              >
-                                <img
-                                  src={getUserAvatarUrl(selectedProfileUser)}
-                                  alt="User Avatar"
-                                  className="w-full h-full object-cover rounded-full"
-                                />
-                              </div>
+                              {(() => {
+                                const profileFrameImg = resolveUserFrameImg(selectedProfileUser);
+                                return (
+                                  <div
+                                    className={`w-24 h-24 rounded-full bg-[#131024] p-[3px] ${profileFrameImg ? "ring-2 ring-amber-400/40" : "ring-4 ring-[#e91e63]"} flex items-center justify-center shadow-2xl relative overflow-hidden cursor-pointer`}
+                                    onClick={() => {
+                                      const isSelf = isOwnSelectedProfile;
+                                      const computedName = isSelf
+                                        ? registerName || "SK Love User"
+                                        : selectedProfileUser.name;
+                                      setEditLocation(
+                                        isSelf
+                                          ? profileLocation
+                                          : selectedProfileUser.id === 41828
+                                            ? "Narail, Dhaka, Bangladesh"
+                                            : "Dhaka, Bangladesh",
+                                      );
+                                      setEditHometown(
+                                        isSelf
+                                          ? profileHometown
+                                          : selectedProfileUser.id === 41828
+                                            ? "Narail, Dhaka, Bangladesh"
+                                            : "Dhaka, Bangladesh",
+                                      );
+                                      setEditBirthday(isSelf ? profileBirthday : "September 18");
+                                      setEditWebsite(
+                                        isSelf
+                                          ? profileWebsite
+                                          : `${selectedProfileUser.username || "user"}.com`,
+                                      );
+                                      setEditWork(isSelf ? profileWork : "Host Creator on SK Love");
+                                      setEditEducation(isSelf ? profileEducation : "Dhaka University");
+                                      setEditBloodGroup(isSelf ? profileBloodGroup : "O+");
+                                      setIsDetailedProfileOpen(true);
+                                      triggerSystemAnnouncement(`Opening View User Profile for ${computedName}`);
+                                    }}
+                                  >
+                                    <img
+                                      src={getUserAvatarUrl(selectedProfileUser)}
+                                      alt="User Avatar"
+                                      className="w-full h-full object-cover rounded-full"
+                                    />
+                                  </div>
+                                );
+                              })()}
 
                               {/* Purchased avatar frame overlay (visible to everyone) — sits AROUND the avatar */}
                               {(() => {
