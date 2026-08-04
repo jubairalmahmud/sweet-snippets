@@ -29,7 +29,7 @@ type FlyingChip = {
   startY: number;
 };
 
-const DEFAULT_CHIPS = [1000, 10000, 100000, 1000000];
+const DEFAULT_CHIPS = [1000, 5000, 10000, 50000, 100000];
 const ROUND_SECONDS = 12;
 
 const HAND_CONFIGS: Record<HandKey, { name: string; drink: string }> = {
@@ -56,9 +56,15 @@ const getChipStyle = (val: number) => {
     return { bg: "from-amber-400 via-yellow-300 to-amber-500", text: "1000K", label: "1000K", border: "border-yellow-200" };
   if (val >= 100000)
     return { bg: "from-sky-400 via-cyan-300 to-blue-500", text: "100K", label: "100K", border: "border-cyan-200" };
+  if (val >= 50000)
+    return { bg: "from-indigo-500 via-purple-400 to-indigo-600", text: "50K", label: "50K", border: "border-indigo-200" };
   if (val >= 10000)
     return { bg: "from-amber-500 via-orange-400 to-amber-600", text: "10K", label: "10K", border: "border-amber-200" };
-  return { bg: "from-purple-500 via-fuchsia-400 to-purple-600", text: "1K", label: "1K", border: "border-purple-200" };
+  if (val >= 5000)
+    return { bg: "from-rose-500 via-pink-400 to-rose-600", text: "5K", label: "5K", border: "border-rose-200" };
+  if (val >= 1000)
+    return { bg: "from-purple-500 via-fuchsia-400 to-purple-600", text: "1K", label: "1K", border: "border-purple-200" };
+  return { bg: "from-slate-500 via-slate-400 to-slate-600", text: `${val}`, label: `${val}`, border: "border-slate-200" };
 };
 
 const parseBalance = (raw: any, fallback = 0) =>
@@ -84,7 +90,7 @@ export default function TeenPattiGame({
     new Map(rawChipOptions.map((c) => [getChipStyle(c).label, c])).values()
   );
   const [balance, setBalance] = useState(balanceProp ?? 70717656);
-  const [selectedChip, setSelectedChip] = useState(chipOptions[3] ?? 1000000); // 1000K default selected
+  const [selectedChip, setSelectedChip] = useState(chipOptions[0] ?? 1000);
   const [bets, setBets] = useState<Record<HandKey, number>>({ A: 0, B: 0, C: 0 });
   const [lastBets, setLastBets] = useState<Record<HandKey, number>>({ A: 0, B: 0, C: 0 });
   const [simulatedPots, setSimulatedPots] = useState<Record<HandKey, number>>({ A: 0, B: 0, C: 0 });
