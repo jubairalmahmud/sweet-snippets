@@ -5821,13 +5821,30 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       setPartyAgoraStatus("Party voice is live.");
       return true;
     } catch (err: any) {
-      const message = String(err?.message || err || "");
+      const message = String(err?.message || err?.code || err || "");
       if (/already|duplicate|published/i.test(message)) {
         partyAgoraAudioPublishedRef.current = true;
         setPartyAgoraStatus("Party voice is live.");
         return true;
       }
-      throw err;
+      if (
+        /INVALID_OPERATION|haven't joined|DISCONNECTED|CONNECTING|NOT_CONNECTED/i.test(message) ||
+        err?.code === "INVALID_OPERATION"
+      ) {
+        partyAgoraAudioPublishedRef.current = false;
+        if (retry < 8) {
+          window.setTimeout(() => {
+            if (shouldAllowPartyMicPublish()) {
+              void safePublishPartyMicrophone(client, audioTrack, retry + 1);
+            }
+          }, 600);
+        }
+        setPartyAgoraStatus("Joining voice channel... microphone will open automatically.");
+        return false;
+      }
+      partyAgoraAudioPublishedRef.current = false;
+      setPartyAgoraStatus(err?.message || "Party microphone publish failed.");
+      return false;
     }
   };
 
@@ -8213,7 +8230,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         const rideLabel = rideInfo ? `${rideInfo.name} ${rideInfo.emoji}` : "VIP Ride 🏎️";
         void api
           .post(`/api/party-rooms/${createdRoomId}/chat`, {
-            text: `[ENTRY:${rideIdToUse}:${registerName || "Host"}:${profileAvatarImg || ""}] ✨ ${registerName || "Host"} opened the party room ${equippedRide ? `with ${rideLabel}` : ""}!`,
+            text: `[ENTRY:${rideIdToUse}:${encodeURIComponent(registerName || "Host")}:${encodeURIComponent(profileAvatarImg || "")}] ✨ ${registerName || "Host"} opened the party room ${equippedRide ? `with ${rideLabel}` : ""}!`,
           })
           .catch(() => undefined);
       }
@@ -8269,7 +8286,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         const rideLabel = rideInfo ? `${rideInfo.name} ${rideInfo.emoji}` : "VIP Ride 🏎️";
         void api
           .post(`/api/party-rooms/${joinedRoomId}/chat`, {
-            text: `[ENTRY:${rideIdToUse}:${registerName || "User"}:${profileAvatarImg || ""}] ✨ ${registerName || "User"} entered ${equippedRide ? `with ${rideLabel}` : "the room"}!`,
+            text: `[ENTRY:${rideIdToUse}:${encodeURIComponent(registerName || "User")}:${encodeURIComponent(profileAvatarImg || "")}] ✨ ${registerName || "User"} entered ${equippedRide ? `with ${rideLabel}` : "the room"}!`,
           })
           .catch(() => undefined);
       }
@@ -8682,7 +8699,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         const rideLabel = rideInfo ? `${rideInfo.name} ${rideInfo.emoji}` : "VIP Ride 🏎️";
         void api
           .post(`/api/party-rooms/${activePartyRoom.id}/chat`, {
-            text: `[ENTRY:${equippedRide}:${selfName}:${profileAvatarImg || ""}] ✨ ${selfName} took seat ${seatIndex + 1} with ${rideLabel}!`,
+            text: `[ENTRY:${equippedRide}:${encodeURIComponent(selfName)}:${encodeURIComponent(profileAvatarImg || "")}] ✨ ${selfName} took seat ${seatIndex + 1} with ${rideLabel}!`,
           })
           .catch(() => undefined);
       }
