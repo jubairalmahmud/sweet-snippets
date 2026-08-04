@@ -8,6 +8,19 @@ import Stacked3DChips from "./teenpatti/Stacked3DChips";
 import { RefreshCw, Users, X, HelpCircle, History } from "lucide-react";
 import { emitGameWin } from "../components/TopGameWinnerBanner";
 
+const formatCoinValue = (val: number): string => {
+  if (!val || isNaN(val)) return "0";
+  if (val >= 1000000) {
+    const m = val / 1000000;
+    return m % 1 === 0 ? `${m}M` : `${parseFloat(m.toFixed(1))}M`;
+  }
+  if (val >= 1000) {
+    const k = val / 1000;
+    return k % 1 === 0 ? `${k}K` : `${parseFloat(k.toFixed(1))}K`;
+  }
+  return val.toString();
+};
+
 type Card = { rank: string; suit: "♠" | "♥" | "♦" | "♣" };
 type Hand = { cards: Card[]; label: string };
 type HandKey = "A" | "B" | "C";
@@ -567,7 +580,7 @@ export default function TeenPattiGame({
 
             {/* Total Win Amount in Big Gold Text */}
             <div className="text-4xl font-mono font-black text-amber-300 my-2 drop-shadow-[0_2px_12px_rgba(245,158,11,0.9)]">
-              {win.amount.toLocaleString()}
+              {formatCoinValue(win.amount)}
             </div>
           </div>
           <WinCelebration amount={win.amount} />

@@ -7539,8 +7539,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
     const bId = String(Date.now() + Math.random());
     const sendText = targets.length > 1
-      ? `sent ${gift.icon || "🎁"} ${gift.name} to ${targets.length} users (${recipientNames}) (${totalCost} diamonds)`
-      : `sent ${gift.icon || "🎁"} ${gift.name} to ${targets[0]?.name || "Host"} (${gift.diamonds || 0} diamonds)`;
+      ? `sent ${gift.icon || "🎁"} ${gift.name} to ${targets.length} users (${recipientNames}) (${formatCoinValue(totalCost)} coins)`
+      : `sent ${gift.icon || "🎁"} ${gift.name} to ${targets[0]?.name || "Host"} (${formatCoinValue(gift.diamonds || 0)} coins)`;
 
     setLiveGiftBanner({
       id: bId,
@@ -14585,7 +14585,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               giverBadge="Agency Holder"
               iconEmoji="🍷"
               mainActionText="WON"
-              amountText={Number(partyBroadcastBanner.coins || 0).toLocaleString()}
+              amountText={formatCoinValue(Number(partyBroadcastBanner.coins || 0))}
               secondaryText="FROM"
               giftName={partyBroadcastBanner.giftName || "GREEDY KING"}
               giftIcon={partyBroadcastBanner.giftIcon || "🎁"}
@@ -15079,7 +15079,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 className="text-[14px] font-black tabular-nums text-amber-300"
                 style={{ textShadow: "0 1px 2px rgba(0,0,0,0.7)" }}
               >
-                {partyEarnedCoins.toLocaleString()}
+                {formatCoinValue(partyEarnedCoins)}
               </span>
             </button>
           </div>
@@ -15291,7 +15291,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                         )}
                         <span className={`flex items-center gap-0.5 text-[10px] font-black tabular-nums leading-none ${effOccupant ? "text-amber-300" : "text-white/30"}`}>
                           <span className="text-[9px] leading-none">⭐</span>
-                          {(effOccupant ? seatCoins : 0).toLocaleString()}
+                          {formatCoinValue(effOccupant ? seatCoins : 0)}
                         </span>
                       </div>
                       {isCrown && (
@@ -28848,7 +28848,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               </div>
               <div className="rounded-2xl border border-yellow-400/20 bg-yellow-500/10 p-3">
                 <p className="text-[8px] font-bold uppercase text-yellow-300">Coins</p>
-                <p className="mt-1 text-sm font-black text-yellow-200">🪙 {liveSummaryData.coins}</p>
+                <p className="mt-1 text-sm font-black text-yellow-200">🪙 {formatCoinValue(liveSummaryData.coins)}</p>
               </div>
               {/* FIX #5: Diamond card removed from live summary — app now shows Coins only */}
 
