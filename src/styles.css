@@ -183,8 +183,12 @@
 /* Royal golden floral frame for host/party cards */
 .royal-frame {
   position: relative;
-  padding: 22px 34px;
+  padding: 18px 46px;
   isolation: isolate;
+  background: linear-gradient(135deg, #0f0d24 0%, #0a0818 100%);
+  border-radius: 18px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
 }
 .royal-frame > * {
   position: relative;

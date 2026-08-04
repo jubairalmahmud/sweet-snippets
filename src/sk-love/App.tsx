@@ -14021,7 +14021,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                             <button
                               type="button"
                               onClick={() => void joinBackendLiveRoom(room)}
-                              className="w-full rounded-2xl bg-gradient-to-br from-[#0f0d24] to-[#0a0818] border border-white/5 p-2.5 flex items-stretch gap-3 text-left shadow-lg shadow-black/40 active:scale-[0.99] transition hover:border-pink-500/30"
+                              className="w-full flex items-stretch gap-3 text-left active:scale-[0.99] transition"
                             >
                               <img
                                 src={
@@ -14029,7 +14029,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                   getUserAvatarUrl({ name: room.hostName || "Live Host", avatar: room.hostAvatar })
                                 }
                                 alt={room.hostName || "Live Host"}
-                                className="w-[86px] h-[86px] rounded-2xl object-cover flex-shrink-0"
+                                className="w-[72px] h-[72px] rounded-xl object-cover flex-shrink-0 border border-white/10 shadow-md"
                               />
                               <div className="min-w-0 flex-1 flex flex-col justify-between py-0.5">
                                 <div className="flex items-start justify-between gap-2">
@@ -14237,7 +14237,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           <button
             type="button"
             onClick={() => openPartyRoom("join", user)}
-            className="w-full rounded-2xl bg-gradient-to-br from-[#0f0d24] to-[#0a0818] border border-white/5 p-2.5 flex items-stretch gap-3 text-left shadow-lg shadow-black/40 active:scale-[0.99] transition hover:border-emerald-400/30"
+            className="w-full flex items-stretch gap-3 text-left active:scale-[0.99] transition"
           >
             <img
               src={getUserAvatarUrl({
@@ -14245,7 +14245,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 avatar: user.hostAvatar,
               })}
               alt={user.hostName || user.title}
-              className="w-[86px] h-[86px] rounded-2xl object-cover flex-shrink-0"
+              className="w-[72px] h-[72px] rounded-xl object-cover flex-shrink-0 border border-white/10 shadow-md"
             />
             <div className="min-w-0 flex-1 flex flex-col justify-between py-0.5">
               <div className="flex items-start justify-between gap-2">
