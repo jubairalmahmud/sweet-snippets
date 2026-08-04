@@ -13141,6 +13141,74 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                   `}</style>
 
                               <div className="grid grid-cols-2 gap-2 pb-28">
+                                {activePkBattles.map((b: any) => {
+                                  const leftAvatar = b.from_avatar || `https://api.dicebear.com/9.x/thumbs/svg?seed=${b.from_host_id || 'left'}`;
+                                  const rightAvatar = b.to_avatar || `https://api.dicebear.com/9.x/thumbs/svg?seed=${b.to_host_id || 'right'}`;
+                                  const leftName = b.from_name || `Host #${b.from_host_id || 'A'}`;
+                                  const flag = b.from_flag || "🇧🇩";
+                                  const username = b.from_username || `@${(b.from_name || 'user').toLowerCase().replace(/\s+/g, '')}`;
+                                  const viewers = b.viewers || b.viewer_count || b.viewer_counter || 0;
+
+                                  return (
+                                    <button
+                                      key={`explore-grid-pk-${b.id}`}
+                                      type="button"
+                                      onClick={() => {
+                                        setPkWatchOrigin("explore");
+                                        setPkWatchBattleId(b.id);
+                                      }}
+                                      className="group relative aspect-[3/4] overflow-hidden rounded-xl border border-rose-500/30 bg-slate-950 text-left shadow-lg active:scale-[0.98] transition cursor-pointer"
+                                    >
+                                      <div className="absolute inset-0 flex">
+                                        <div className="w-1/2 h-full relative overflow-hidden border-r border-black/40">
+                                          <img
+                                            src={leftAvatar}
+                                            alt={leftName}
+                                            className="w-full h-full object-cover object-center group-hover:scale-105 transition duration-300"
+                                          />
+                                        </div>
+                                        <div className="w-1/2 h-full relative overflow-hidden">
+                                          <img
+                                            src={rightAvatar}
+                                            alt={b.to_name || "Opponent"}
+                                            className="w-full h-full object-cover object-center group-hover:scale-105 transition duration-300"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      <div className="absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-black/70 to-transparent pointer-events-none z-10" />
+
+                                      <span className="absolute left-2 top-2 z-20 rounded-md bg-gradient-to-r from-amber-400 to-rose-500 px-1.5 py-0.5 text-[7px] font-black uppercase text-slate-950 shadow-md">
+                                        PK Live
+                                      </span>
+
+                                      <div className="absolute right-2 top-2 z-20 flex items-center gap-1 bg-black/60 backdrop-blur-md text-white px-1.5 py-0.5 rounded-md text-[7.5px] font-bold border border-white/10 shadow-sm">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
+                                        <span>{viewers}</span>
+                                      </div>
+
+                                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none select-none">
+                                        <span className="text-2xl font-black italic tracking-tighter filter drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] flex items-center">
+                                          <span className="text-blue-500 drop-shadow">V</span>
+                                          <span className="text-pink-500 -ml-0.5 drop-shadow">S</span>
+                                        </span>
+                                      </div>
+
+                                      <div className="absolute inset-x-0 bottom-0 z-20 p-2.5 bg-gradient-to-t from-black/95 via-black/60 to-transparent">
+                                        <p className="truncate text-[10px] font-black text-white">
+                                          {leftName}
+                                        </p>
+                                        <p className="mt-0.5 truncate text-[8px] font-bold text-slate-200">
+                                          {flag} {username}
+                                        </p>
+                                        <div className="mt-1.5 flex items-center justify-between text-[8px] font-bold text-rose-300">
+                                          <span>PK Battle Live</span>
+                                          <span className="rounded bg-rose-500 px-1.5 py-0.5 text-white font-black">Watch</span>
+                                        </div>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
                                 {liveRooms.slice(0, 6).map((room) => (
                                   <button
                                     key={`explore-grid-live-${room.id}`}

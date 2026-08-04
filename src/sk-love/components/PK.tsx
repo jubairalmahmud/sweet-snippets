@@ -29,7 +29,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 import { createPortal } from "react-dom";
-import { Swords, X, Clock, Crown, Send, Search, Loader2, MessageCircle, Trophy } from "lucide-react";
+import { Swords, X, Clock, Crown, Send, Search, Loader2, MessageCircle, Trophy, Reply, CornerDownRight, AtSign } from "lucide-react";
 import { api } from "../lib/api";
 
 type PKUser = { id: string | number; name: string; avatar?: string };
@@ -768,6 +768,18 @@ const PKAgoraPromise: Promise<any> =
     ? import("agora-rtc-sdk-ng").then((m) => m.default)
     : (Promise.resolve(null as any));
 
+export type SideGiftOverlayItem = {
+  id: string;
+  side: "from" | "to";
+  giftName: string;
+  giftIcon: string;
+  giftImage?: string | null;
+  diamonds: number;
+  senderName: string;
+  senderAvatar?: string | null;
+  receiverName: string;
+};
+
 function BattleView({
   me,
   opp,
@@ -809,12 +821,87 @@ function BattleView({
   const oppVideoRef = useRef<HTMLDivElement | null>(null);
   const [meHasVideo, setMeHasVideo] = useState(false);
   const [oppHasVideo, setOppHasVideo] = useState(false);
+  const [sideGifts, setSideGifts] = useState<SideGiftOverlayItem[]>([]);
 
-  /* ---- Render my own local camera track (published by App) ----
-     IMPORTANT: don't call `agoraTrack.play(container)` — that re-parents
-     Agora's internal <video> and steals it from App's main live view,
-     which leaves the PK creator's own side blank. Instead, clone the
-     underlying MediaStreamTrack into our own <video> element. */
+  const leftUser = iAmFromHost ? me : opp;
+  const rightUser = iAmFromHost ? opp : me;
+  const leftScore = iAmFromHost ? myScore : oppScore;
+  const rightScore = iAmFromHost ? oppScore : myScore;
+  const leftPct = iAmFromHost ? myPct : oppPct;
+  const rightPct = 100 - leftPct;
+  const leftVideoRef = iAmFromHost ? meVideoRef : oppVideoRef;
+  const rightVideoRef = iAmFromHost ? oppVideoRef : meVideoRef;
+  const leftHasVideo = iAmFromHost ? meHasVideo : oppHasVideo;
+  const rightHasVideo = iAmFromHost ? oppHasVideo : meHasVideo;
+
+  const triggerSideGift = (
+    side: "from" | "to",
+    gift: { name: string; icon?: string; diamonds?: number; image?: string | null },
+    senderName: string,
+    senderAvatar?: string | null,
+    receiverName?: string,
+    giftKey?: string,
+  ) => {
+    const id = giftKey || `host_gift_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    setSideGifts((prev) => {
+      if (prev.some((g) => g.id === id)) return prev;
+      const item: SideGiftOverlayItem = {
+        id,
+        side,
+        giftName: gift.name || "Special Gift",
+        giftIcon: gift.icon || "🎁",
+        giftImage: gift.image || null,
+        diamonds: gift.diamonds || 100,
+        senderName: senderName || "Gifter",
+        senderAvatar: senderAvatar || null,
+        receiverName: receiverName || (side === "from" ? (leftUser?.name || "Host A") : (rightUser?.name || "Host B")),
+      };
+      return [...prev.slice(-2), item];
+    });
+
+    setTimeout(() => {
+      setSideGifts((prev) => prev.filter((g) => g.id !== id));
+    }, 3500);
+  };
+
+  // Listen to live gift events during battle
+  useEffect(() => {
+    const handler = (e: any) => {
+      const d = e?.detail;
+      if (!d) return;
+      const targetSide = d.side || (d.targetHostId === leftUser?.id ? "from" : "to");
+      triggerSideGift(
+        targetSide,
+        { name: d.giftName || "Gift", icon: d.giftIcon || "🎁", diamonds: d.diamonds || 100 },
+        d.senderName || "Gifter",
+        d.senderAvatar,
+        d.receiverName,
+      );
+    };
+    window.addEventListener("sk-love-pk-gift", handler);
+    return () => window.removeEventListener("sk-love-pk-gift", handler);
+  }, [leftUser?.id, rightUser?.id]);
+
+  // Auto trigger gift animations on host screen when scores increase
+  const prevLeftScore = useRef(leftScore);
+  const prevRightScore = useRef(rightScore);
+  useEffect(() => {
+    if (leftScore > prevLeftScore.current && prevLeftScore.current >= 0) {
+      const diff = leftScore - prevLeftScore.current;
+      triggerSideGift("from", { name: "Special Gift", icon: "💎", diamonds: diff }, "Fan Supporter", null, leftUser?.name || "Host");
+    }
+    prevLeftScore.current = leftScore;
+  }, [leftScore, leftUser?.name]);
+
+  useEffect(() => {
+    if (rightScore > prevRightScore.current && prevRightScore.current >= 0) {
+      const diff = rightScore - prevRightScore.current;
+      triggerSideGift("to", { name: "Special Gift", icon: "💎", diamonds: diff }, "Fan Supporter", null, rightUser?.name || "Host");
+    }
+    prevRightScore.current = rightScore;
+  }, [rightScore, rightUser?.name]);
+
+  /* ---- Render my own local camera track (published by App) ---- */
   useEffect(() => {
     if (!localVideoTrackRef) return;
     let cancelled = false;
@@ -842,7 +929,6 @@ function BattleView({
           container.appendChild(videoEl);
           void videoEl.play().catch(() => {});
         } else {
-          // Fallback (older SDK): use Agora play — may steal from main view
           t.play(container);
         }
         setMeHasVideo(true);
@@ -943,17 +1029,6 @@ function BattleView({
     };
   }, [oppRoomId, apiBase, authToken]);
 
-  const leftUser = iAmFromHost ? me : opp;
-  const rightUser = iAmFromHost ? opp : me;
-  const leftScore = iAmFromHost ? myScore : oppScore;
-  const rightScore = iAmFromHost ? oppScore : myScore;
-  const leftPct = iAmFromHost ? myPct : oppPct;
-  const rightPct = 100 - leftPct;
-  const leftVideoRef = iAmFromHost ? meVideoRef : oppVideoRef;
-  const rightVideoRef = iAmFromHost ? oppVideoRef : meVideoRef;
-  const leftHasVideo = iAmFromHost ? meHasVideo : oppHasVideo;
-  const rightHasVideo = iAmFromHost ? oppHasVideo : meHasVideo;
-
   return (
     <div className="mx-auto max-w-2xl -mx-4 -mt-4">
       {/* Arena — edge-to-edge dual video, no gap, no borders */}
@@ -993,6 +1068,41 @@ function BattleView({
             </span>
           </div>
 
+          {/* Animated Gift Side Overlay for Left Host */}
+          {sideGifts
+            .filter((g) => g.side === "from")
+            .map((g) => (
+              <div
+                key={g.id}
+                className="absolute inset-0 z-40 pointer-events-none flex flex-col items-center justify-center p-2 bg-gradient-to-b from-rose-950/90 via-pink-950/70 to-black/90 backdrop-blur-[2px] animate-in fade-in zoom-in-75 duration-300"
+              >
+                <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-rose-500/50 via-amber-400/40 to-pink-500/50 blur-xl animate-pulse" />
+                <div className="relative z-10 flex items-center gap-1.5 bg-black/85 border border-rose-400/80 rounded-full px-2.5 py-1 shadow-2xl mb-1 backdrop-blur-md max-w-[95%]">
+                  <img
+                    src={g.senderAvatar || resolveAvatar(null, g.senderName)}
+                    alt=""
+                    className="w-4 h-4 rounded-full object-cover border border-rose-300 shrink-0"
+                  />
+                  <div className="text-[9px] font-extrabold truncate leading-none">
+                    <span className="text-amber-300">{g.senderName}</span>
+                    <span className="text-white/80 mx-1">GIFTED</span>
+                    <span className="text-rose-300">{g.receiverName}</span>
+                  </div>
+                </div>
+                <div className="relative z-10 my-0.5 animate-bounce text-4xl">
+                  {g.giftIcon || "🎁"}
+                </div>
+                <div className="relative z-10 flex flex-col items-center">
+                  <div className="text-[10px] font-black uppercase text-amber-200 text-center">
+                    {g.giftName}
+                  </div>
+                  <div className="bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full shadow border border-yellow-200/50 flex items-center gap-1">
+                    <span>💎</span>
+                    <span>+{g.diamonds}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
         </div>
 
         {/* Right side */}
@@ -1030,9 +1140,44 @@ function BattleView({
             </div>
           </div>
 
+          {/* Animated Gift Side Overlay for Right Host */}
+          {sideGifts
+            .filter((g) => g.side === "to")
+            .map((g) => (
+              <div
+                key={g.id}
+                className="absolute inset-0 z-40 pointer-events-none flex flex-col items-center justify-center p-2 bg-gradient-to-b from-cyan-950/90 via-blue-950/70 to-black/90 backdrop-blur-[2px] animate-in fade-in zoom-in-75 duration-300"
+              >
+                <div className="absolute w-32 h-32 rounded-full bg-gradient-to-r from-cyan-500/50 via-amber-400/40 to-blue-500/50 blur-xl animate-pulse" />
+                <div className="relative z-10 flex items-center gap-1.5 bg-black/85 border border-cyan-400/80 rounded-full px-2.5 py-1 shadow-2xl mb-1 backdrop-blur-md max-w-[95%]">
+                  <img
+                    src={g.senderAvatar || resolveAvatar(null, g.senderName)}
+                    alt=""
+                    className="w-4 h-4 rounded-full object-cover border border-cyan-300 shrink-0"
+                  />
+                  <div className="text-[9px] font-extrabold truncate leading-none">
+                    <span className="text-amber-300">{g.senderName}</span>
+                    <span className="text-white/80 mx-1">GIFTED</span>
+                    <span className="text-cyan-300">{g.receiverName}</span>
+                  </div>
+                </div>
+                <div className="relative z-10 my-0.5 animate-bounce text-4xl">
+                  {g.giftIcon || "🎁"}
+                </div>
+                <div className="relative z-10 flex flex-col items-center">
+                  <div className="text-[10px] font-black uppercase text-amber-200 text-center">
+                    {g.giftName}
+                  </div>
+                  <div className="bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full shadow border border-yellow-200/50 flex items-center gap-1">
+                    <span>💎</span>
+                    <span>+{g.diamonds}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
         </div>
 
-        {/* Score progress bar — overlaid on TOP of the videos, shows viewer gift totals INSIDE */}
+        {/* Score progress bar — overlaid on TOP of the videos */}
         <div className="pointer-events-none absolute top-2 left-2 right-2 z-30">
           <div className="relative h-6 w-full flex rounded-full overflow-hidden border border-white/30 shadow-lg bg-black/50">
             <div
@@ -1051,7 +1196,6 @@ function BattleView({
             <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-7 bg-white/80 rounded-full shadow" />
           </div>
         </div>
-
 
         {/* VS badge */}
         <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 bg-gradient-to-br from-amber-300 to-amber-500 text-slate-950 font-black text-sm py-1.5 px-3 rounded-full border-[3px] border-slate-950 italic shadow-2xl shadow-amber-500/50 animate-pulse">
@@ -1084,7 +1228,7 @@ function BattleView({
           <button
             type="button"
             onClick={onEnd}
-            className="rounded-full bg-slate-800 border border-slate-600 px-5 py-2 text-xs font-black uppercase text-slate-200"
+            className="rounded-full bg-slate-800 border border-slate-600 px-5 py-2 text-xs font-black uppercase text-slate-200 hover:bg-slate-700 active:scale-95 transition cursor-pointer"
           >
             End Battle
           </button>
@@ -1095,7 +1239,7 @@ function BattleView({
 }
 
 /* ================================================================== */
-/*  CommentStrip — realtime chat during a battle                       */
+/*  CommentStrip — realtime chat with Reply & Mention during battle     */
 /* ================================================================== */
 type PKComment = {
   id: number;
@@ -1104,6 +1248,7 @@ type PKComment = {
   user_avatar?: string | null;
   role: "host_from" | "host_to" | "viewer";
   text: string;
+  replyTo?: { name: string; text: string } | null;
 };
 
 const notifyPkCommentError = (message: string) => {
@@ -1133,8 +1278,55 @@ function CommentStrip({
   const [comments, setComments] = useState<PKComment[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<{ name: string; text: string } | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const lastIdRef = useRef<number>(0);
+
+  // Auto detect mentions
+  const lastWordInDraft = (text.split(" ").pop() || "").trim();
+  const isMentioningUser = lastWordInDraft.startsWith("@");
+  const mentionQuery = isMentioningUser ? lastWordInDraft.slice(1).toLowerCase() : "";
+
+  const uniqueCommenters = useMemo(() => {
+    const map = new Map<string, { name: string; avatar?: string | null }>();
+    comments.forEach((c) => {
+      if (c.user_name && !map.has(c.user_name)) {
+        map.set(c.user_name, { name: c.user_name, avatar: c.user_avatar });
+      }
+    });
+    return Array.from(map.values());
+  }, [comments]);
+
+  const filteredMentionSuggestions = useMemo(() => {
+    if (!isMentioningUser) return [];
+    return uniqueCommenters.filter(
+      (p) =>
+        p.name.toLowerCase().includes(mentionQuery) ||
+        p.name.toLowerCase().replace(/\s+/g, "").includes(mentionQuery),
+    );
+  }, [isMentioningUser, mentionQuery, uniqueCommenters]);
+
+  const renderFormattedCommentText = (str: string) => {
+    if (!str) return "";
+    const parts = str.split(/(@[\w\u0980-\u09FF.-]+)/g);
+    return (
+      <>
+        {parts.map((part, index) => {
+          if (part.startsWith("@")) {
+            return (
+              <span
+                key={index}
+                className="font-black text-cyan-300 bg-cyan-950/80 px-1 py-0.5 rounded text-[10px] mx-0.5 border border-cyan-400/40 shadow-sm"
+              >
+                {part}
+              </span>
+            );
+          }
+          return part;
+        })}
+      </>
+    );
+  };
 
   // poll new comments every 2s
   useEffect(() => {
@@ -1157,7 +1349,7 @@ function CommentStrip({
           merged.sort((a, b) => a.id - b.id);
           const maxId = merged.reduce((m, c) => (c.id > m ? c.id : m), 0);
           lastIdRef.current = maxId;
-          return merged.slice(-80); // keep last 80
+          return merged.slice(-80);
         });
       } catch { /* silent */ }
     };
@@ -1176,20 +1368,31 @@ function CommentStrip({
     const t = text.trim();
     if (!t || sending) return;
     setSending(true);
+    const activeReply = replyingTo;
     setText("");
+    setReplyingTo(null);
+
     // optimistic
     const tempId = -Date.now();
     setComments((prev) => [
       ...prev,
       {
-        id: tempId, user_id: Number(me?.id || 0),
-        user_name: me?.name || "You", user_avatar: me?.avatar,
-        role: "viewer", text: t,
+        id: tempId,
+        user_id: Number(me?.id || 0),
+        user_name: me?.name || "You",
+        user_avatar: me?.avatar,
+        role: "viewer",
+        text: t,
+        replyTo: activeReply,
       },
     ]);
+
     try {
       const j: any = await pkPost(
-        apiBase, `/pk/${battleId}/comment`, { text: t }, authToken,
+        apiBase,
+        `/pk/${battleId}/comment`,
+        { text: t, replyTo: activeReply },
+        authToken,
       );
       if (j?.comment?.id) {
         setComments((prev) => prev.map((c) => (c.id === tempId ? { ...c, ...j.comment } : c)));
@@ -1198,6 +1401,7 @@ function CommentStrip({
     } catch (e: any) {
       setComments((prev) => prev.filter((c) => c.id !== tempId));
       setText(t);
+      setReplyingTo(activeReply);
       const msg = String(e?.message || "Comment failed");
       console.error("[PK comment]", e);
       notifyPkCommentError(`PK comment failed: ${msg}`);
@@ -1208,14 +1412,20 @@ function CommentStrip({
   };
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-950/70 overflow-hidden">
-      <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-slate-800/80 bg-slate-900/60">
-        <MessageCircle className="h-3.5 w-3.5 text-fuchsia-300" />
-        <span className="text-[10px] font-black uppercase tracking-wider text-fuchsia-200">
-          Live chat
+    <div className="rounded-xl border border-slate-800 bg-slate-950/70 overflow-hidden relative">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-800/80 bg-slate-900/60">
+        <div className="flex items-center gap-1.5">
+          <MessageCircle className="h-3.5 w-3.5 text-fuchsia-300" />
+          <span className="text-[10px] font-black uppercase tracking-wider text-fuchsia-200">
+            Live Chat
+          </span>
+        </div>
+        <span className="text-[9px] text-slate-400 font-bold">
+          {comments.length} comments
         </span>
       </div>
-      <div ref={listRef} className="max-h-40 min-h-[80px] overflow-y-auto px-3 py-2 space-y-1.5">
+
+      <div ref={listRef} className="max-h-44 min-h-[90px] overflow-y-auto px-3 py-2 space-y-2">
         {comments.length === 0 && (
           <p className="text-[11px] text-slate-600 text-center py-3">
             Say something to the arena…
@@ -1225,34 +1435,109 @@ function CommentStrip({
           const color =
             c.role === "host_from" ? "text-rose-300"
             : c.role === "host_to" ? "text-cyan-300"
-            : "text-slate-200";
+            : "text-amber-200";
           const badge =
             c.role === "host_from" ? "border-rose-400/40 bg-rose-500/10 text-rose-200"
             : c.role === "host_to" ? "border-cyan-400/40 bg-cyan-500/10 text-cyan-200"
             : null;
+
           return (
-            <div key={c.id} className="flex items-start gap-2 text-[12px] leading-snug">
-              <img
-                src={resolveAvatar(c.user_avatar, c.user_id)}
-                alt=""
-                className="h-5 w-5 rounded-full object-cover border border-slate-700 mt-0.5 shrink-0"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/thumbs/svg?seed=${c.user_id}`;
-                }}
-              />
-              <div className="min-w-0 flex-1">
-                <span className={cx("font-bold mr-1", color)}>{c.user_name}</span>
-                {badge && (
-                  <span className={cx("inline-block rounded px-1 py-[1px] text-[9px] font-black uppercase mr-1 border", badge)}>
-                    Host
+            <div key={c.id} className="flex flex-col gap-1 bg-black/40 border border-slate-800/60 p-2 rounded-xl text-[11.5px] leading-snug">
+              {c.replyTo && (
+                <div className="flex items-center gap-1 text-[9.5px] text-fuchsia-300 font-semibold px-2 py-0.5 bg-fuchsia-950/60 rounded-md border border-fuchsia-500/30 truncate">
+                  <CornerDownRight className="w-2.5 h-2.5 shrink-0 text-fuchsia-400" />
+                  <span className="truncate">
+                    Replying to @{c.replyTo.name}: "{c.replyTo.text}"
                   </span>
-                )}
-                <span className="text-slate-100 break-words">{c.text}</span>
+                </div>
+              )}
+              <div className="flex items-start gap-2">
+                <img
+                  src={resolveAvatar(c.user_avatar, c.user_id)}
+                  alt=""
+                  className="h-5 w-5 rounded-full object-cover border border-slate-700 mt-0.5 shrink-0"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = `https://api.dicebear.com/7.x/thumbs/svg?seed=${c.user_id}`;
+                  }}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className={cx("font-extrabold mr-1", color)}>{c.user_name}</span>
+                      {badge && (
+                        <span className={cx("inline-block rounded px-1 py-[1px] text-[8.5px] font-black uppercase mr-1 border", badge)}>
+                          Host
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReplyingTo({ name: c.user_name, text: c.text });
+                        setText((prev) => (prev.includes(`@${c.user_name}`) ? prev : `@${c.user_name} ${prev}`));
+                      }}
+                      className="text-[9px] font-bold text-fuchsia-300 hover:text-white bg-white/10 hover:bg-fuchsia-600/80 px-2 py-0.5 rounded-full transition active:scale-95 shrink-0 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Reply className="w-2.5 h-2.5" />
+                      <span>রিপ্লাই</span>
+                    </button>
+                  </div>
+                  <div className="text-slate-100 break-words mt-0.5">
+                    {renderFormattedCommentText(c.text)}
+                  </div>
+                </div>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Replying banner */}
+      {replyingTo && (
+        <div className="flex items-center justify-between gap-2 px-3 py-1 bg-fuchsia-950/90 border-t border-fuchsia-500/40 text-[10px] text-fuchsia-200">
+          <div className="flex items-center gap-1 truncate">
+            <CornerDownRight className="w-3 h-3 text-fuchsia-400 shrink-0" />
+            <span className="truncate">Replying to <strong className="text-amber-300">@{replyingTo.name}</strong>: "{replyingTo.text}"</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReplyingTo(null)}
+            className="text-fuchsia-300 hover:text-white font-bold shrink-0 ml-1 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Mention Auto-Suggestions Popover */}
+      {isMentioningUser && filteredMentionSuggestions.length > 0 && (
+        <div className="absolute bottom-12 left-2 right-2 z-50 max-h-32 overflow-y-auto bg-slate-900 border border-cyan-500/50 rounded-xl p-1 shadow-2xl space-y-0.5">
+          <div className="px-2 py-1 text-[9px] font-extrabold uppercase text-cyan-300 border-b border-slate-800 flex items-center gap-1">
+            <AtSign className="w-3 h-3" />
+            <span>Mention user</span>
+          </div>
+          {filteredMentionSuggestions.map((item) => (
+            <button
+              key={item.name}
+              type="button"
+              onClick={() => {
+                const words = text.split(" ");
+                words.pop();
+                setText([...words, `@${item.name} `].join(" "));
+              }}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-800 text-left transition active:scale-98 cursor-pointer"
+            >
+              <img
+                src={resolveAvatar(item.avatar, item.name)}
+                alt=""
+                className="w-4 h-4 rounded-full object-cover border border-cyan-400 shrink-0"
+              />
+              <span className="text-[11px] font-extrabold text-white truncate">{item.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <form
         onSubmit={(e) => { e.preventDefault(); send(); }}
         className="flex items-center gap-2 border-t border-slate-800/80 bg-slate-900/60 px-2 py-1.5"
@@ -1260,14 +1545,14 @@ function CommentStrip({
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Type a message…"
+          placeholder="Type a message or use @ to mention…"
           maxLength={300}
           className="flex-1 rounded-full bg-slate-950 border border-slate-700 px-3 py-1.5 text-[12px] text-slate-100 placeholder:text-slate-500 focus:border-fuchsia-500 outline-none"
         />
         <button
           type="submit"
           disabled={!text.trim() || sending}
-          className="rounded-full bg-gradient-to-r from-fuchsia-500 to-rose-500 p-2 text-white disabled:opacity-40"
+          className="rounded-full bg-gradient-to-r from-fuchsia-500 to-rose-500 p-2 text-white disabled:opacity-40 hover:opacity-90 active:scale-95 transition cursor-pointer"
           aria-label="Send comment"
         >
           <Send className="h-3.5 w-3.5" />
