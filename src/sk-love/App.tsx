@@ -174,18 +174,19 @@ import { GamesLauncher, type GameKey } from "./games/GamesLauncher";
 // ==========================================
 const AVATAR_FRAME_CATALOG: Array<{
   id: string;
+  dbId?: number;
   name: string;
   image: string;
   price: number;
   durationDays: number;
   adminOnly?: boolean;
 }> = [
-  { id: "avatar-egol", name: "Egol", image: frameEgolImg, price: 500000, durationDays: 30 },
-  { id: "avatar-fair", name: "Fair", image: frameFairImg, price: 500000, durationDays: 30 },
-  { id: "avatar-king", name: "KING", image: frameKingImg, price: 500000, durationDays: 30 },
-  { id: "avatar-queen", name: "QUEEN", image: frameQueenImg, price: 500000, durationDays: 30 },
+  { id: "avatar-egol", dbId: 1, name: "Egol", image: frameEgolImg, price: 500000, durationDays: 30 },
+  { id: "avatar-fair", dbId: 2, name: "Fair", image: frameFairImg, price: 500000, durationDays: 30 },
+  { id: "avatar-king", dbId: 3, name: "KING", image: frameKingImg, price: 500000, durationDays: 30 },
+  { id: "avatar-queen", dbId: 4, name: "QUEEN", image: frameQueenImg, price: 500000, durationDays: 30 },
   // Admin-granted only — awarded to approved agency owners via Admin Dashboard.
-  { id: "avatar-agency-premium", name: "AGENCY", image: frameAgencyPremiumImg, price: 0, durationDays: 3650, adminOnly: true },
+  { id: "avatar-agency-premium", dbId: 5, name: "AGENCY", image: frameAgencyPremiumImg, price: 0, durationDays: 3650, adminOnly: true },
 ];
 
 export function getFrameCatalogItem(frameId: string | number | null | undefined) {
@@ -2364,7 +2365,18 @@ export default function App() {
   }, []);
   // Un-equip if the equipped one has expired / not owned
   useEffect(() => {
-    if (equippedAvatarFrame && !ownedAvatarFrames[equippedAvatarFrame]) {
+    if (!equippedAvatarFrame) return;
+    const catItem = getFrameCatalogItem(equippedAvatarFrame);
+    const candidateKeys = [
+      equippedAvatarFrame,
+      catItem?.id,
+      catItem?.name,
+      catItem?.id ? catItem.id.replace(/^avatar-/, "") : null,
+    ].filter(Boolean) as string[];
+
+    const now = Date.now();
+    const isOwned = candidateKeys.some((k) => (ownedAvatarFrames[k] || 0) > now);
+    if (!isOwned) {
       setEquippedAvatarFrame(null);
     }
   }, [equippedAvatarFrame, ownedAvatarFrames]);
@@ -3168,20 +3180,46 @@ export default function App() {
         const res: any = await api.get("/api/me/frames");
         if (cancelled) return;
         const rows: any[] = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
-        const owned: Record<string, number> = {};
-        let equipped: string | null = null;
+        const ownedFromServer: Record<string, number> = {};
+        let equippedFromServer: string | null = null;
+
         rows.forEach((r: any) => {
-          const id = String(r.code || r.name || r.frame_id || "");
-          if (!id) return;
-          owned[id] = r.expires_at
+          const rawId = String(r.code || r.name || r.frame_id || r.id || "").trim();
+          if (!rawId) return;
+          const catItem = getFrameCatalogItem(rawId);
+          const primaryId = catItem ? catItem.id : rawId;
+          const exp = r.expires_at
             ? new Date(r.expires_at).getTime()
-            : Date.now() + 3650 * 86400 * 1000;
-          dbSyncKnownOwnedFramesRef.current[id] = true;
-          if (r.is_equipped) equipped = id;
+            : Date.now() + 30 * 86400 * 1000; // default 30 days
+
+          ownedFromServer[primaryId] = Math.max(ownedFromServer[primaryId] || 0, exp);
+          if (catItem) {
+            ownedFromServer[catItem.name] = Math.max(ownedFromServer[catItem.name] || 0, exp);
+            ownedFromServer[catItem.id.replace(/^avatar-/, "")] = Math.max(ownedFromServer[catItem.id.replace(/^avatar-/, "")] || 0, exp);
+          }
+
+          dbSyncKnownOwnedFramesRef.current[primaryId] = true;
+          dbSyncKnownOwnedFramesRef.current[rawId] = true;
+
+          if (r.is_equipped) {
+            equippedFromServer = primaryId;
+          }
         });
-        if (rows.length) {
-          setOwnedAvatarFrames(owned);
-          if (equipped) setEquippedAvatarFrame(equipped);
+
+        // MERGE with local unexpired frames instead of overwriting completely
+        setOwnedAvatarFrames((prev) => {
+          const merged = { ...prev };
+          const now = Date.now();
+          Object.entries(ownedFromServer).forEach(([k, exp]) => {
+            if (exp > now) {
+              merged[k] = Math.max(merged[k] || 0, exp);
+            }
+          });
+          return merged;
+        });
+
+        if (equippedFromServer) {
+          setEquippedAvatarFrame(equippedFromServer);
         }
       } catch {
         /* offline — keep localStorage state */
@@ -3219,12 +3257,17 @@ export default function App() {
 
   // ────── Push equipped-frame change to server ──────
   useEffect(() => {
-    if (!dbSyncHydratedFramesRef.current || !equippedAvatarFrame) return;
-    // Resolve numeric frame_id from catalog
-    const cat = AVATAR_FRAME_CATALOG.find((f) => f.id === equippedAvatarFrame);
-    const dbId = (cat as any)?.dbId;
-    if (dbId) {
-      api.post(`/api/me/frames/${dbId}/equip`, {}).catch(() => {});
+    if (!dbSyncHydratedFramesRef.current) return;
+    if (equippedAvatarFrame) {
+      const cat = getFrameCatalogItem(equippedAvatarFrame);
+      const dbId = cat?.dbId;
+      const code = cat?.id || equippedAvatarFrame;
+      if (dbId) {
+        api.post(`/api/me/frames/${dbId}/equip`, { code }).catch(() => {});
+      }
+      api.post(`/api/me/frames/equip`, { code, frame_id: dbId }).catch(() => {});
+    } else {
+      api.post(`/api/me/frames/unequip`, {}).catch(() => {});
     }
   }, [equippedAvatarFrame]);
 
@@ -3234,9 +3277,13 @@ export default function App() {
     Object.keys(ownedAvatarFrames).forEach((id) => {
       if (dbSyncKnownOwnedFramesRef.current[id]) return;
       dbSyncKnownOwnedFramesRef.current[id] = true;
-      const cat = AVATAR_FRAME_CATALOG.find((f) => f.id === id);
-      const dbId = (cat as any)?.dbId;
-      if (dbId) api.post(`/api/frame-catalog/${dbId}/buy`, {}).catch(() => {});
+      const cat = getFrameCatalogItem(id);
+      const dbId = cat?.dbId;
+      const code = cat?.id || id;
+      if (dbId) {
+        api.post(`/api/frame-catalog/${dbId}/buy`, { code, days: cat?.durationDays || 30 }).catch(() => {});
+      }
+      api.post(`/api/me/frames/purchase`, { code, frame_id: dbId, days: cat?.durationDays || 30 }).catch(() => {});
     });
   }, [ownedAvatarFrames]);
 
@@ -27543,8 +27590,23 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 diamonds: Math.max(0, prev.diamonds - catItem.price),
                                 avatarFrame: catItem.name,
                               }));
-                              setOwnedAvatarFrames((prev) => ({ ...prev, [catItem.id]: expiry }));
+                              const cleanId = catItem.id.replace(/^avatar-/, "");
+                              setOwnedAvatarFrames((prev) => ({
+                                ...prev,
+                                [catItem.id]: expiry,
+                                [catItem.name]: expiry,
+                                [cleanId]: expiry,
+                              }));
                               setEquippedAvatarFrame(catItem.id);
+
+                              // Immediate backend purchase & equip calls
+                              if (catItem.dbId) {
+                                api.post(`/api/frame-catalog/${catItem.dbId}/buy`, { code: catItem.id, days: catItem.durationDays }).catch(() => {});
+                                api.post(`/api/me/frames/${catItem.dbId}/equip`, { code: catItem.id }).catch(() => {});
+                              }
+                              api.post(`/api/me/frames/purchase`, { code: catItem.id, frame_id: catItem.dbId, days: catItem.durationDays }).catch(() => {});
+                              api.post(`/api/me/frames/equip`, { code: catItem.id, frame_id: catItem.dbId }).catch(() => {});
+
                               window.alert(
                                 `🎉 "${catItem.name}" ফ্রেম কেনা হলো এবং সক্রিয় করা হয়েছে!\nমেয়াদ: ${catItem.durationDays} দিন`,
                               );
