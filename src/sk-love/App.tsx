@@ -188,6 +188,40 @@ const AVATAR_FRAME_CATALOG: Array<{
   { id: "avatar-agency-premium", name: "AGENCY", image: frameAgencyPremiumImg, price: 0, durationDays: 3650, adminOnly: true },
 ];
 
+export function getFrameCatalogItem(frameId: string | number | null | undefined) {
+  if (!frameId) return null;
+  const str = String(frameId).trim();
+  if (!str || str === "default" || str === "none" || str === "null") return null;
+
+  if (/^(https?:\/\/|\/|data:)/i.test(str)) {
+    return { id: "custom", name: "Custom Frame", image: str, price: 0, durationDays: 3650 };
+  }
+
+  const lower = str.toLowerCase();
+  const found = AVATAR_FRAME_CATALOG.find((f) => {
+    const fId = f.id.toLowerCase();
+    const fName = f.name.toLowerCase();
+    const fClean = fId.replace(/^avatar-/, "");
+    return (
+      fId === lower ||
+      fName === lower ||
+      fClean === lower ||
+      `avatar-${lower}` === fId ||
+      lower.includes(fClean) ||
+      lower.includes(fName)
+    );
+  });
+
+  if (found) return found;
+
+  const num = parseInt(str, 10);
+  if (!isNaN(num) && num >= 1 && num <= AVATAR_FRAME_CATALOG.length) {
+    return AVATAR_FRAME_CATALOG[num - 1] ?? null;
+  }
+
+  return null;
+}
+
 
 // ==========================================
 // LIVE STREAM — reactions shown in the action bar next to the comment input.
@@ -2320,9 +2354,13 @@ export default function App() {
       setEquippedAvatarFrame(null);
     }
   }, [equippedAvatarFrame, ownedAvatarFrames]);
-  const activeAvatarFrameImg = equippedAvatarFrame
-    ? AVATAR_FRAME_CATALOG.find((f) => f.id === equippedAvatarFrame)?.image ?? null
-    : null;
+  const activeAvatarFrameImg = useMemo(() => {
+    if (!equippedAvatarFrame) return null;
+    const item = getFrameCatalogItem(equippedAvatarFrame);
+    if (item) return item.image;
+    if (/^(https?:\/\/|\/|data:)/i.test(String(equippedAvatarFrame))) return String(equippedAvatarFrame);
+    return null;
+  }, [equippedAvatarFrame]);
 
   // ---- Store: owned Rides / Entry Effects { id -> expiryTimestamp(ms) } + equipped ----
   const [ownedRides, setOwnedRides] = useState<Record<string, number>>(() => {
@@ -2883,6 +2921,39 @@ export default function App() {
     }
   };
 
+  const getRideCatalogItem = React.useCallback(
+    (rideId: string | number | null | undefined) => {
+      if (!rideId) return null;
+      const str = String(rideId).trim();
+      if (!str || str === "default" || str === "none" || str === "null") return null;
+
+      const lower = str.toLowerCase();
+      const found = RIDES_CATALOG.find((r) => {
+        const rId = r.id.toLowerCase();
+        const rName = r.name.toLowerCase();
+        const rClean = rId.replace(/^rides-/, "");
+        return (
+          rId === lower ||
+          rName === lower ||
+          rClean === lower ||
+          `rides-${lower}` === rId ||
+          lower.includes(rClean) ||
+          lower.includes(rName)
+        );
+      });
+
+      if (found) return found;
+
+      const num = parseInt(str, 10);
+      if (!isNaN(num) && num >= 1 && num <= RIDES_CATALOG.length) {
+        return RIDES_CATALOG[num - 1] ?? null;
+      }
+
+      return null;
+    },
+    [RIDES_CATALOG],
+  );
+
   const triggerPartyEntryAnimation = (
     userName: string,
     userAvatar?: string | null,
@@ -2893,8 +2964,8 @@ export default function App() {
     if (!rideId || rideId === "default" || rideId === "none" || rideId === "null") return;
     if (rideIdOverride === undefined && !ownedRides[rideId]) return;
 
-    const rideItem = RIDES_CATALOG.find((r) => r.id === rideId) || {
-      id: rideId,
+    const rideItem = getRideCatalogItem(rideId) || {
+      id: String(rideId),
       name: "VIP Ride",
       emoji: "🏎️",
       avatarImg: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=400&auto=format&fit=crop&q=80",
@@ -2920,7 +2991,10 @@ export default function App() {
 
     playEntryEffectSound(rideItem.id);
 
-    setTimeout(() => {
+    if (partyEntryAnimTimerRef.current) {
+      clearTimeout(partyEntryAnimTimerRef.current);
+    }
+    partyEntryAnimTimerRef.current = setTimeout(() => {
       setActivePartyEntryAnimation(null);
     }, 10000);
   };
@@ -3168,30 +3242,40 @@ export default function App() {
       if (!u) return null;
       try {
         const myId = getCurrentUserId();
-        const uid = u.userId ?? u.id ?? u.user_id ?? null;
-        if (myId != null && uid != null && Number(uid) === Number(myId)) {
+        const uid = u.userId ?? u.id ?? u.user_id ?? u.uid ?? null;
+        const uName = String(u.occupant ?? u.name ?? u.username ?? u.registerName ?? "").trim().toLowerCase();
+        const myName = String(registerName || "").trim().toLowerCase();
+
+        const isSelf =
+          (myId != null && uid != null && Number(uid) === Number(myId)) ||
+          (myName !== "" && uName !== "" && myName === uName);
+
+        if (isSelf && activeAvatarFrameImg) {
           return activeAvatarFrameImg;
         }
       } catch {
         /* noop */
       }
-      // Backend (shape → frameShape) sends the frame image URL directly per
-      // seat, so every viewer sees other users' frames.
+
       const directImg =
         u.frameImg ?? u.frameImage ?? u.frameImageUrl ?? u.frame_img ?? u.frame_image ?? null;
       if (directImg && String(directImg).trim() !== "") return String(directImg);
+
       const frameId: string | null =
-        u.frame ?? u.frameId ?? u.activeFrame ?? u.active_frame ?? u.avatarFrameId ?? u.avatar_frame_id ?? null;
+        u.frame ?? u.frameId ?? u.activeFrame ?? u.active_frame ?? u.avatarFrame ?? u.avatar_frame ?? u.avatarFrameId ?? u.avatar_frame_id ?? u.avatar_code ?? null;
       if (!frameId) return null;
+
       const expiry =
         u.activeFrameExpiresAt ?? u.active_frame_expires_at ?? u.avatarFrameExpiresAt ?? null;
       if (expiry != null) {
         const expMs = typeof expiry === "number" ? expiry : Date.parse(String(expiry));
         if (Number.isFinite(expMs) && expMs > 0 && expMs < Date.now()) return null;
       }
-      return AVATAR_FRAME_CATALOG.find((f) => f.id === frameId)?.image ?? null;
+
+      const item = getFrameCatalogItem(frameId);
+      return item ? item.image : null;
     },
-    [activeAvatarFrameImg],
+    [activeAvatarFrameImg, registerName],
   );
 
 
@@ -7905,6 +7989,38 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   seenPartyBroadcastIdsRef.current.add(eventKey);
                   triggerPartyEntryAnimation(entryUserName, entryAvatar, entryRideId);
                 }
+              }
+            }
+          }
+        }
+
+        // 1b. FRAME EQUIP BROADCAST ACROSS ALL DEVICES
+        if (m.text.includes("[FRAME:")) {
+          const startIdx = m.text.indexOf("[FRAME:");
+          const endIdx = m.text.indexOf("]", startIdx);
+          if (startIdx !== -1 && endIdx !== -1) {
+            const tagContent = m.text.slice(startIdx + 7, endIdx);
+            const parts = tagContent.split(":");
+            if (parts.length >= 2) {
+              const newFrameId = parts[0];
+              let frameUserName = parts[1] || m.name;
+              try { frameUserName = decodeURIComponent(frameUserName); } catch {}
+              const msgIdKey = m.id && Number(m.id) > 0 ? String(m.id) : `frame-${frameUserName}-${newFrameId}-${m.text}`;
+              const eventKey = `frame-msg-${msgIdKey}`;
+              if (!seenPartyBroadcastIdsRef.current.has(eventKey)) {
+                seenPartyBroadcastIdsRef.current.add(eventKey);
+                setPartySeats((prev) =>
+                  prev.map((s) => {
+                    if (s.occupant && frameUserName && s.occupant.trim().toLowerCase() === frameUserName.trim().toLowerCase()) {
+                      return {
+                        ...s,
+                        frame: newFrameId === "none" ? null : newFrameId,
+                        frameId: newFrameId === "none" ? null : newFrameId,
+                      };
+                    }
+                    return s;
+                  })
+                );
               }
             }
           }
@@ -27017,7 +27133,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                           );
                         }
 
-                        const catItem = AVATAR_FRAME_CATALOG.find((f) => f.id === selected.id);
+                        const catItem = getFrameCatalogItem(selected.id);
                         const isOwned = !!ownedAvatarFrames[selected.id];
                         const isEquipped = equippedAvatarFrame === selected.id;
                         if (isEquipped) {
@@ -27027,6 +27143,21 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 setEquippedAvatarFrame(null);
                                 setUserWallet((prev) => ({ ...prev, avatarFrame: "Default" }));
                                 triggerSystemAnnouncement(`Frame "${selected.name}" un-equipped.`);
+                                if (activePartyRoom?.id) {
+                                  setPartySeats((prev) =>
+                                    prev.map((s) => {
+                                      if (s.occupant && registerName && s.occupant.trim().toLowerCase() === registerName.trim().toLowerCase()) {
+                                        return { ...s, frame: null, frameId: null };
+                                      }
+                                      return s;
+                                    })
+                                  );
+                                  void api
+                                    .post(`/api/party-rooms/${activePartyRoom.id}/chat`, {
+                                      text: `[FRAME:none:${encodeURIComponent(registerName || "User")}] ✨ ${registerName || "User"} un-equipped frame!`,
+                                    })
+                                    .catch(() => undefined);
+                                }
                               }}
                               className="bg-slate-800 text-white font-bold text-[13px] px-6 py-2.5 rounded-full border-none cursor-pointer shadow-md hover:opacity-90"
                             >
@@ -27041,6 +27172,21 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 setEquippedAvatarFrame(selected.id);
                                 setUserWallet((prev) => ({ ...prev, avatarFrame: selected.name }));
                                 triggerSystemAnnouncement(`🎨 ${selected.name} frame equipped!`);
+                                if (activePartyRoom?.id) {
+                                  setPartySeats((prev) =>
+                                    prev.map((s) => {
+                                      if (s.occupant && registerName && s.occupant.trim().toLowerCase() === registerName.trim().toLowerCase()) {
+                                        return { ...s, frame: selected.id, frameId: selected.id };
+                                      }
+                                      return s;
+                                    })
+                                  );
+                                  void api
+                                    .post(`/api/party-rooms/${activePartyRoom.id}/chat`, {
+                                      text: `[FRAME:${selected.id}:${encodeURIComponent(registerName || "User")}] ✨ ${registerName || "User"} equipped ${selected.name} frame!`,
+                                    })
+                                    .catch(() => undefined);
+                                }
                               }}
                               className="bg-gradient-to-r from-emerald-500 to-green-500 text-white font-bold text-[13px] px-8 py-2.5 rounded-full border-none cursor-pointer shadow-md hover:opacity-90"
                             >
