@@ -15224,25 +15224,25 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                         )}
 
                         {/* #5/#10: mic status badge (bottom-right) — visible to EVERYONE.
-                            Pink mic = speaking/open with sound wave animation, violet slashed = muted. */}
+                            Pink mic = speaking/open with animated sound wave bars, violet slashed = muted. */}
                         {effOccupant && (
                           <div className="absolute -bottom-1 -right-1 z-40 flex items-center pointer-events-none">
                             {!effectiveSeatMuted && (
                               <>
                                 {/* Animated sound wave aura ring */}
                                 <span className="absolute inset-0 rounded-full bg-pink-500/80 animate-ping opacity-75" />
-                                {/* Sound wave equalizer bars (speaking indicator) */}
-                                <span className="absolute -top-3 -right-2.5 z-50 flex items-end gap-[1.5px] rounded-full bg-slate-950/95 border border-pink-400/80 px-1 py-0.5 shadow-[0_0_8px_rgba(236,72,153,0.8)]">
+                                {/* Animated Sound Wave Equalizer Bars */}
+                                <span className="absolute -top-3.5 -right-2 z-50 flex items-end gap-[2px] h-3.5 rounded-full bg-slate-950/95 border border-pink-400/80 px-1 py-0.5 shadow-[0_0_8px_rgba(236,72,153,0.8)]">
                                   <span
-                                    className="w-[2.5px] rounded-full bg-gradient-to-t from-pink-500 to-emerald-400"
+                                    className="w-[2.5px] rounded-full bg-pink-400"
                                     style={{ animation: "soundWaveBar 0.5s ease-in-out infinite" }}
                                   />
                                   <span
-                                    className="w-[2.5px] rounded-full bg-gradient-to-t from-pink-400 to-amber-300"
+                                    className="w-[2.5px] rounded-full bg-emerald-400"
                                     style={{ animation: "soundWaveBar 0.35s ease-in-out infinite 0.12s" }}
                                   />
                                   <span
-                                    className="w-[2.5px] rounded-full bg-gradient-to-t from-pink-500 to-cyan-300"
+                                    className="w-[2.5px] rounded-full bg-cyan-400"
                                     style={{ animation: "soundWaveBar 0.65s ease-in-out infinite 0.25s" }}
                                   />
                                 </span>
@@ -15874,34 +15874,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
               {/* Mic mute toggle — wrapped in h-12 slot for even alignment */}
               <div className="flex h-12 w-12 shrink-0 items-center justify-center relative">
-                {!isPartyMicMuted && (
-                  <>
-                    <span className="absolute inset-2 rounded-full bg-pink-500/70 animate-ping opacity-60 pointer-events-none" />
-                    <span className="absolute -top-1 -right-0.5 z-50 flex items-end gap-[1.5px] rounded-full bg-slate-950/95 border border-pink-400/80 px-1 py-0.5 shadow-[0_0_8px_rgba(236,72,153,0.8)] pointer-events-none">
-                      <span
-                        className="w-[2.5px] rounded-full bg-gradient-to-t from-pink-500 to-emerald-400"
-                        style={{ animation: "soundWaveBar 0.5s ease-in-out infinite" }}
-                      />
-                      <span
-                        className="w-[2.5px] rounded-full bg-gradient-to-t from-pink-400 to-amber-300"
-                        style={{ animation: "soundWaveBar 0.35s ease-in-out infinite 0.12s" }}
-                      />
-                      <span
-                        className="w-[2.5px] rounded-full bg-gradient-to-t from-pink-500 to-cyan-300"
-                        style={{ animation: "soundWaveBar 0.65s ease-in-out infinite 0.25s" }}
-                      />
-                    </span>
-                  </>
-                )}
                 <button
                   type="button"
                   onClick={() => void toggleSelfMute()}
                   aria-label={isPartyMicMuted ? "Unmute microphone" : "Mute microphone"}
                   title={isPartyMicMuted ? "Unmute microphone" : "Mute microphone"}
-                  className={`relative z-10 grid place-items-center h-9 w-9 rounded-full border-2 border-[#0a0618] shadow active:scale-95 transition ${
+                  className={`grid place-items-center h-9 w-9 rounded-full border-2 border-[#0a0618] shadow active:scale-95 transition ${
                     isPartyMicMuted
                       ? "bg-gradient-to-br from-violet-500 to-purple-700"
-                      : "bg-gradient-to-br from-pink-500 to-fuchsia-600 shadow-[0_0_12px_rgba(236,72,153,0.8)]"
+                      : "bg-gradient-to-br from-pink-500 to-fuchsia-600 shadow-[0_0_10px_rgba(236,72,153,0.8)]"
                   }`}
                 >
                   {isPartyMicMuted ? (

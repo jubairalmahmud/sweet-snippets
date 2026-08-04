@@ -210,6 +210,18 @@
   opacity: 0.95;
 }
 
+/* Sound Wave Equalizer animation for active party room microphones */
+@keyframes soundWaveBar {
+  0%, 100% {
+    height: 3px;
+    opacity: 0.6;
+  }
+  50% {
+    height: 12px;
+    opacity: 1;
+  }
+}
+
 /* Hide scrollbars while enabling overflow scrolling */
 .scrollbar-none {
   -ms-overflow-style: none;
