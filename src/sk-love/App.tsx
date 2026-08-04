@@ -27730,20 +27730,82 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 );
               })()}
 
-              {/* BOTTOM PREMIUM GEM NAV BAR — image reference (exact match) */}
+              {/* BOTTOM PREMIUM GEM NAV BAR — image reference with resilient fallback */}
               {appSection !== "stream" && !isCommentInputPopupOpen && !isPartyCommentPopupOpen && (
                 <div
-                  className="relative w-screen max-w-full select-none shrink-0 overflow-visible"
+                  className="relative w-full max-w-full select-none shrink-0 overflow-visible min-h-[58px] bg-[#0c0a1e] border-t border-purple-900/30 flex items-center justify-between"
                 >
                   <img
                     src={navGemBarImg}
-                    alt=""
+                    alt="Navigation Bar"
                     aria-hidden="true"
                     draggable={false}
-                    className="block w-full h-auto pointer-events-none"
+                    className="block w-full h-auto pointer-events-none z-10 relative"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = "none";
+                    }}
                   />
-                  {/* Click zones positioned at the actual icon centers in the image
-                      (measured: 11%, 30%, 50%, 70%, 89%) */}
+
+                  {/* Fallback CSS Navigation Bar — visible if image fails or is loading */}
+                  <div className="absolute inset-0 z-0 flex items-center justify-around px-2 bg-gradient-to-r from-[#0d0922] via-[#140e34] to-[#0d0922]">
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedProfileUser(null); setAppSection("home"); setHomeSubTab("explore"); }}
+                      className="flex flex-col items-center gap-0.5 text-slate-300 active:scale-95 transition"
+                    >
+                      <span className="text-base">🏠</span>
+                      <span className="text-[9px] font-bold text-slate-200">Home</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedProfileUser(null); setAppSection("discover"); setEarthActiveTab("Post"); setShowVipStore(false); }}
+                      className="flex flex-col items-center gap-0.5 text-slate-300 active:scale-95 transition"
+                    >
+                      <span className="text-base">🧭</span>
+                      <span className="text-[9px] font-bold text-slate-200">Discover</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { openBoardPicker(); }}
+                      className="flex flex-col items-center justify-center -mt-3 w-11 h-11 rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 text-white shadow-lg shadow-pink-500/40 active:scale-95 transition border-2 border-amber-300"
+                    >
+                      <span className="text-lg">🎙️</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedProfileUser(null); setAppSection("call1to1"); }}
+                      className="flex flex-col items-center gap-0.5 text-slate-300 active:scale-95 transition"
+                    >
+                      <span className="text-base">📹</span>
+                      <span className="text-[9px] font-bold text-slate-200">Video</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cachedUser = JSON.parse(localStorage.getItem("sk_love_user") || "{}");
+                        const selfProfileObj = {
+                          id: getCurrentUserId() || cachedUser?.id || 77777,
+                          name: registerName || "Zubair Mahmud",
+                          username: registerEmail ? registerEmail.split("@")[0] : "zubayer_admin",
+                          vipLevel: userWallet.vipLevel,
+                          status: "Online",
+                          avatar: profileAvatarImg || cachedUser?.avatar || cachedUser?.avatarImg || "",
+                          cover: profileCoverImg || cachedUser?.cover || cachedUser?.coverImg || "",
+                          rCoins: userWallet.rCoins,
+                          diamonds: userWallet.diamonds,
+                          bio: "Lead Developer & Admin of SK Love App 💖",
+                        };
+                        setSelectedProfileUser(selfProfileObj);
+                        setAppSection("profile");
+                      }}
+                      className="flex flex-col items-center gap-0.5 text-slate-300 active:scale-95 transition"
+                    >
+                      <span className="text-base">👤</span>
+                      <span className="text-[9px] font-bold text-slate-200">Profile</span>
+                    </button>
+                  </div>
+
+                  {/* Click zones positioned at the actual icon centers in the image */}
                   {[
                     { left: "11%", label: "Home", onClick: () => { setSelectedProfileUser(null); setAppSection("home"); setHomeSubTab("explore"); } },
                     { left: "30%", label: "Discover", onClick: () => { setSelectedProfileUser(null); setAppSection("discover"); setEarthActiveTab("Post"); setShowVipStore(false); } },
@@ -27769,9 +27831,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   ].map((b) => (
                     <button
                       key={b.label}
+                      type="button"
                       onClick={b.onClick}
                       aria-label={b.label}
-                      className="absolute top-0 h-full active:scale-95 transition"
+                      className="absolute top-0 h-full z-20 active:scale-95 transition cursor-pointer"
                       style={{ left: b.left, width: "18%", transform: "translateX(-50%)" }}
                     />
                   ))}
