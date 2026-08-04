@@ -183,16 +183,20 @@
 /* Royal golden floral frame for host/party cards */
 .royal-frame {
   position: relative;
-  padding: 18px 46px;
+  padding: 20px 48px;
+  min-height: 116px;
   isolation: isolate;
-  background: linear-gradient(135deg, #0f0d24 0%, #0a0818 100%);
-  border-radius: 18px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  background: linear-gradient(135deg, #120f2e 0%, #0a081a 100%);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   overflow: hidden;
+  display: flex;
+  align-items: center;
 }
 .royal-frame > * {
   position: relative;
-  z-index: 1;
+  z-index: 5;
+  width: 100%;
 }
 .royal-frame::after {
   content: "";
@@ -202,7 +206,8 @@
   background-image: url("/royal-frame.png");
   background-size: 100% 100%;
   background-repeat: no-repeat;
-  z-index: 3;
+  z-index: 2;
+  opacity: 0.95;
 }
 
 /* Hide scrollbars while enabling overflow scrolling */

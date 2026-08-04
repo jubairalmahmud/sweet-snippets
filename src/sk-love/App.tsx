@@ -14021,7 +14021,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                             <button
                               type="button"
                               onClick={() => void joinBackendLiveRoom(room)}
-                              className="w-full flex items-stretch gap-3 text-left active:scale-[0.99] transition"
+                              className="w-full flex items-center gap-2.5 text-left active:scale-[0.99] transition"
                             >
                               <img
                                 src={
@@ -14029,33 +14029,33 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                   getUserAvatarUrl({ name: room.hostName || "Live Host", avatar: room.hostAvatar })
                                 }
                                 alt={room.hostName || "Live Host"}
-                                className="w-[72px] h-[72px] rounded-xl object-cover flex-shrink-0 border border-white/10 shadow-md"
+                                className="w-14 h-14 rounded-xl object-cover flex-shrink-0 border border-amber-300/30 shadow-md"
                               />
-                              <div className="min-w-0 flex-1 flex flex-col justify-between py-0.5">
-                                <div className="flex items-start justify-between gap-2">
-                                  <h4 className="text-white font-black text-[13px] leading-tight truncate">
+                              <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
+                                <div className="flex items-center justify-between gap-1.5">
+                                  <h4 className="text-white font-black text-[12px] leading-tight truncate">
                                     {room.hostName || `Host #${room.hostId}`}
                                   </h4>
-                                  <span className="flex items-center gap-1 text-[11px] font-black text-white shrink-0">
-                                    <span className="text-rose-400">💎</span>
+                                  <span className="flex items-center gap-1 text-[10px] font-black text-amber-300 shrink-0">
+                                    <span>💎</span>
                                     {formatCompact(Number(room.totalDiamonds || 0))}
                                   </span>
                                 </div>
-                                <div className="flex items-center gap-1.5 mt-1">
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-2 py-[2px] text-[9px] font-black text-slate-900">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-2 py-[1px] text-[8px] font-black text-slate-900">
                                     💬 Chat
                                   </span>
-                                  <span className="text-[11px] leading-none">🇧🇩</span>
+                                  <span className="text-[10px] leading-none">🇧🇩</span>
                                 </div>
-                                <div className="flex items-end justify-between gap-2 mt-1">
-                                  <p className="text-[10px] text-slate-300 font-semibold line-clamp-2 flex-1">
-                                    {room.title || "SK Love live stream is active now."}
+                                <div className="flex items-center justify-between gap-1.5">
+                                  <p className="text-[10px] text-slate-300 font-semibold truncate flex-1">
+                                    {room.title || "SK Love live stream active"}
                                   </p>
-                                  <span className="flex items-center gap-1 text-[10px] font-black text-slate-200 shrink-0">
-                                    <span className="inline-flex items-end gap-[1.5px] h-3">
-                                      <span className="w-[3px] h-[6px] bg-rose-400 rounded-sm" />
-                                      <span className="w-[3px] h-[9px] bg-amber-400 rounded-sm" />
-                                      <span className="w-[3px] h-[12px] bg-emerald-400 rounded-sm" />
+                                  <span className="flex items-center gap-1 text-[9px] font-black text-slate-200 shrink-0">
+                                    <span className="inline-flex items-end gap-[1px] h-2.5">
+                                      <span className="w-[2.5px] h-[5px] bg-rose-400 rounded-sm" />
+                                      <span className="w-[2.5px] h-[7px] bg-amber-400 rounded-sm" />
+                                      <span className="w-[2.5px] h-[10px] bg-emerald-400 rounded-sm" />
                                     </span>
                                     {room.viewerCount || 0}
                                   </span>
@@ -14237,7 +14237,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           <button
             type="button"
             onClick={() => openPartyRoom("join", user)}
-            className="w-full flex items-stretch gap-3 text-left active:scale-[0.99] transition"
+            className="w-full flex items-center gap-2.5 text-left active:scale-[0.99] transition"
           >
             <img
               src={getUserAvatarUrl({
@@ -14245,15 +14245,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 avatar: user.hostAvatar,
               })}
               alt={user.hostName || user.title}
-              className="w-[72px] h-[72px] rounded-xl object-cover flex-shrink-0 border border-white/10 shadow-md"
+              className="w-14 h-14 rounded-xl object-cover flex-shrink-0 border border-amber-300/30 shadow-md"
             />
-            <div className="min-w-0 flex-1 flex flex-col justify-between py-0.5">
-              <div className="flex items-start justify-between gap-2">
-                <h4 className="text-white font-black text-[13px] leading-tight truncate">
+            <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
+              <div className="flex items-center justify-between gap-1.5">
+                <h4 className="text-white font-black text-[12px] leading-tight truncate">
                   {user.hostName || user.title || `Host #${user.hostId}`}
                 </h4>
-                <span className="flex items-center gap-1 text-[11px] font-black text-white shrink-0">
-                  <span className="text-amber-300">🪙</span>
+                <span className="flex items-center gap-1 text-[10px] font-black text-amber-300 shrink-0">
+                  <span>🪙</span>
                   {formatCompact(
                     Math.max(
                       Number((user as any).totalCoins || 0),
@@ -14263,21 +14263,21 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   )}
                 </span>
               </div>
-              <div className="flex items-center gap-1.5 mt-1">
-                <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-2 py-[2px] text-[9px] font-black text-slate-900">
+              <div className="flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 px-2 py-[1px] text-[8px] font-black text-slate-900">
                   💬 Chat
                 </span>
-                <span className="text-[11px] leading-none">🇧🇩</span>
+                <span className="text-[10px] leading-none">🇧🇩</span>
               </div>
-              <div className="flex items-end justify-between gap-2 mt-1">
-                <p className="text-[10px] text-slate-300 font-semibold line-clamp-2 flex-1">
-                  {user.title || "Open party room — tap to join the voice chat."}
+              <div className="flex items-center justify-between gap-1.5">
+                <p className="text-[10px] text-slate-300 font-semibold truncate flex-1">
+                  {user.title || "Open party room"}
                 </p>
-                <span className="flex items-center gap-1 text-[10px] font-black text-slate-200 shrink-0">
-                  <span className="inline-flex items-end gap-[1.5px] h-3">
-                    <span className="w-[3px] h-[6px] bg-rose-400 rounded-sm" />
-                    <span className="w-[3px] h-[9px] bg-amber-400 rounded-sm" />
-                    <span className="w-[3px] h-[12px] bg-emerald-400 rounded-sm" />
+                <span className="flex items-center gap-1 text-[9px] font-black text-slate-200 shrink-0">
+                  <span className="inline-flex items-end gap-[1px] h-2.5">
+                    <span className="w-[2.5px] h-[5px] bg-rose-400 rounded-sm" />
+                    <span className="w-[2.5px] h-[7px] bg-amber-400 rounded-sm" />
+                    <span className="w-[2.5px] h-[10px] bg-emerald-400 rounded-sm" />
                   </span>
                   {user.viewerCount || 0}
                 </span>
