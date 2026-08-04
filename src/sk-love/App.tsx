@@ -15447,24 +15447,16 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
 
 
-          {/* FIX: Party chat feed (host + guests). Default shows last 2; toggle expands to 5 visible with hidden scroll. */}
-          {/* FIX (UI parity): Party chat feed styled to mirror the video-streaming
-              comment overlay — bubble pills with avatar + ID chip + name + text.
-              Click a bubble to reply. Toggle expands to show more history. */}
+          {/* Party chat feed showing all messages scrollably */}
           {isPartyCommentsOpen && partyChatMessages.length > 0 && (
             <div
-              className={`party-chat-feed mt-auto mx-3 mb-16 relative z-20 max-w-[100%] overflow-y-auto p-0 flex flex-col-reverse ${
-                isPartyChatExpanded ? "max-h-40" : "max-h-32"
-              }`}
+              className="party-chat-feed mt-auto mx-3 mb-16 relative z-20 max-w-[100%] max-h-36 overflow-y-auto p-0 flex flex-col-reverse"
               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             >
               <style>{`.party-chat-feed::-webkit-scrollbar{display:none;width:0;height:0}`}</style>
               <div className="flex flex-col gap-1.5">
 
-                {(isPartyChatExpanded
-                  ? partyChatMessages
-                  : partyChatMessages.slice(-5)
-                ).map((m, index) => {
+                {partyChatMessages.map((m, index) => {
                   const trimmed = (m.text || "").trim();
                   const cleanText = trimmed
                     .replace(/\[ENTRY:[^\]]+\]\s*/g, "")
@@ -15529,6 +15521,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
             </div>
           )}
 
+          {/* Full screen backdrop to close comment popup when clicking anywhere outside */}
+          {isPartyCommentPopupOpen && (
+            <div
+              className="fixed inset-0 z-[75] bg-black/40 cursor-pointer"
+              onClick={() => setIsPartyCommentPopupOpen(false)}
+            />
+          )}
+
           {/* FIX: Bottom bar is fixed to the party screen bottom; parent padding/scroll can no longer leave a visible gap. */}
           <div className="fixed bottom-0 left-1/2 z-[60] flex w-full max-w-[480px] -translate-x-1/2 items-end gap-2 px-3 pt-0 pb-0 bg-gradient-to-t from-[#050310] via-[#050310]/95 to-[#050310]/70 backdrop-blur border-t border-pink-500/20">
 
@@ -15563,12 +15563,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 the button visuals were swapped to match the stream footer. */}
             <div className="relative flex flex-1 items-center justify-between gap-1 px-1 pb-0">
               {isPartyCommentPopupOpen ? (
-                <>
-                  <div
-                    className="fixed inset-0 z-[75] bg-black/30"
-                    onClick={() => setIsPartyCommentPopupOpen(false)}
-                  />
-                  <div className="relative z-[80] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
+                <div className="relative z-[80] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
                     <div className="relative flex items-center">
                       <input
                         ref={partyCommentInputRef}
@@ -15602,7 +15597,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                       </button>
                     </div>
                   </div>
-                </>
               ) : (
                 <>
                   {/* FIX (UI parity): Comment pencil button — mirrors the video
