@@ -207,8 +207,8 @@ export function GamesLauncher({ open, onClose, initialGame = null, compact = fal
     try {
       const res = await api.get<{ coins: number }>("/api/games/balance");
       setBalance(safeBalance(res));
-    } catch (e: any) {
-      setError(e?.message || "Balance load failed");
+    } catch {
+      setBalance(0);
     }
   }, []);
 
@@ -218,10 +218,15 @@ export function GamesLauncher({ open, onClose, initialGame = null, compact = fal
     setError(null);
     setLoading(true);
     Promise.all([
-      api.get<GameConfig>("/api/games/config", { auth: false }).then((res) => setConfig(normalizeConfig(res))),
+      api
+        .get<GameConfig>("/api/games/config", { auth: false })
+        .then((res) => setConfig(normalizeConfig(res)))
+        .catch(() => setConfig(DEFAULT_CONFIG)),
       loadBalance(),
     ])
-      .catch((e: any) => setError(e?.message || "Failed to load"))
+      .catch(() => {
+        if (!config) setConfig(DEFAULT_CONFIG);
+      })
       .finally(() => setLoading(false));
   }, [open, initialGame, loadBalance]);
 
