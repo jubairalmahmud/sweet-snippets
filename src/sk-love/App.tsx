@@ -7270,7 +7270,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       const receiverId = res?.receiver?.id ? Number(res.receiver.id) : null;
       const receiverRCoins = res?.receiver?.rCoins != null ? Number(res.receiver.rCoins) : null;
       if (receiverId && receiverRCoins != null) {
-        setTopStars((prev) =>
+        setLeaderboardStars((prev) =>
           prev.map((star: any) =>
             Number(star?.id) === receiverId ? { ...star, rCoins: receiverRCoins } : star,
           ),
