@@ -16401,7 +16401,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   <span className="text-[9px] font-bold uppercase tracking-widest text-amber-200/80">Total Gift Coins</span>
                 </div>
                 <span className="text-[18px] font-black text-amber-200 tabular-nums">
-                  🪙 {partyRoomSummary.totalCoins.toLocaleString()}
+                  🪙 {formatCoinValue(partyRoomSummary.totalCoins)}
                 </span>
               </div>
             </div>
@@ -16417,7 +16417,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                     {partyRoomSummary.topGifter.name}
                   </span>
                   <span className="ml-2 shrink-0 text-[13px] font-black text-amber-200 tabular-nums">
-                    🪙 {partyRoomSummary.topGifter.amount.toLocaleString()}
+                    🪙 {formatCoinValue(partyRoomSummary.topGifter.amount)}
                   </span>
                 </div>
               ) : (
