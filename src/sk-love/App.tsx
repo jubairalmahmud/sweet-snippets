@@ -181,12 +181,12 @@ const AVATAR_FRAME_CATALOG: Array<{
   durationDays: number;
   adminOnly?: boolean;
 }> = [
-  { id: "avatar-egol", dbId: 1, name: "Egol", image: frameEgolImg, price: 500000, durationDays: 30 },
-  { id: "avatar-fair", dbId: 2, name: "Fair", image: frameFairImg, price: 500000, durationDays: 30 },
-  { id: "avatar-king", dbId: 3, name: "KING", image: frameKingImg, price: 500000, durationDays: 30 },
-  { id: "avatar-queen", dbId: 4, name: "QUEEN", image: frameQueenImg, price: 500000, durationDays: 30 },
+  { id: "avatar-egol", dbId: 1, name: "Egol", image: frameEgolImg || "/frames/egol.png", price: 500000, durationDays: 30 },
+  { id: "avatar-fair", dbId: 2, name: "Fair", image: frameFairImg || "/frames/fair.png", price: 500000, durationDays: 30 },
+  { id: "avatar-king", dbId: 3, name: "KING", image: frameKingImg || "/frames/king.png", price: 500000, durationDays: 30 },
+  { id: "avatar-queen", dbId: 4, name: "QUEEN", image: frameQueenImg || "/frames/queen.png", price: 500000, durationDays: 30 },
   // Admin-granted only — awarded to approved agency owners via Admin Dashboard.
-  { id: "avatar-agency-premium", dbId: 5, name: "AGENCY", image: frameAgencyPremiumImg, price: 0, durationDays: 3650, adminOnly: true },
+  { id: "avatar-agency-premium", dbId: 5, name: "AGENCY", image: frameAgencyPremiumImg || "/frames/agency-premium.png", price: 0, durationDays: 3650, adminOnly: true },
 ];
 
 export function getFrameCatalogItem(frameId: string | number | null | undefined) {
@@ -27295,6 +27295,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 src={selected.image}
                                 alt={selected.name}
                                 className="pointer-events-none absolute inset-0 w-full h-full object-contain drop-shadow-[0_0_12px_rgba(255,200,80,0.65)] animate-pulse"
+                                onError={(e) => {
+                                  const clean = selected.id.replace(/^avatar-/, "");
+                                  e.currentTarget.src = `/frames/${clean}.png`;
+                                }}
                               />
                             </>
                           ) : (
@@ -27338,6 +27342,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                       src={item.image}
                                       alt={item.name}
                                       className="w-[92%] h-[92%] object-contain"
+                                      onError={(e) => {
+                                        const clean = item.id.replace(/^avatar-/, "");
+                                        e.currentTarget.src = `/frames/${clean}.png`;
+                                      }}
                                     />
                                   ) : (
                                     <span>{item.emoji}</span>
