@@ -1506,6 +1506,7 @@ export default function App() {
   const [partyJoinRequests, setPartyJoinRequests] = useState<any[]>([]);
   const [isPartyJoinRequestsOpen, setIsPartyJoinRequestsOpen] = useState<boolean>(false);
   const [partyMyJoinStatus, setPartyMyJoinStatus] = useState<"pending" | "accepted" | "rejected" | null>(null);
+  const consumedJoinStatusRef = useRef<boolean>(false);
   // FIX (Private mode): visible in-room toast (comments feed was too subtle).
   const [partyToast, setPartyToast] = useState<{ id: number; text: string; tone: "info" | "success" | "warn" } | null>(null);
   const partyToastTimerRef = useRef<any>(null);
@@ -6563,6 +6564,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     setPartyRoomPrivacy("public");
     setPartyJoinRequests([]);
     setPartyMyJoinStatus(null);
+    consumedJoinStatusRef.current = false;
   }, [activePartyRoom?.id]);
 
   useEffect(() => {
@@ -6637,6 +6639,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         const data: any = await api.get(`/api/party-rooms/${rid}/join-requests/mine`);
         if (cancelled) return;
         const nextStatus = ((data?.status ?? data?.data?.status ?? data?.request?.status) as any) ?? null;
+        if (consumedJoinStatusRef.current && nextStatus === "accepted") {
+          return;
+        }
         setPartyMyJoinStatus((prev) => {
           if (prev !== nextStatus) {
             if (nextStatus === "accepted") {
@@ -8694,6 +8699,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     );
     delete partySeatMuteOverrideRef.current[seatIndex];
     partyMicMuteHoldRef.current = null;
+    if (partyRoomPrivacy === "private") {
+      consumedJoinStatusRef.current = true;
+      setPartyMyJoinStatus(null);
+    }
     isPartyMicMutedRef.current = isSelfMutedByHost;
     setIsPartyMicMuted(isSelfMutedByHost);
     partyHadSeatRef.current = true;
@@ -8824,6 +8833,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     delete partySeatMuteOverrideRef.current[seatIndex];
     partyHadSeatRef.current = true;
     partyMicMuteHoldRef.current = null;
+    if (partyRoomPrivacy === "private") {
+      consumedJoinStatusRef.current = true;
+      setPartyMyJoinStatus(null);
+    }
     const isSelfMutedByHost = Boolean(
       (currentUserId && hostMutedPartyUserIdsRef.current.has(Number(currentUserId))) ||
       (selfName && hostMutedPartyUserNamesRef.current.has(String(selfName).trim().toLowerCase()))
@@ -10573,6 +10586,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     const rid = activePartyRoom?.id;
     if (!rid) return;
     try {
+      consumedJoinStatusRef.current = false;
       const data: any = await api.post(`/api/party-rooms/${rid}/join-requests`, {});
       setPartyMyJoinStatus("pending");
       showPartyToast(
