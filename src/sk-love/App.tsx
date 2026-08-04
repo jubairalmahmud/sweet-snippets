@@ -187,10 +187,10 @@ const AVATAR_FRAME_CATALOG: Array<{
   { id: "avatar-fair", dbId: 2, name: "Fair", image: frameFairImg || "/frames/fair.png", price: 500000, durationDays: 30 },
   { id: "avatar-king", dbId: 3, name: "KING", image: frameKingImg || "/frames/king.png", price: 500000, durationDays: 30 },
   { id: "avatar-queen", dbId: 4, name: "QUEEN", image: frameQueenImg || "/frames/queen.png", price: 500000, durationDays: 30 },
-  // Official Role Badge Frames
-  { id: "avatar-agency-premium", dbId: 5, name: "AGENCY", image: frameAgencyPremiumImg || "/frames/agency-premium.png", price: 0, durationDays: 3650 },
-  { id: "avatar-host-premium", dbId: 6, name: "HOST", image: frameHostPremiumImg || "/frames/host-premium.png", price: 0, durationDays: 3650 },
-  { id: "avatar-reseller-premium", dbId: 7, name: "RESELLER", image: frameResellerPremiumImg || "/frames/reseller-premium.png", price: 0, durationDays: 3650 },
+  // Official Role Badge Frames (Admin Granted Only - Cannot be purchased with coins)
+  { id: "avatar-agency-premium", dbId: 5, name: "AGENCY", image: frameAgencyPremiumImg || "/frames/agency-premium.png", price: 0, durationDays: 3650, adminOnly: true },
+  { id: "avatar-host-premium", dbId: 6, name: "HOST", image: frameHostPremiumImg || "/frames/host-premium.png", price: 0, durationDays: 3650, adminOnly: true },
+  { id: "avatar-reseller-premium", dbId: 7, name: "RESELLER", image: frameResellerPremiumImg || "/frames/reseller-premium.png", price: 0, durationDays: 3650, adminOnly: true },
 ];
 
 export function getFrameCatalogItem(frameId: string | number | null | undefined) {
@@ -27212,13 +27212,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   "avatar" | "party" | "rides",
                   { id: string; name: string; emoji: string; price: string; gradient: string; image?: string }[]
                 > = {
-                  avatar: AVATAR_FRAME_CATALOG.filter((f) => !f.adminOnly).map((f) => ({
+                  avatar: AVATAR_FRAME_CATALOG.map((f) => ({
                     id: f.id,
                     name: f.name,
                     emoji: "",
                     image: f.image,
-                    price: f.price > 0 ? `${(f.price / 1000).toLocaleString()}K/${f.durationDays} d` : "OFFICIAL",
-                    gradient: f.price === 0 ? "from-amber-100 to-yellow-50" : "from-purple-100 to-pink-50",
+                    price: f.adminOnly ? "OFFICIAL" : f.price > 0 ? `${(f.price / 1000).toLocaleString()}K/${f.durationDays} d` : "FREE",
+                    gradient: f.adminOnly ? "from-amber-100 to-yellow-50" : "from-purple-100 to-pink-50",
+                    adminOnly: f.adminOnly,
                   })),
 
 
@@ -27584,6 +27585,22 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                             </button>
                           );
                         }
+                        if (catItem?.adminOnly) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                window.alert(
+                                  `🔒 "${catItem.name}" এটি একটি অফিসিয়াল রোল ব্যাজ ফ্রেম।\n\nএটি কয়েন দিয়ে কেনা যাবে না। শুধুমাত্র এডমিন ড্যাশবোর্ড থেকে অনুমোদিত এজেন্সি, হোস্ট বা রিসেলারদের এই ফ্রেম প্রদান করা হয়।`,
+                                );
+                              }}
+                              className="bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold text-[12px] px-6 py-2.5 rounded-full cursor-pointer hover:bg-amber-500/30 transition flex items-center gap-1.5 shadow-md"
+                            >
+                              <span>🔒 Admin Granted Only (এডমিন প্রদত্ত)</span>
+                            </button>
+                          );
+                        }
+
                         return (
                           <button
                             onClick={() => {
@@ -27597,9 +27614,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 );
                                 return;
                               }
-                              const confirmMsg = catItem.price > 0
-                                ? `"${catItem.name}" ফ্রেমটি কিনতে চান?\n\nমূল্য: 🪙 ${catItem.price.toLocaleString()}\nমেয়াদ: ${catItem.durationDays} দিন`
-                                : `"${catItem.name}" অফিসিয়াল ফ্রেমটি ফ্রিতে যুক্ত এবং সক্রিয় করতে চান?`;
+                              const confirmMsg = `"${catItem.name}" ফ্রেমটি কিনতে চান?\n\nমূল্য: 🪙 ${catItem.price.toLocaleString()}\nমেয়াদ: ${catItem.durationDays} দিন`;
                               const ok = window.confirm(confirmMsg);
                               if (!ok) return;
                               const expiry = Date.now() + catItem.durationDays * 24 * 60 * 60 * 1000;
@@ -27633,7 +27648,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                           >
                             Purchase
                           </button>
-
                         );
                       })()}
 

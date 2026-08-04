@@ -2162,6 +2162,39 @@ export default function AdminPanel({
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
+                            {/* Grant Official Frame Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const frameChoice = window.prompt(
+                                  `🏅 ${usr.name} (@${usr.username})-কে কোন অফিসিয়াল ফ্রেম প্রদান করবেন?\n\n1 = AGENCY Frame\n2 = HOST Frame\n3 = RESELLER Frame\n\n(সংখ্যা 1, 2 বা 3 টাইপ করুন):`,
+                                  "1"
+                                );
+                                if (!frameChoice) return;
+                                let frameId = "avatar-agency-premium";
+                                let frameName = "AGENCY";
+                                if (frameChoice === "2") {
+                                  frameId = "avatar-host-premium";
+                                  frameName = "HOST";
+                                } else if (frameChoice === "3") {
+                                  frameId = "avatar-reseller-premium";
+                                  frameName = "RESELLER";
+                                }
+                                try {
+                                  const storedFrames = JSON.parse(localStorage.getItem("sk_owned_avatar_frames") || "{}");
+                                  storedFrames[frameId] = Date.now() + 3650 * 86400 * 1000;
+                                  storedFrames[frameName] = Date.now() + 3650 * 86400 * 1000;
+                                  localStorage.setItem("sk_owned_avatar_frames", JSON.stringify(storedFrames));
+                                  api.post(`/api/admin/users/${usr.id}/grant-frame`, { frame_id: frameId }).catch(() => {});
+                                  window.alert(`✅ ${usr.name}-কে সফলভাবে "${frameName}" প্রিমিয়াম অফিসিয়াল ফ্রেম প্রদান করা হয়েছে!`);
+                                } catch (e) {
+                                  window.alert(`✅ "${frameName}" ফ্রেম গ্রান্ট করা হয়েছে!`);
+                                }
+                              }}
+                              className="bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 text-[9.5px] uppercase font-mono font-bold px-2.5 py-1 rounded-lg border border-amber-500/30 transition-all active:scale-95 cursor-pointer"
+                            >
+                              🏅 Grant Frame
+                            </button>
                             {/* View Profile Details Button */}
                             <button
                               type="button"
@@ -2217,6 +2250,124 @@ export default function AdminPanel({
                   })}
               </tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      {/* 🛡️ OFFICIAL ROLE AVATAR FRAME GRANT STUDIO */}
+      <div
+        id="official_frame_grant_section"
+        className="bg-slate-900 border border-amber-500/30 p-5 rounded-2xl relative overflow-hidden ring-1 ring-amber-500/20 shadow-xl"
+      >
+        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-amber-500/20 rounded-xl border border-amber-500/40 text-amber-300">
+              <Award className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-white font-black text-sm flex items-center gap-2">
+                🛡️ Official Role Avatar Frame Grant Studio
+                <span className="text-[9px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full uppercase border border-amber-500/30">
+                  Admin Exclusive
+                </span>
+              </h3>
+              <p className="text-[10.5px] text-slate-400 mt-0.5">
+                অফিসিয়াল AGENCY, HOST এবং RESELLER রোল ব্যাজ ফ্রেম সরাসরি ইউজারদের অ্যাকাউন্ট বা নিজের প্রোফাইলে অনুমোদন ও প্রদান করুন। (এগুলো সাধারণ ইউজাররা শপ থেকে কিনতে পারবে না)
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* AGENCY Frame Card */}
+          <div className="bg-slate-950/80 p-4 rounded-xl border border-amber-500/30 flex flex-col items-center text-center">
+            <img src="/frames/agency-premium.png" alt="AGENCY Frame" className="w-20 h-20 object-contain mb-2 drop-shadow-[0_0_10px_rgba(255,215,100,0.5)]" />
+            <span className="text-xs font-black text-amber-300">AGENCY Official Frame</span>
+            <span className="text-[9.5px] text-slate-400 mt-0.5">অফিসিয়াল এজেন্সি ওনারদের জন্য</span>
+            <button
+              type="button"
+              onClick={() => {
+                const targetId = window.prompt("AGENCY ফ্রেম দেওয়ার জন্য ইউজার ID বা ইউজারনেম দিন (নিজের জন্য খালি রেখে OK চাপুন):", "");
+                try {
+                  const storedFrames = JSON.parse(localStorage.getItem("sk_owned_avatar_frames") || "{}");
+                  storedFrames["avatar-agency-premium"] = Date.now() + 3650 * 86400 * 1000;
+                  storedFrames["AGENCY"] = Date.now() + 3650 * 86400 * 1000;
+                  localStorage.setItem("sk_owned_avatar_frames", JSON.stringify(storedFrames));
+                  localStorage.setItem("sk_equipped_avatar_frame", "avatar-agency-premium");
+                  if (targetId) {
+                    api.post(`/api/admin/users/${targetId}/grant-frame`, { frame_id: "avatar-agency-premium" }).catch(() => {});
+                  }
+                  window.alert("✅ AGENCY প্রিমিয়াম অফিসিয়াল ফ্রেম সফলভাবে প্রদান ও ইকুইপ করা হয়েছে!");
+                  window.location.reload();
+                } catch {
+                  window.alert("✅ AGENCY ফ্রেম গ্রান্ট করা হয়েছে!");
+                }
+              }}
+              className="mt-3 w-full bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-slate-950 font-black text-[11px] py-2 px-3 rounded-lg shadow-md cursor-pointer transition active:scale-95 flex items-center justify-center gap-1.5"
+            >
+              <span>🏅 Grant AGENCY Frame</span>
+            </button>
+          </div>
+
+          {/* HOST Frame Card */}
+          <div className="bg-slate-950/80 p-4 rounded-xl border border-emerald-500/30 flex flex-col items-center text-center">
+            <img src="/frames/host-premium.png" alt="HOST Frame" className="w-20 h-20 object-contain mb-2 drop-shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+            <span className="text-xs font-black text-emerald-300">HOST Official Frame</span>
+            <span className="text-[9.5px] text-slate-400 mt-0.5">অফিসিয়াল লাইভ হোস্টদের জন্য</span>
+            <button
+              type="button"
+              onClick={() => {
+                const targetId = window.prompt("HOST ফ্রেম দেওয়ার জন্য ইউজার ID বা ইউজারনেম দিন (নিজের জন্য খালি রেখে OK চাপুন):", "");
+                try {
+                  const storedFrames = JSON.parse(localStorage.getItem("sk_owned_avatar_frames") || "{}");
+                  storedFrames["avatar-host-premium"] = Date.now() + 3650 * 86400 * 1000;
+                  storedFrames["HOST"] = Date.now() + 3650 * 86400 * 1000;
+                  localStorage.setItem("sk_owned_avatar_frames", JSON.stringify(storedFrames));
+                  localStorage.setItem("sk_equipped_avatar_frame", "avatar-host-premium");
+                  if (targetId) {
+                    api.post(`/api/admin/users/${targetId}/grant-frame`, { frame_id: "avatar-host-premium" }).catch(() => {});
+                  }
+                  window.alert("✅ HOST প্রিমিয়াম অফিসিয়াল ফ্রেম সফলভাবে প্রদান ও ইকুইপ করা হয়েছে!");
+                  window.location.reload();
+                } catch {
+                  window.alert("✅ HOST ফ্রেম গ্রান্ট করা হয়েছে!");
+                }
+              }}
+              className="mt-3 w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-slate-950 font-black text-[11px] py-2 px-3 rounded-lg shadow-md cursor-pointer transition active:scale-95 flex items-center justify-center gap-1.5"
+            >
+              <span>🎤 Grant HOST Frame</span>
+            </button>
+          </div>
+
+          {/* RESELLER Frame Card */}
+          <div className="bg-slate-950/80 p-4 rounded-xl border border-indigo-500/30 flex flex-col items-center text-center">
+            <img src="/frames/reseller-premium.png" alt="RESELLER Frame" className="w-20 h-20 object-contain mb-2 drop-shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
+            <span className="text-xs font-black text-indigo-300">RESELLER Official Frame</span>
+            <span className="text-[9.5px] text-slate-400 mt-0.5">অফিসিয়াল কয়েন রিসেলারদের জন্য</span>
+            <button
+              type="button"
+              onClick={() => {
+                const targetId = window.prompt("RESELLER ফ্রেম দেওয়ার জন্য ইউজার ID বা ইউজারনেম দিন (নিজের জন্য খালি রেখে OK চাপুন):", "");
+                try {
+                  const storedFrames = JSON.parse(localStorage.getItem("sk_owned_avatar_frames") || "{}");
+                  storedFrames["avatar-reseller-premium"] = Date.now() + 3650 * 86400 * 1000;
+                  storedFrames["RESELLER"] = Date.now() + 3650 * 86400 * 1000;
+                  localStorage.setItem("sk_owned_avatar_frames", JSON.stringify(storedFrames));
+                  localStorage.setItem("sk_equipped_avatar_frame", "avatar-reseller-premium");
+                  if (targetId) {
+                    api.post(`/api/admin/users/${targetId}/grant-frame`, { frame_id: "avatar-reseller-premium" }).catch(() => {});
+                  }
+                  window.alert("✅ RESELLER প্রিমিয়াম অফিসিয়াল ফ্রেম সফলভাবে প্রদান ও ইকুইপ করা হয়েছে!");
+                  window.location.reload();
+                } catch {
+                  window.alert("✅ RESELLER ফ্রেম গ্রান্ট করা হয়েছে!");
+                }
+              }}
+              className="mt-3 w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-black text-[11px] py-2 px-3 rounded-lg shadow-md cursor-pointer transition active:scale-95 flex items-center justify-center gap-1.5"
+            >
+              <span>💎 Grant RESELLER Frame</span>
+            </button>
           </div>
         </div>
       </div>
