@@ -14876,11 +14876,55 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               const occupants = partySeats
                 .slice(0, maxGuestSeats + 1)
                 .filter((s) => s.occupant);
+
+              const seatedNamesSet = new Set<string>();
+              occupants.forEach((s) => {
+                if (s.occupant) seatedNamesSet.add(s.occupant.trim().toLowerCase());
+              });
+
+              // Audience items (chat senders + current user + simulated users)
+              const audienceAvatars: Array<{ name: string; avatar?: string | null }> = [];
+              const seenNames = new Set<string>();
+
+              // 1. Chat senders
+              partyChatMessages.forEach((m) => {
+                const cname = (m.name || "").trim();
+                if (cname && !seatedNamesSet.has(cname.toLowerCase()) && !seenNames.has(cname.toLowerCase())) {
+                  seenNames.add(cname.toLowerCase());
+                  audienceAvatars.push({ name: cname, avatar: (m as any).avatar });
+                }
+              });
+
+              // 2. Current user
+              const myName = (registerName || "").trim();
+              if (myName && !seatedNamesSet.has(myName.toLowerCase()) && !seenNames.has(myName.toLowerCase())) {
+                seenNames.add(myName.toLowerCase());
+                audienceAvatars.push({ name: myName, avatar: profileAvatarImg });
+              }
+
+              // 3. Simulated users fallback
+              if (Array.isArray(simulatedUsers)) {
+                for (const sim of simulatedUsers) {
+                  const sName = (sim.name || "").trim();
+                  if (sName && !seatedNamesSet.has(sName.toLowerCase()) && !seenNames.has(sName.toLowerCase())) {
+                    seenNames.add(sName.toLowerCase());
+                    audienceAvatars.push({ name: sName, avatar: sim.avatar });
+                    if (occupants.length + audienceAvatars.length >= 4) break;
+                  }
+                }
+              }
+
+              // Combine seated occupants and audience members for avatar stack
+              const combinedAvatars = [
+                ...occupants.map((s) => ({ name: s.occupant || "", avatar: s.icon || (s as any).avatar })),
+                ...audienceAvatars,
+              ];
+
               const viewerCount = Math.max(
                 Number(activePartyRoom?.viewerCount || 0),
-                occupants.length,
+                occupants.length + audienceAvatars.length,
               );
-              const avatarStack = occupants.slice(0, 3);
+              const avatarStack = combinedAvatars.slice(0, 4);
               return (
                 <button
                   type="button"
@@ -14900,8 +14944,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                     <span className="flex items-center -space-x-2">
                       {avatarStack.map((s, i) => (
                         <img
-                          key={`vp-${i}-${s.userId ?? s.occupant}`}
-                          src={getUserAvatarUrl({ name: s.occupant || "", avatar: s.icon || (s as any).avatar })}
+                          key={`vp-${i}-${s.name}`}
+                          src={getUserAvatarUrl({ name: s.name, avatar: s.avatar })}
                           alt=""
                           className="h-6 w-6 rounded-full border border-slate-900 object-cover bg-slate-800"
                         />
@@ -14916,8 +14960,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 </button>
               );
             })()}
-
-
 
             {/* Right: blue hex viewer chip + red exit */}
             <button
@@ -15530,7 +15572,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           )}
 
           {/* FIX: Bottom bar is fixed to the party screen bottom; parent padding/scroll can no longer leave a visible gap. */}
-          <div className="fixed bottom-0 left-1/2 z-[60] flex w-full max-w-[480px] -translate-x-1/2 items-end gap-2 px-3 pt-0 pb-0 bg-gradient-to-t from-[#050310] via-[#050310]/95 to-[#050310]/70 backdrop-blur border-t border-pink-500/20">
+          <div className={`fixed bottom-0 left-1/2 ${isPartyCommentPopupOpen ? "z-[80]" : "z-[60]"} flex w-full max-w-[480px] -translate-x-1/2 items-end gap-2 px-3 pt-0 pb-0 bg-gradient-to-t from-[#050310] via-[#050310]/95 to-[#050310]/70 backdrop-blur border-t border-pink-500/20`}>
 
 
             {/* FIX (UI parity): inline comment input removed; replaced by
@@ -15563,7 +15605,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 the button visuals were swapped to match the stream footer. */}
             <div className="relative flex flex-1 items-center justify-between gap-1 px-1 pb-0">
               {isPartyCommentPopupOpen ? (
-                <div className="relative z-[80] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
+                <div
+                  className="relative z-[80] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md"
+                  onClick={(e) => e.stopPropagation()}
+                  onTouchEnd={(e) => e.stopPropagation()}
+                >
                     <div className="relative flex items-center">
                       <input
                         ref={partyCommentInputRef}
@@ -15584,6 +15630,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                       />
                       <button
                         type="button"
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
                           sendPartyChat();
                           setTimeout(() => partyCommentInputRef.current?.focus(), 50);
@@ -16078,11 +16125,81 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               (s) => hostIdNum != null && s.userId && Number(s.userId) === hostIdNum,
             );
             const guests = seated.filter((s) => s !== hostSeat);
-            const totalCount = Math.max(
+
+            const seatedNamesSet = new Set<string>();
+            seated.forEach((s) => {
+              if (s.occupant) seatedNamesSet.add(s.occupant.trim().toLowerCase());
+            });
+
+            // Gather Audience (non-seated viewers)
+            const audienceMap = new Map<string, { id?: number | string; name: string; avatar?: string | null; role?: string }>();
+
+            // 1. Direct viewers/audience array in activePartyRoom if present
+            const roomViewersArr = activePartyRoom?.audience || activePartyRoom?.viewers || activePartyRoom?.members || activePartyRoom?.participants || [];
+            if (Array.isArray(roomViewersArr)) {
+              roomViewersArr.forEach((u: any) => {
+                const uname = (u?.name || u?.userName || u?.nickname || u?.occupant || "").trim();
+                if (uname && !seatedNamesSet.has(uname.toLowerCase())) {
+                  audienceMap.set(uname.toLowerCase(), {
+                    id: u?.id || u?.userId,
+                    name: uname,
+                    avatar: u?.avatar || u?.icon || u?.avatarUrl,
+                    role: "Audience",
+                  });
+                }
+              });
+            }
+
+            // 2. Chat message senders in partyChatMessages
+            if (Array.isArray(partyChatMessages)) {
+              partyChatMessages.forEach((m) => {
+                const cname = (m.name || "").trim();
+                if (cname && !seatedNamesSet.has(cname.toLowerCase()) && !audienceMap.has(cname.toLowerCase())) {
+                  audienceMap.set(cname.toLowerCase(), {
+                    name: cname,
+                    avatar: (m as any).avatar || null,
+                    role: "Audience",
+                  });
+                }
+              });
+            }
+
+            // 3. Current logged-in user if active and not seated
+            const myName = (registerName || "").trim();
+            if (myName && !seatedNamesSet.has(myName.toLowerCase()) && !audienceMap.has(myName.toLowerCase())) {
+              audienceMap.set(myName.toLowerCase(), {
+                name: myName,
+                avatar: profileAvatarImg || null,
+                role: "You (Audience)",
+              });
+            }
+
+            // 4. Fill remaining needed viewer count using simulated users if total viewerCount > known users
+            const targetTotalCount = Math.max(
               Number(activePartyRoom?.viewerCount || 0),
-              seated.length,
+              seated.length + audienceMap.size,
             );
-            const silentCount = Math.max(0, totalCount - seated.length);
+
+            if (targetTotalCount > seated.length + audienceMap.size && Array.isArray(simulatedUsers)) {
+              for (const sim of simulatedUsers) {
+                if (seated.length + audienceMap.size >= targetTotalCount) break;
+                const sName = (sim.name || "").trim();
+                if (sName && !seatedNamesSet.has(sName.toLowerCase()) && !audienceMap.has(sName.toLowerCase())) {
+                  audienceMap.set(sName.toLowerCase(), {
+                    id: sim.id,
+                    name: sName,
+                    avatar: sim.avatar,
+                    role: "Audience",
+                  });
+                }
+              }
+            }
+
+            const audienceList = Array.from(audienceMap.values());
+            const knownCount = seated.length + audienceList.length;
+            const totalCount = Math.max(targetTotalCount, knownCount);
+            const silentCount = Math.max(0, totalCount - knownCount);
+
             return (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4">
                 <div className="w-full max-w-sm rounded-3xl border border-purple-400/25 bg-gradient-to-br from-[#1a1030] via-[#140a2b] to-[#0a0618] p-5 shadow-[0_25px_60px_-15px_rgba(168,85,247,0.4)] relative overflow-hidden">
@@ -16106,10 +16223,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   </div>
 
                   <div className="relative max-h-[320px] overflow-y-auto space-y-1.5 pr-1">
+                    {/* Host Card */}
                     {hostSeat && (
                       <div className="flex items-center gap-2.5 rounded-xl border border-amber-400/30 bg-amber-500/[0.08] px-2.5 py-2">
                         <img
-                          src={getUserAvatarUrl({ name: hostSeat.occupant || "", avatar: hostSeat.avatar })}
+                          src={getUserAvatarUrl({ name: hostSeat.occupant || "", avatar: hostSeat.avatar || hostSeat.icon })}
                           alt={hostSeat.occupant || ""}
                           className="h-8 w-8 rounded-full border border-amber-300/40 object-cover"
                         />
@@ -16120,13 +16238,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                         <Crown className="h-4 w-4 text-amber-300" />
                       </div>
                     )}
+
+                    {/* Guests Cards */}
                     {guests.map((s) => (
                       <div
-                        key={`viewer-${s._idx}`}
+                        key={`viewer-seat-${s._idx}`}
                         className="flex items-center gap-2.5 rounded-xl border border-white/8 bg-white/[0.03] px-2.5 py-2"
                       >
                         <img
-                          src={getUserAvatarUrl({ name: s.occupant || "", avatar: s.avatar })}
+                          src={getUserAvatarUrl({ name: s.occupant || "", avatar: s.avatar || s.icon })}
                           alt={s.occupant || ""}
                           className="h-7 w-7 rounded-full border border-white/10 object-cover"
                         />
@@ -16136,6 +16256,37 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                         </div>
                       </div>
                     ))}
+
+                    {/* Audience Section */}
+                    {audienceList.length > 0 && (
+                      <div className="pt-2 pb-1">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-purple-300/70 mb-1.5 px-1 flex items-center justify-between">
+                          <span>Audience</span>
+                          <span className="text-[9px] font-semibold text-purple-300/50">{audienceList.length}</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {audienceList.map((aud, i) => (
+                            <div
+                              key={`viewer-aud-${i}-${aud.name}`}
+                              className="flex items-center gap-2.5 rounded-xl border border-purple-500/15 bg-purple-900/10 px-2.5 py-2"
+                            >
+                              <img
+                                src={getUserAvatarUrl({ name: aud.name, avatar: aud.avatar })}
+                                alt={aud.name}
+                                className="h-7 w-7 rounded-full border border-purple-400/20 object-cover"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-[12px] font-bold text-white">{aud.name}</div>
+                                <div className="text-[9px] font-semibold text-purple-300/60">{aud.role || "Audience"}</div>
+                              </div>
+                              <Eye className="h-3.5 w-3.5 text-purple-300/40" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Silent Viewers Count */}
                     {silentCount > 0 && (
                       <div className="mt-2 rounded-xl border border-white/8 bg-white/[0.02] px-2.5 py-2 text-center">
                         <span className="text-[11px] font-semibold text-purple-200/70">
@@ -16143,7 +16294,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                         </span>
                       </div>
                     )}
-                    {seated.length === 0 && silentCount === 0 && (
+
+                    {/* Empty state */}
+                    {seated.length === 0 && audienceList.length === 0 && silentCount === 0 && (
                       <div className="py-8 text-center">
                         <Users className="mx-auto h-6 w-6 text-purple-300/40" />
                         <p className="mt-2 text-[11px] font-semibold text-purple-200/60">
@@ -21919,6 +22072,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                         />
                                         <button
                                           type="button"
+                                          onMouseDown={(e) => e.preventDefault()}
                                           onClick={() => {
                                             void sendComment();
                                             setTimeout(() => liveCommentInputRef.current?.focus(), 50);
@@ -23420,6 +23574,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                       />
                                       <button
                                         type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => {
                                           void sendComment();
                                           setTimeout(() => liveCommentInputRef.current?.focus(), 50);
