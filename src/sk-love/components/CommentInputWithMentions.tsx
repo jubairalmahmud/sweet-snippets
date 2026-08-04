@@ -121,9 +121,13 @@ export default function CommentInputWithMentions({
                     : "text-slate-300 hover:bg-slate-900"
                 }`}
               >
-                <span className="w-4.5 h-4.5 rounded-full bg-slate-900/60 border border-slate-800 flex items-center justify-center text-[7.5px] shrink-0 font-sans">
-                  {user.avatar || "👤"}
-                </span>
+                {user.avatar && (user.avatar.startsWith("http") || user.avatar.startsWith("data:")) ? (
+                  <img src={user.avatar} alt="" className="w-4.5 h-4.5 rounded-full object-cover shrink-0 border border-slate-800" />
+                ) : (
+                  <span className="w-4.5 h-4.5 rounded-full bg-slate-900/60 border border-slate-800 flex items-center justify-center text-[7.5px] shrink-0 font-sans">
+                    {user.avatar || "👤"}
+                  </span>
+                )}
                 <div className="truncate flex-1 min-w-0">
                   <p
                     className={`font-bold truncate leading-none ${idx === selectedUserIndex ? "text-white" : "text-slate-200"}`}

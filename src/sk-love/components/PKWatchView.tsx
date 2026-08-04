@@ -7,10 +7,10 @@
  *  timer, top contributors, live chat overlay, floating hearts & gifting.
  * ============================================================================
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import type { MutableRefObject } from "react";
 import { createPortal } from "react-dom";
-import { X, Send, Gift, Heart, Share2, Star, Plus } from "lucide-react";
+import { X, Send, Gift, Heart, Share2, Star, Plus, CornerDownRight, Reply, AtSign } from "lucide-react";
 import { api } from "../lib/api";
 
 // Dynamic Agora import — matches App.tsx SSR-safe pattern
@@ -49,10 +49,12 @@ type PKComment = {
   user_id: number;
   user_name?: string | null;
   user_avatar?: string | null;
+  avatar?: string | null;
   role: "host_from" | "host_to" | "viewer";
   text: string;
   level?: number;
   created_at?: string | null;
+  replyTo?: { name: string; text: string } | null;
 };
 
 export type PKGiftItem = {
@@ -62,6 +64,18 @@ export type PKGiftItem = {
   diamonds: number;
   rCoins: number;
   image?: string | null;
+};
+
+export type SideGiftOverlayItem = {
+  id: string;
+  side: "from" | "to";
+  giftName: string;
+  giftIcon: string;
+  giftImage?: string | null;
+  diamonds: number;
+  senderName: string;
+  senderAvatar?: string | null;
+  receiverName: string;
 };
 
 interface Props {
@@ -179,6 +193,102 @@ export default function PKWatchView({
   const [giftTarget, setGiftTarget] = useState<"from" | "to" | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [hearts, setHearts] = useState<FloatingHeartItem[]>([]);
+  const [replyingTo, setReplyingTo] = useState<{ name: string; text: string } | null>(null);
+  const [sideGifts, setSideGifts] = useState<SideGiftOverlayItem[]>([]);
+
+  const triggerSideGift = (
+    side: "from" | "to",
+    gift: { name: string; icon?: string; diamonds?: number; image?: string | null },
+    senderName: string,
+    senderAvatar?: string | null,
+    receiverName?: string,
+    giftKey?: string,
+  ) => {
+    const id = giftKey || `side_gift_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
+    setSideGifts((prev) => {
+      if (prev.some((g) => g.id === id)) return prev;
+
+      const now = Date.now();
+      const isRecentDuplicate = prev.some(
+        (g) =>
+          g.side === side &&
+          g.senderName === senderName &&
+          g.giftName === gift.name &&
+          Math.abs(now - (g.timestamp || 0)) < 2500
+      );
+      if (isRecentDuplicate) return prev;
+
+      const item: SideGiftOverlayItem & { timestamp?: number } = {
+        id,
+        side,
+        giftName: gift.name || "Special Gift",
+        giftIcon: gift.icon || "🎁",
+        giftImage: gift.image || null,
+        diamonds: gift.diamonds || 100,
+        senderName: senderName || "Gifter",
+        senderAvatar: senderAvatar || null,
+        receiverName:
+          receiverName ||
+          (side === "from" ? (battle?.from_name || "Host A") : (battle?.to_name || "Host B")),
+        timestamp: now,
+      };
+
+      return [...prev.slice(-2), item];
+    });
+
+    setTimeout(() => {
+      setSideGifts((prev) => prev.filter((g) => g.id !== id));
+    }, 3500);
+  };
+
+  const renderFormattedCommentText = (text: string) => {
+    if (!text) return "";
+    const parts = text.split(/(@[\w\u0980-\u09FF.-]+)/g);
+    return (
+      <>
+        {parts.map((part, index) => {
+          if (part.startsWith("@")) {
+            return (
+              <span
+                key={index}
+                className="font-black text-cyan-300 bg-cyan-950/80 px-1 py-0.5 rounded text-[10px] mx-0.5 border border-cyan-400/40 shadow-sm"
+              >
+                {part}
+              </span>
+            );
+          }
+          return part;
+        })}
+      </>
+    );
+  };
+
+  const lastWordInDraft = (draft.split(" ").pop() || "").trim();
+  const isMentioningUser = lastWordInDraft.startsWith("@");
+  const mentionQuery = isMentioningUser ? lastWordInDraft.slice(1).toLowerCase() : "";
+
+  const pkParticipants = useMemo(() => {
+    const map = new Map<string, { name: string; avatar?: string | null }>();
+    if (battle?.from_name) map.set(battle.from_name, { name: battle.from_name, avatar: battle.from_avatar });
+    if (battle?.to_name) map.set(battle.to_name, { name: battle.to_name, avatar: battle.to_avatar });
+    comments.forEach((c) => {
+      const uName = c.user_name || `user_${c.user_id}`;
+      if (uName && !map.has(uName)) {
+        map.set(uName, { name: uName, avatar: c.user_avatar || c.avatar });
+      }
+    });
+    return Array.from(map.values());
+  }, [battle?.from_name, battle?.from_avatar, battle?.to_name, battle?.to_avatar, comments]);
+
+  const filteredMentionSuggestions = useMemo(() => {
+    if (!isMentioningUser) return [];
+    return pkParticipants.filter(
+      (p) =>
+        p.name.toLowerCase().includes(mentionQuery) ||
+        p.name.toLowerCase().replace(/\s+/g, "").includes(mentionQuery),
+    );
+  }, [isMentioningUser, mentionQuery, pkParticipants]);
   
   const lastCommentIdRef = useRef<number>(0);
   const endedTimerRef = useRef<number | null>(null);
@@ -421,9 +531,10 @@ export default function PKWatchView({
     const iv = window.setInterval(() => {
       setRemaining((r) => {
         if (r <= 1) {
-          // Time expired -> trigger auto-next PK or return to live stream
           window.clearInterval(iv);
-          handleCloseOrNext();
+          setTimeout(() => {
+            handleCloseOrNext();
+          }, 0);
           return 0;
         }
         return r - 1;
@@ -451,7 +562,50 @@ export default function PKWatchView({
             const seen = new Set(prev.map((c) => c.id));
             const merged = [...prev];
             arr.forEach((c) => {
-              if (!seen.has(c.id)) merged.push(c);
+              if (!seen.has(c.id)) {
+                merged.push(c);
+                if (c.text && (c.text.startsWith("sent ") || c.text.includes("🪙)"))) {
+                  const isMe =
+                    Boolean(currentUser?.name && c.user_name === currentUser.name) ||
+                    Boolean(currentUser?.id && String(c.user_id) === String(currentUser.id));
+
+                  if (!isMe) {
+                    const giftMatch = c.text.match(/sent\s+(\S+)\s+([^()]+)(?:\((\d+)(?:🪙|💎)?\))?/);
+                    if (giftMatch) {
+                      const giftIcon = giftMatch[1] || "🎁";
+                      const giftName = giftMatch[2]?.trim() || "Gift";
+                      const diamonds = Number(giftMatch[3]) || 100;
+
+                      const targetHostIdStr = String((c as any).receiver_id || (c as any).target_host_id || "");
+                      const toHostIdStr = String(battle?.to_host_id || "");
+                      const fromHostIdStr = String(battle?.from_host_id || "");
+
+                      let isTo = false;
+                      if (targetHostIdStr && targetHostIdStr === toHostIdStr) {
+                        isTo = true;
+                      } else if (targetHostIdStr && targetHostIdStr === fromHostIdStr) {
+                        isTo = false;
+                      } else if (battle?.to_name && c.text.toLowerCase().includes(battle.to_name.toLowerCase())) {
+                        isTo = true;
+                      } else if (c.text.toLowerCase().includes("team blue") || c.text.toLowerCase().includes("host b")) {
+                        isTo = true;
+                      }
+
+                      const side = isTo ? "to" : "from";
+                      const hostName = isTo ? (battle?.to_name || "Host B") : (battle?.from_name || "Host A");
+
+                      triggerSideGift(
+                        side,
+                        { name: giftName, icon: giftIcon, diamonds },
+                        c.user_name || "Viewer",
+                        c.user_avatar || c.avatar,
+                        hostName,
+                        `comment_gift_${c.id}`,
+                      );
+                    }
+                  }
+                }
+              }
             });
             merged.sort((a, b) => a.id - b.id);
             const last = merged[merged.length - 1];
@@ -482,25 +636,34 @@ export default function PKWatchView({
     if (!t || !battleId || sending) return;
     setSending(true);
     const tempId = -Date.now();
+    const currentReply = replyingTo;
+    const userAv = currentUser?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(currentUser?.name || "You")}`;
     setComments((prev) => [
       ...prev,
       {
         id: tempId,
         user_id: Number(currentUser?.id ?? 0),
         user_name: currentUser?.name || "You",
-        user_avatar: currentUser?.avatar || null,
+        user_avatar: userAv,
         role: "viewer",
         text: t,
         level: 12,
+        replyTo: currentReply,
       },
     ]);
     setDraft("");
+    setReplyingTo(null);
     triggerFloatingHeart("❤️");
     try {
-      const j: any = await httpPost(apiBase, `/pk/${battleId}/comment`, { text: t }, authToken);
+      const j: any = await httpPost(
+        apiBase,
+        `/pk/${battleId}/comment`,
+        { text: t, reply_to: currentReply },
+        authToken,
+      );
       if (j?.comment) {
         setComments((prev) =>
-          prev.map((c) => (c.id === tempId ? { ...c, ...j.comment } : c)),
+          prev.map((c) => (c.id === tempId ? { ...c, ...j.comment, replyTo: currentReply } : c)),
         );
         if (j.comment.id > lastCommentIdRef.current) lastCommentIdRef.current = j.comment.id;
       }
@@ -518,8 +681,10 @@ export default function PKWatchView({
   const b = battle;
   const leftScore = b?.from_score ?? 0;
   const rightScore = b?.to_score ?? 0;
-  const totalScore = Math.max(1, leftScore + rightScore);
-  const leftPct = Math.min(85, Math.max(15, (leftScore / totalScore) * 100));
+  const leftPct =
+    leftScore === 0 && rightScore === 0
+      ? 50
+      : Math.min(85, Math.max(15, (leftScore / (leftScore + rightScore)) * 100));
 
   const hostAName = b?.from_name || "Host";
   const hostBName = b?.to_name || "Host";
@@ -627,7 +792,7 @@ export default function PKWatchView({
                 WIN × {b.to_wins}
               </span>
             )}
-            <span className="text-[12px] font-black text-white tracking-wider drop-shadow">
+            <span className="text-[12px] font-black text-white tracking-wider drop-shadow ml-auto">
               {rightScore.toLocaleString()}
             </span>
           </div>
@@ -666,12 +831,81 @@ export default function PKWatchView({
             </div>
           )}
 
-          {/* Left Country Flag Badge */}
-          {hostAFlag && (
-            <div className="absolute bottom-4 left-2 z-20 flex items-center gap-1 bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[11px] font-bold border border-white/10">
-              <span>{hostAFlag}</span>
+          {/* Colorful Compact Host A Name Overlay inside video screen */}
+          <div className="absolute bottom-2 left-2 z-30 flex items-center gap-1.5 bg-gradient-to-r from-rose-950/90 via-slate-950/85 to-black/90 backdrop-blur-md border border-rose-500/60 rounded-full px-2 py-0.5 shadow-lg shadow-rose-950/60 max-w-[92%] pointer-events-none">
+            <div className="relative shrink-0">
+              <img
+                src={hostAAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(hostAName)}`}
+                alt=""
+                className="w-5 h-5 rounded-full object-cover border border-rose-400"
+              />
+              <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-rose-500 border border-black animate-pulse" />
             </div>
-          )}
+            <div className="flex items-center gap-1 min-w-0">
+              <span className="text-[10px] font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-rose-300 via-pink-200 to-amber-200 truncate max-w-[85px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                {hostAName}
+              </span>
+              {hostAFlag && <span className="text-[10px] shrink-0">{hostAFlag}</span>}
+            </div>
+          </div>
+
+          {/* Animated Gift Side Overlay for Left Host A */}
+          {sideGifts
+            .filter((g) => g.side === "from")
+            .map((g) => (
+              <div
+                key={g.id}
+                className="absolute inset-0 z-40 pointer-events-none flex flex-col items-center justify-center p-2 bg-gradient-to-b from-rose-950/85 via-pink-950/65 to-black/90 backdrop-blur-[2px] animate-in fade-in zoom-in-75 duration-300"
+              >
+                <div className="absolute w-36 h-36 rounded-full bg-gradient-to-r from-rose-500/50 via-amber-400/40 to-pink-500/50 blur-xl animate-pulse" />
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                  <span className="absolute top-3 left-3 text-lg animate-bounce delay-75">✨</span>
+                  <span className="absolute top-6 right-3 text-xl animate-bounce delay-150">🌹</span>
+                  <span className="absolute bottom-10 left-4 text-lg animate-bounce delay-200">💎</span>
+                  <span className="absolute bottom-5 right-4 text-lg animate-bounce delay-300">⭐</span>
+                </div>
+                <div className="relative z-10 flex items-center gap-1.5 bg-black/85 border border-rose-400/80 rounded-full px-2.5 py-1 shadow-2xl mb-1.5 backdrop-blur-md max-w-[95%]">
+                  <img
+                    src={
+                      g.senderAvatar ||
+                      `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(g.senderName)}`
+                    }
+                    alt=""
+                    className="w-5 h-5 rounded-full object-cover border border-rose-300 shrink-0"
+                  />
+                  <div className="text-[9.5px] font-extrabold truncate leading-none">
+                    <span className="text-amber-300">{g.senderName}</span>
+                    <span className="text-white/80 mx-1">GIFTED</span>
+                    <span className="text-rose-300">{g.receiverName}</span>
+                  </div>
+                </div>
+                <div className="relative z-10 my-0.5 animate-bounce">
+                  {g.giftImage ? (
+                    <img
+                      src={g.giftImage}
+                      alt={g.giftName}
+                      className="w-16 h-16 object-contain filter drop-shadow-[0_8px_16px_rgba(244,63,94,0.9)]"
+                    />
+                  ) : (
+                    <span className="text-5xl drop-shadow-[0_8px_20px_rgba(251,191,36,0.95)] select-none">
+                      {g.giftIcon || "🎁"}
+                    </span>
+                  )}
+                </div>
+                <div className="relative z-10 flex flex-col items-center">
+                  <div className="text-xs font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-rose-100 to-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] text-center">
+                    {g.giftName}
+                  </div>
+                  <div className="mt-0.5 bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black text-[9.5px] px-2 py-0.5 rounded-full shadow border border-yellow-200/50 flex items-center gap-1">
+                    <span>💎</span>
+                    <span>+{g.diamonds}</span>
+                  </div>
+                </div>
+                <div className="relative z-10 mt-1 text-xl font-black italic text-yellow-300 drop-shadow-[0_4px_10px_rgba(0,0,0,0.9)] tracking-tighter animate-pulse">
+                  x1 COMBO!
+                </div>
+              </div>
+            ))}
         </div>
 
         {/* Right Host B Video (50%) */}
@@ -693,35 +927,129 @@ export default function PKWatchView({
             </div>
           )}
 
-          {/* Right Country Flag Badge */}
-          {hostBFlag && (
-            <div className="absolute bottom-4 right-2 z-20 flex items-center gap-1 bg-black/40 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[11px] font-bold border border-white/10">
-              <span>{hostBFlag}</span>
+          {/* Colorful Compact Host B Name Overlay inside video screen */}
+          <div className="absolute bottom-2 right-2 z-30 flex items-center gap-1.5 bg-gradient-to-r from-slate-950/90 via-slate-950/85 to-cyan-950/90 backdrop-blur-md border border-cyan-500/60 rounded-full px-2 py-0.5 shadow-lg shadow-cyan-950/60 max-w-[92%] pointer-events-none">
+            <div className="flex items-center gap-1 min-w-0">
+              {hostBFlag && <span className="text-[10px] shrink-0">{hostBFlag}</span>}
+              <span className="text-[10px] font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-200 to-amber-200 truncate max-w-[85px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                {hostBName}
+              </span>
             </div>
-          )}
+            <div className="relative shrink-0">
+              <img
+                src={hostBAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(hostBName)}`}
+                alt=""
+                className="w-5 h-5 rounded-full object-cover border border-cyan-400"
+              />
+              <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-cyan-400 border border-black animate-pulse" />
+            </div>
+          </div>
+
+          {/* Animated Gift Side Overlay for Right Host B */}
+          {sideGifts
+            .filter((g) => g.side === "to")
+            .map((g) => (
+              <div
+                key={g.id}
+                className="absolute inset-0 z-40 pointer-events-none flex flex-col items-center justify-center p-2 bg-gradient-to-b from-cyan-950/85 via-blue-950/65 to-black/90 backdrop-blur-[2px] animate-in fade-in zoom-in-75 duration-300"
+              >
+                <div className="absolute w-36 h-36 rounded-full bg-gradient-to-r from-cyan-500/50 via-amber-400/40 to-blue-500/50 blur-xl animate-pulse" />
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                  <span className="absolute top-3 left-3 text-lg animate-bounce delay-75">✨</span>
+                  <span className="absolute top-6 right-3 text-xl animate-bounce delay-150">🚀</span>
+                  <span className="absolute bottom-10 left-4 text-lg animate-bounce delay-200">💎</span>
+                  <span className="absolute bottom-5 right-4 text-lg animate-bounce delay-300">⭐</span>
+                </div>
+                <div className="relative z-10 flex items-center gap-1.5 bg-black/85 border border-cyan-400/80 rounded-full px-2.5 py-1 shadow-2xl mb-1.5 backdrop-blur-md max-w-[95%]">
+                  <img
+                    src={
+                      g.senderAvatar ||
+                      `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(g.senderName)}`
+                    }
+                    alt=""
+                    className="w-5 h-5 rounded-full object-cover border border-cyan-300 shrink-0"
+                  />
+                  <div className="text-[9.5px] font-extrabold truncate leading-none">
+                    <span className="text-amber-300">{g.senderName}</span>
+                    <span className="text-white/80 mx-1">GIFTED</span>
+                    <span className="text-cyan-300">{g.receiverName}</span>
+                  </div>
+                </div>
+                <div className="relative z-10 my-0.5 animate-bounce">
+                  {g.giftImage ? (
+                    <img
+                      src={g.giftImage}
+                      alt={g.giftName}
+                      className="w-16 h-16 object-contain filter drop-shadow-[0_8px_16px_rgba(6,182,212,0.9)]"
+                    />
+                  ) : (
+                    <span className="text-5xl drop-shadow-[0_8px_20px_rgba(251,191,36,0.95)] select-none">
+                      {g.giftIcon || "🎁"}
+                    </span>
+                  )}
+                </div>
+                <div className="relative z-10 flex flex-col items-center">
+                  <div className="text-xs font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-cyan-100 to-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] text-center">
+                    {g.giftName}
+                  </div>
+                  <div className="mt-0.5 bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black text-[9.5px] px-2 py-0.5 rounded-full shadow border border-yellow-200/50 flex items-center gap-1">
+                    <span>💎</span>
+                    <span>+{g.diamonds}</span>
+                  </div>
+                </div>
+                <div className="relative z-10 mt-1 text-xl font-black italic text-yellow-300 drop-shadow-[0_4px_10px_rgba(0,0,0,0.9)] tracking-tighter animate-pulse">
+                  x1 COMBO!
+                </div>
+              </div>
+            ))}
         </div>
       </div>
 
       {/* 4. LIVE CHAT & FLOATING REACTION AREA */}
       <div className="shrink-0 relative h-36 px-3 py-1 flex flex-col justify-end z-30">
-        <div ref={scrollRef} className="max-h-32 overflow-y-auto space-y-1.5 pr-16 scrollbar-none">
+        <div ref={scrollRef} className="max-h-32 overflow-y-auto space-y-1.5 pr-2 scrollbar-none">
           {comments.map((c) => {
-            const avatarUrl = c.user_avatar || c.avatar;
+            const avatarUrl =
+              c.user_avatar ||
+              c.avatar ||
+              `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(c.user_name || String(c.user_id))}`;
+            const userName = c.user_name || `user_${c.user_id}`;
+
             return (
-              <div key={c.id} className="inline-flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full max-w-[80%] border border-white/5">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt="" className="w-4 h-4 rounded-full object-cover shrink-0 border border-white/20" />
-                ) : (
-                  <div className="w-4 h-4 rounded-full bg-gradient-to-tr from-pink-500 to-rose-500 text-white text-[8px] font-bold flex items-center justify-center shrink-0">
-                    {(c.user_name || "U")[0].toUpperCase()}
+              <div
+                key={c.id}
+                className="flex flex-col gap-1 bg-black/60 backdrop-blur-md px-2.5 py-1.5 rounded-2xl max-w-[85%] border border-white/10 shadow-md my-0.5"
+              >
+                {c.replyTo && (
+                  <div className="flex items-center gap-1 text-[9px] text-fuchsia-300 font-semibold px-1.5 py-0.5 bg-fuchsia-950/80 rounded-md border border-fuchsia-500/30 truncate">
+                    <CornerDownRight className="w-2.5 h-2.5 shrink-0 text-fuchsia-400" />
+                    <span className="truncate">
+                      Replying to @{c.replyTo.name}: "{c.replyTo.text}"
+                    </span>
                   </div>
                 )}
-                <span className="text-[11px] font-bold text-slate-300 shrink-0">
-                  {c.user_name || `user_${c.user_id}`}
-                </span>
-                <span className="text-[11px] text-white truncate">
-                  {c.text}
-                </span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <img
+                    src={avatarUrl}
+                    alt=""
+                    className="w-5 h-5 rounded-full object-cover shrink-0 border border-amber-300/40 shadow-sm"
+                  />
+                  <span className="text-[11px] font-extrabold text-amber-200 shrink-0 drop-shadow">
+                    {userName}:
+                  </span>
+                  <span className="text-[11px] text-white leading-tight break-words flex-1 drop-shadow">
+                    {renderFormattedCommentText(c.text)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setReplyingTo({ name: userName, text: c.text })}
+                    className="ml-1 text-[8.5px] font-bold text-fuchsia-300 hover:text-white bg-white/10 hover:bg-fuchsia-600 px-1.5 py-0.5 rounded-full transition active:scale-95 shrink-0 flex items-center gap-0.5 cursor-pointer"
+                    title="Reply to comment"
+                  >
+                    <Reply className="w-2.5 h-2.5" />
+                    <span>রিপ্লাই</span>
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -784,9 +1112,20 @@ export default function PKWatchView({
                     key={g.id}
                     type="button"
                     onClick={() => {
-                      const targetId = giftTarget === "from" ? Number(b.from_host_id) : Number(b.to_host_id);
+                      const targetSide = giftTarget || "from";
+                      const targetId = targetSide === "from" ? Number(b.from_host_id) : Number(b.to_host_id);
+                      const targetHostName = targetSide === "from" ? hostAName : hostBName;
+
+                      triggerSideGift(
+                        targetSide,
+                        { name: g.name, icon: g.icon, diamonds: g.diamonds, image: g.image },
+                        currentUser?.name || "You",
+                        currentUser?.avatar || null,
+                        targetHostName,
+                      );
+
                       void onSendGift?.(g, targetId);
-                      triggerFloatingHeart("🎁");
+                      triggerFloatingHeart(g.icon || "🎁");
                       setGiftOpen(false);
                       setGiftTarget(null);
                     }}
@@ -804,50 +1143,117 @@ export default function PKWatchView({
       )}
 
       {/* 5. BOTTOM ACTION & GIFTING BAR */}
-      <div className="shrink-0 z-30 p-3 bg-gradient-to-t from-black via-black/80 to-transparent flex items-center gap-2">
-        {/* Comment Input */}
-        <div className="flex-1 flex items-center bg-white/10 backdrop-blur-md rounded-full px-3.5 py-2 border border-white/10">
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") sendComment();
+      <div className="shrink-0 z-30 p-3 bg-gradient-to-t from-black via-black/80 to-transparent flex flex-col gap-1.5">
+        {/* Replying context bar */}
+        {replyingTo && (
+          <div className="flex items-center justify-between bg-fuchsia-950/90 border border-fuchsia-500/40 rounded-xl px-2.5 py-1 text-[10px] text-fuchsia-200 shadow-lg">
+            <span className="truncate flex items-center gap-1">
+              <CornerDownRight className="w-3 h-3 text-fuchsia-400 shrink-0" />
+              <span>Replying to <strong className="text-white">@{replyingTo.name}</strong></span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setReplyingTo(null)}
+              className="text-slate-400 hover:text-white ml-2 text-xs font-bold cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Mention Suggestions Popup */}
+        {isMentioningUser && filteredMentionSuggestions.length > 0 && (
+          <div className="absolute left-3 right-28 bottom-full mb-1 bg-slate-950/98 border border-fuchsia-500/40 rounded-xl shadow-2xl z-[90] max-h-36 overflow-y-auto p-1 flex flex-col gap-1 backdrop-blur-md">
+            <div className="flex items-center justify-between px-2 py-0.5 border-b border-slate-800/80">
+              <span className="text-[8px] text-fuchsia-300 font-black uppercase tracking-wider flex items-center gap-1">
+                <AtSign className="w-2.5 h-2.5" /> Mention Participants
+              </span>
+              <span className="text-[7.5px] text-slate-400">
+                {filteredMentionSuggestions.length} found
+              </span>
+            </div>
+            {filteredMentionSuggestions.slice(0, 6).map((user) => {
+              const cleanName = user.name.replace(/\s+/g, "");
+              const userAv = user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user.name)}`;
+              return (
+                <button
+                  key={`pk-mention-user-${user.name}`}
+                  type="button"
+                  onClick={() => {
+                    const words = draft.split(" ");
+                    words[words.length - 1] = `@${cleanName}`;
+                    setDraft(words.join(" ") + " ");
+                  }}
+                  className="flex items-center gap-2 px-2 py-1 rounded-lg text-left text-xs text-slate-200 hover:bg-fuchsia-900/50 hover:text-white transition cursor-pointer"
+                >
+                  <img
+                    src={userAv}
+                    alt=""
+                    className="w-5 h-5 rounded-full object-cover border border-fuchsia-400/40 shrink-0"
+                  />
+                  <span className="truncate font-semibold text-[11px]">{user.name}</span>
+                  <span className="ml-auto text-[9px] text-fuchsia-400 font-mono">@{cleanName}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="flex items-center gap-2">
+          {/* Comment Input */}
+          <div className="relative flex-1 flex items-center bg-white/10 backdrop-blur-md rounded-full pl-3.5 pr-1.5 py-1.5 border border-white/10">
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") sendComment();
+              }}
+              placeholder="মেসেজ পাঠান... (@ দিয়ে মেনশন করুন)"
+              maxLength={200}
+              className="w-full bg-transparent text-[12px] text-white placeholder:text-white/60 outline-none pr-8"
+            />
+            <button
+              type="button"
+              onClick={sendComment}
+              disabled={!draft.trim()}
+              className="absolute right-1 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-r from-fuchsia-600 to-pink-500 text-white shadow hover:opacity-90 active:scale-90 transition cursor-pointer disabled:opacity-40 shrink-0"
+              aria-label="Send comment"
+              title="Send"
+            >
+              <Send className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Rose Button */}
+          <button
+            onClick={() => triggerFloatingHeart("🌹")}
+            className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-xl active:scale-90 transition shadow-lg shrink-0"
+            title="Send Rose"
+          >
+            🌹
+          </button>
+
+          {/* Gift Button */}
+          <button
+            onClick={() => {
+              setGiftOpen((v) => !v);
+              setGiftTarget(null);
             }}
-            placeholder="Add comment"
-            maxLength={200}
-            className="w-full bg-transparent text-[12px] text-white placeholder:text-white/60 outline-none"
-          />
+            className="w-10 h-10 rounded-full bg-gradient-to-tr from-fuchsia-600 via-pink-500 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-pink-500/40 active:scale-90 transition border border-white/30 shrink-0"
+            title="Send Gift"
+          >
+            <Gift className="w-5 h-5 text-white" />
+          </button>
+
+          {/* Share Button */}
+          <button
+            onClick={() => triggerFloatingHeart("💖")}
+            className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white active:scale-90 transition shadow-lg shrink-0"
+            title="Share"
+          >
+            <Share2 className="w-4 h-4" />
+          </button>
         </div>
-
-        {/* Rose Button */}
-        <button
-          onClick={() => triggerFloatingHeart("🌹")}
-          className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-xl active:scale-90 transition shadow-lg"
-          title="Send Rose"
-        >
-          🌹
-        </button>
-
-        {/* Gift Button */}
-        <button
-          onClick={() => {
-            setGiftOpen((v) => !v);
-            setGiftTarget(null);
-          }}
-          className="w-10 h-10 rounded-full bg-gradient-to-tr from-fuchsia-600 via-pink-500 to-rose-500 flex items-center justify-center text-white shadow-lg shadow-pink-500/40 active:scale-90 transition border border-white/30"
-          title="Send Gift"
-        >
-          <Gift className="w-5 h-5 text-white" />
-        </button>
-
-        {/* Share Button */}
-        <button
-          onClick={() => triggerFloatingHeart("💖")}
-          className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white active:scale-90 transition shadow-lg"
-          title="Share"
-        >
-          <Share2 className="w-5 h-5 text-white" />
-        </button>
       </div>
     </div>,
     document.body,

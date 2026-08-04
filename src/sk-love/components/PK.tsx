@@ -273,7 +273,7 @@ export default function PK({
       setRemaining((r) => {
         if (r <= 1) {
           window.clearInterval(timerRef.current!);
-          setPhase("result");
+          setTimeout(() => setPhase("result"), 0);
           return 0;
         }
         return r - 1;
@@ -797,8 +797,10 @@ function BattleView({
   oppRoomId: string | number | null;
   localVideoTrackRef?: MutableRefObject<any> | null;
 }) {
-  const total = Math.max(1, myScore + oppScore);
-  const myPct = Math.round((myScore / total) * 100);
+  const myPct =
+    myScore === 0 && oppScore === 0
+      ? 50
+      : Math.min(85, Math.max(15, Math.round((myScore / (myScore + oppScore)) * 100)));
   const oppPct = 100 - myPct;
   const leader: "me" | "opp" | null =
     myScore === oppScore ? null : myScore > oppScore ? "me" : "opp";
@@ -977,10 +979,18 @@ function BattleView({
           {leader && ((iAmFromHost && leader === "me") || (!iAmFromHost && leader === "opp")) && (
             <Trophy className="absolute top-8 right-2 z-10 w-5 h-5 text-amber-300 drop-shadow-[0_0_6px_rgba(252,211,77,0.9)]" />
           )}
-          <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-2 py-2 text-center">
-            <div className="text-[12px] font-black text-white truncate">
-              {leftUser?.name || (iAmFromHost ? "You" : "Opponent")}
+          <div className="absolute bottom-2 left-2 z-20 flex items-center gap-1.5 bg-slate-950/85 backdrop-blur-md border border-rose-500/60 rounded-full px-2 py-0.5 shadow-lg shadow-rose-950/60 max-w-[90%] pointer-events-none">
+            <div className="relative shrink-0">
+              <img
+                src={resolveAvatar(leftUser?.avatar, leftUser?.id || "l")}
+                alt=""
+                className="w-4 h-4 rounded-full object-cover border border-rose-400"
+              />
+              <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
             </div>
+            <span className="text-[10px] font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-rose-300 via-pink-200 to-amber-200 truncate max-w-[80px]">
+              {leftUser?.name || (iAmFromHost ? "You" : "Opponent")}
+            </span>
           </div>
 
         </div>
@@ -1006,9 +1016,17 @@ function BattleView({
           {leader && ((iAmFromHost && leader === "opp") || (!iAmFromHost && leader === "me")) && (
             <Trophy className="absolute top-8 left-2 z-10 w-5 h-5 text-amber-300 drop-shadow-[0_0_6px_rgba(252,211,77,0.9)]" />
           )}
-          <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/90 via-black/60 to-transparent px-2 py-2 text-center">
-            <div className="text-[12px] font-black text-white truncate">
+          <div className="absolute bottom-2 right-2 z-20 flex items-center gap-1.5 bg-slate-950/85 backdrop-blur-md border border-cyan-500/60 rounded-full px-2 py-0.5 shadow-lg shadow-cyan-950/60 max-w-[90%] pointer-events-none">
+            <span className="text-[10px] font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-blue-200 to-amber-200 truncate max-w-[80px]">
               {rightUser?.name || (iAmFromHost ? "Opponent" : "You")}
+            </span>
+            <div className="relative shrink-0">
+              <img
+                src={resolveAvatar(rightUser?.avatar, rightUser?.id || "r")}
+                alt=""
+                className="w-4 h-4 rounded-full object-cover border border-cyan-400"
+              />
+              <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
             </div>
           </div>
 

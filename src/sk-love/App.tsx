@@ -7442,8 +7442,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     setTimeout(() => setShowGiftAnimation(false), 2000);
 
     try {
+      const activePk = activePkBattles.find((b) => String(b.id) === String(battleId));
+      const targetHostName = activePk
+        ? (Number(targetHostId) === Number(activePk.to_host_id) ? activePk.to_name : activePk.from_name)
+        : "";
       await api.post(`/api/pk/${battleId}/comment`, {
-        text: `sent ${gift.icon} ${gift.name} (${gift.diamonds}🪙)`,
+        text: `sent ${gift.icon} ${gift.name} (${gift.diamonds}🪙)${targetHostName ? ` to ${targetHostName}` : ""}`,
+        receiver_id: Number(targetHostId),
+        target_host_id: Number(targetHostId),
       });
     } catch {
       // Non-fatal — chat will resync on next poll.
@@ -13548,9 +13554,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                             key={comment.id}
                                             className="flex gap-2 bg-slate-950/50 p-2.5 rounded-xl border border-slate-900/60"
                                           >
-                                            <span className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center text-sm">
-                                              {comment.senderAvatar || "👦"}
-                                            </span>
+                                            <img
+                                              src={getUserAvatarUrl({ name: comment.sender, avatar: comment.senderAvatar })}
+                                              alt=""
+                                              className="w-6 h-6 rounded-full object-cover shrink-0 border border-slate-800"
+                                            />
                                             <div className="flex-1">
                                               <div className="flex justify-between items-baseline">
                                                 <span className="text-[9.5px] font-black text-slate-200">
@@ -18794,9 +18802,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                             key={comment.id}
                                             className="flex gap-2 bg-slate-950/50 p-2.5 rounded-xl border border-slate-900/60 font-sans"
                                           >
-                                            <span className="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center text-pink-200">
-                                              <User className="h-3.5 w-3.5" />
-                                            </span>
+                                            <img
+                                              src={getUserAvatarUrl({ name: comment.sender, avatar: comment.senderAvatar })}
+                                              alt=""
+                                              className="w-6 h-6 rounded-full object-cover shrink-0 border border-slate-800"
+                                            />
                                             <div className="flex-1 font-sans">
                                               <div className="flex justify-between items-baseline font-sans">
                                                 <span className="text-[9.5px] font-black text-slate-200">
