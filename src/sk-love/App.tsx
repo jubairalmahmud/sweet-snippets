@@ -2406,6 +2406,7 @@ export default function App() {
   }, [equippedRide, ownedRides]);
 
   // Entry Effect Animation overlay state
+  const seatFrameMapRef = useRef<Map<string, string>>(new Map());
   const [activePartyEntryAnimation, setActivePartyEntryAnimation] = useState<{
     userName: string;
     userAvatar?: string | null;
@@ -4307,6 +4308,51 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       document.removeEventListener("visibilitychange", onVis);
     };
   }, [isLoggedIn, isPartyRoomOpen]);
+
+  // ═══════════════════════════════════════════════════════════════
+  // SCREEN WAKE LOCK — Keep screen awake during Party Room / Live Stream
+  // ═══════════════════════════════════════════════════════════════
+  useEffect(() => {
+    const isSessionActive = isPartyRoomOpen || Boolean(activeLiveRoom) || appSection === "stream";
+    if (!isSessionActive) return;
+
+    let wakeLock: any = null;
+    let isCancelled = false;
+
+    const requestWakeLock = async () => {
+      if (
+        typeof navigator !== "undefined" &&
+        "wakeLock" in navigator &&
+        navigator.wakeLock &&
+        typeof navigator.wakeLock.request === "function"
+      ) {
+        try {
+          wakeLock = await navigator.wakeLock.request("screen");
+        } catch {
+          /* Wake lock request failed or rejected */
+        }
+      }
+    };
+
+    void requestWakeLock();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && !isCancelled) {
+        void requestWakeLock();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      isCancelled = true;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (wakeLock && typeof wakeLock.release === "function") {
+        void wakeLock.release().catch(() => undefined);
+        wakeLock = null;
+      }
+    };
+  }, [isPartyRoomOpen, activeLiveRoom, appSection]);
 
   // ═══════════════════════════════════════════════════════════════
   // BATCH 2 — Session cleanup (leave active rooms on tab close/refresh)
@@ -7843,6 +7889,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           (isSelfSeat && isPartyMicMutedRef.current) ||
           (localMuteOverrideValue !== null ? localMuteOverrideValue : normalizedMuted);
 
+        const occKey = normalizedOccupant ? normalizedOccupant.trim().toLowerCase() : null;
+        const rawFrameId =
+          seat.frameId ?? seat.frame ?? seat.frameCode ?? seat.frame_code ?? seatUser?.frameId ?? seatUser?.frame ?? seatUser?.activeFrame ?? seatUser?.avatarFrame ?? null;
+        const rememberedFrame = occKey ? seatFrameMapRef.current.get(occKey) : null;
+        const effectiveFrameId = rawFrameId ?? rememberedFrame ?? null;
+        if (occKey && rawFrameId) {
+          seatFrameMapRef.current.set(occKey, String(rawFrameId));
+        }
+
         nextSeats[index] = {
           seatNum: index + 1,
           userId: seatUid,
@@ -7850,9 +7905,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           icon: normalizedIcon || null,
           muted: effectiveMuted,
           // Carry the frame so other viewers can render it (resolveUserFrameImg).
-          frameId:
-            seat.frameId ?? seat.frame ?? seat.frameCode ?? seat.frame_code ?? null,
-          frame: seat.frame ?? seat.frameId ?? seat.frame_code ?? null,
+          frameId: effectiveFrameId,
+          frame: effectiveFrameId,
           frameImg: seat.frameImg ?? seat.frameImage ?? seat.frameImageUrl ?? null,
         } as any;
       }
@@ -7968,7 +8022,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       serverMsgs.forEach((m) => {
         if (!m.text) return;
 
-        // 1. ENTRY ANIMATION BROADCAST ACROSS ALL DEVICES
+        // 1. ENTRY ANIMATION & FRAME BROADCAST ACROSS ALL DEVICES
         if (m.text.includes("[ENTRY:")) {
           const startIdx = m.text.indexOf("[ENTRY:");
           const endIdx = m.text.indexOf("]", startIdx);
@@ -7979,8 +8033,21 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               const entryRideId = parts[0];
               let entryUserName = parts[1] || m.name;
               try { entryUserName = decodeURIComponent(entryUserName); } catch {}
-              let entryAvatar = parts.slice(2).join(":") || null;
-              try { if (entryAvatar) entryAvatar = decodeURIComponent(entryAvatar); } catch {}
+              let entryAvatar = parts[2] ? decodeURIComponent(parts[2]) : null;
+              let entryFrameId = parts[3] ? decodeURIComponent(parts[3]) : null;
+
+              const uKey = entryUserName ? entryUserName.trim().toLowerCase() : "";
+              if (uKey && entryFrameId && entryFrameId !== "none" && entryFrameId !== "null") {
+                seatFrameMapRef.current.set(uKey, entryFrameId);
+                setPartySeats((prev) =>
+                  prev.map((s) => {
+                    if (s.occupant && s.occupant.trim().toLowerCase() === uKey) {
+                      return { ...s, frame: entryFrameId, frameId: entryFrameId };
+                    }
+                    return s;
+                  })
+                );
+              }
 
               if (entryRideId && entryRideId !== "default" && entryRideId !== "none" && entryRideId !== "null") {
                 const msgIdKey = m.id && Number(m.id) > 0 ? String(m.id) : `${entryUserName}-${entryRideId}-${m.text}`;
@@ -8005,13 +8072,17 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               const newFrameId = parts[0];
               let frameUserName = parts[1] || m.name;
               try { frameUserName = decodeURIComponent(frameUserName); } catch {}
-              const msgIdKey = m.id && Number(m.id) > 0 ? String(m.id) : `frame-${frameUserName}-${newFrameId}-${m.text}`;
-              const eventKey = `frame-msg-${msgIdKey}`;
-              if (!seenPartyBroadcastIdsRef.current.has(eventKey)) {
-                seenPartyBroadcastIdsRef.current.add(eventKey);
+              const uKey = frameUserName ? frameUserName.trim().toLowerCase() : "";
+
+              if (uKey) {
+                if (newFrameId === "none" || newFrameId === "null") {
+                  seatFrameMapRef.current.delete(uKey);
+                } else {
+                  seatFrameMapRef.current.set(uKey, newFrameId);
+                }
                 setPartySeats((prev) =>
                   prev.map((s) => {
-                    if (s.occupant && frameUserName && s.occupant.trim().toLowerCase() === frameUserName.trim().toLowerCase()) {
+                    if (s.occupant && s.occupant.trim().toLowerCase() === uKey) {
                       return {
                         ...s,
                         frame: newFrameId === "none" ? null : newFrameId,
@@ -8344,9 +8415,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         const rideIdToUse = equippedRide || "default";
         const rideInfo = RIDES_CATALOG.find((r) => r.id === equippedRide);
         const rideLabel = rideInfo ? `${rideInfo.name} ${rideInfo.emoji}` : "VIP Ride 🏎️";
+        const frameToUse = equippedAvatarFrame || "none";
+        if (registerName && equippedAvatarFrame) {
+          seatFrameMapRef.current.set(registerName.trim().toLowerCase(), equippedAvatarFrame);
+        }
         void api
           .post(`/api/party-rooms/${createdRoomId}/chat`, {
-            text: `[ENTRY:${rideIdToUse}:${encodeURIComponent(registerName || "Host")}:${encodeURIComponent(profileAvatarImg || "")}] ✨ ${registerName || "Host"} opened the party room ${equippedRide ? `with ${rideLabel}` : ""}!`,
+            text: `[ENTRY:${rideIdToUse}:${encodeURIComponent(registerName || "Host")}:${encodeURIComponent(profileAvatarImg || "")}:${encodeURIComponent(frameToUse)}] ✨ ${registerName || "Host"} opened the party room ${equippedRide ? `with ${rideLabel}` : ""}!`,
           })
           .catch(() => undefined);
       }
@@ -8400,9 +8475,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         const rideIdToUse = equippedRide || "default";
         const rideInfo = RIDES_CATALOG.find((r) => r.id === equippedRide);
         const rideLabel = rideInfo ? `${rideInfo.name} ${rideInfo.emoji}` : "VIP Ride 🏎️";
+        const frameToUse = equippedAvatarFrame || "none";
+        if (registerName && equippedAvatarFrame) {
+          seatFrameMapRef.current.set(registerName.trim().toLowerCase(), equippedAvatarFrame);
+        }
         void api
           .post(`/api/party-rooms/${joinedRoomId}/chat`, {
-            text: `[ENTRY:${rideIdToUse}:${encodeURIComponent(registerName || "User")}:${encodeURIComponent(profileAvatarImg || "")}] ✨ ${registerName || "User"} entered ${equippedRide ? `with ${rideLabel}` : "the room"}!`,
+            text: `[ENTRY:${rideIdToUse}:${encodeURIComponent(registerName || "User")}:${encodeURIComponent(profileAvatarImg || "")}:${encodeURIComponent(frameToUse)}] ✨ ${registerName || "User"} entered ${equippedRide ? `with ${rideLabel}` : "the room"}!`,
           })
           .catch(() => undefined);
       }
@@ -8810,12 +8889,17 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       void publishPreparedPartyMicrophone();
       setPendingPartySeatIndex(null);
       triggerPartyEntryAnimation(selfName, profileAvatarImg, equippedRide, seatIndex);
-      if (equippedRide && activePartyRoom?.id) {
+      if (activePartyRoom?.id) {
+        const rideToUse = equippedRide || "default";
         const rideInfo = RIDES_CATALOG.find((r) => r.id === equippedRide);
         const rideLabel = rideInfo ? `${rideInfo.name} ${rideInfo.emoji}` : "VIP Ride 🏎️";
+        const frameToUse = equippedAvatarFrame || "none";
+        if (selfName && equippedAvatarFrame) {
+          seatFrameMapRef.current.set(selfName.trim().toLowerCase(), equippedAvatarFrame);
+        }
         void api
           .post(`/api/party-rooms/${activePartyRoom.id}/chat`, {
-            text: `[ENTRY:${equippedRide}:${encodeURIComponent(selfName)}:${encodeURIComponent(profileAvatarImg || "")}] ✨ ${selfName} took seat ${seatIndex + 1} with ${rideLabel}!`,
+            text: `[ENTRY:${rideToUse}:${encodeURIComponent(selfName)}:${encodeURIComponent(profileAvatarImg || "")}:${encodeURIComponent(frameToUse)}] ✨ ${selfName} took seat ${seatIndex + 1} ${equippedRide ? `with ${rideLabel}` : ""}!`,
           })
           .catch(() => undefined);
       }
@@ -27142,6 +27226,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               onClick={() => {
                                 setEquippedAvatarFrame(null);
                                 setUserWallet((prev) => ({ ...prev, avatarFrame: "Default" }));
+                                if (registerName) {
+                                  seatFrameMapRef.current.delete(registerName.trim().toLowerCase());
+                                }
                                 triggerSystemAnnouncement(`Frame "${selected.name}" un-equipped.`);
                                 if (activePartyRoom?.id) {
                                   setPartySeats((prev) =>
@@ -27171,6 +27258,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               onClick={() => {
                                 setEquippedAvatarFrame(selected.id);
                                 setUserWallet((prev) => ({ ...prev, avatarFrame: selected.name }));
+                                if (registerName) {
+                                  seatFrameMapRef.current.set(registerName.trim().toLowerCase(), selected.id);
+                                }
                                 triggerSystemAnnouncement(`🎨 ${selected.name} frame equipped!`);
                                 if (activePartyRoom?.id) {
                                   setPartySeats((prev) =>
