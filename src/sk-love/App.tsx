@@ -2336,6 +2336,10 @@ export default function App() {
     referredCount: 0,
     refCode: "",
   });
+  const userWalletRef = React.useRef(userWallet);
+  React.useEffect(() => {
+    userWalletRef.current = userWallet;
+  }, [userWallet]);
 
   // ---- Store: owned avatar frames { id -> expiryTimestamp(ms) } + currently equipped ----
   const [ownedAvatarFrames, setOwnedAvatarFrames] = useState<Record<string, number>>(() => {
@@ -7375,9 +7379,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     recentGiftEvent?: PartyBroadcastEvent;
   }> => {
     const costAmount = Number(params.diamonds || params.rCoins || 0);
+    const currentBalance = userWalletRef.current?.diamonds ?? userWallet.diamonds;
 
     // Strict balance check before making API call
-    if (userWallet.diamonds < costAmount) {
+    if (currentBalance < costAmount) {
       const msg = "পর্যাপ্ত ব্যালেন্স না থাকায় গিফট সেন্ড করা সম্ভব হচ্ছে না।";
       try { toast.error(msg); } catch {}
       setToastAlert(msg);
@@ -7385,6 +7390,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       triggerSystemAnnouncement(`⚠️ ${msg}`);
       return null;
     }
+
+    // Optimistic balance deduction so sender sees instant balance drop in UI & memory
+    const newOptimisticBalance = Math.max(0, currentBalance - costAmount);
+    if (userWalletRef.current) userWalletRef.current.diamonds = newOptimisticBalance;
+    setUserWallet((prev) => ({
+      ...prev,
+      diamonds: newOptimisticBalance,
+    }));
 
     try {
       const res = await api.post<{
@@ -7402,8 +7415,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
       const remainingRecharge = res.diamonds !== undefined
         ? Number(res.diamonds)
-        : Math.max(0, userWallet.diamonds - costAmount);
+        : newOptimisticBalance;
 
+      if (userWalletRef.current) userWalletRef.current.diamonds = remainingRecharge;
       setUserWallet((prev) => ({
         ...prev,
         diamonds: remainingRecharge,
@@ -7467,6 +7481,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
       return res;
     } catch (e: any) {
+      const revertedBalance = (userWalletRef.current?.diamonds ?? userWallet.diamonds) + costAmount;
+      if (userWalletRef.current) userWalletRef.current.diamonds = revertedBalance;
+      setUserWallet((prev) => ({
+        ...prev,
+        diamonds: revertedBalance,
+      }));
       const serverMsg = e?.response?.data?.message || "পর্যাপ্ত ব্যালেন্স না থাকায় গিফট সেন্ড করা সম্ভব হচ্ছে না।";
       try { toast.error(serverMsg); } catch {}
       setToastAlert(serverMsg);
@@ -8327,6 +8347,30 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       if (room?.id) {
         saveStoredPartyRoomGifters(room.id, Array.from(gifterMap.values()));
       }
+    }
+
+    // Sync per-receiver seat coins map from server (so host + all seat occupants get current seat coins ⭐)
+    const rawSeatCoins =
+      room?.seatCoinsMap ??
+      room?.seat_coins_map ??
+      room?.seatCoins ??
+      room?.seat_coins;
+    if (rawSeatCoins && typeof rawSeatCoins === "object") {
+      setPartySeatSessionCoins((prev) => {
+        const next = { ...prev };
+        let changed = false;
+        Object.entries(rawSeatCoins).forEach(([uidStr, coinsVal]) => {
+          const uid = Number(uidStr);
+          const coins = Number(coinsVal || 0);
+          if (uid > 0 && coins >= 0) {
+            if ((next[uid] || 0) < coins) {
+              next[uid] = coins;
+              changed = true;
+            }
+          }
+        });
+        return changed ? next : prev;
+      });
     }
 
     // FIX #3 + #4: Consume broadcast events from backend polling payload.

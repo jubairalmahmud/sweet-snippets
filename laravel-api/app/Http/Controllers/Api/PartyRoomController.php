@@ -511,11 +511,14 @@ class PartyRoomController extends Controller
                     $selects[] = DB::raw('NULL as sender_avatar');
                 }
 
+                $roomIdVal = $this->prop($room, 'id');
+                $roomIds = array_values(array_filter(array_unique([(string)$roomIdVal, (string)(int)$roomIdVal])));
+
                 $rows = DB::table('gift_transactions as g')
                     ->leftJoin('users as sender',   'sender.id',   '=', 'g.sender_id')
                     ->leftJoin('users as receiver', 'receiver.id', '=', 'g.receiver_id')
                     ->where('g.room_type', 'party')
-                    ->where('g.room_id', (string) $this->prop($room, 'id'))
+                    ->whereIn('g.room_id', $roomIds)
                     ->where('g.created_at', '>=', now()->subHours(12))
                     ->orderByDesc('g.id')
                     ->limit(50)
@@ -546,7 +549,7 @@ class PartyRoomController extends Controller
                 $summaryRows = DB::table('gift_transactions as g')
                     ->leftJoin('users as sender', 'sender.id', '=', 'g.sender_id')
                     ->where('g.room_type', 'party')
-                    ->where('g.room_id', (string) $this->prop($room, 'id'))
+                    ->whereIn('g.room_id', $roomIds)
                     ->select([
                         'g.sender_id',
                         'sender.name as name',
@@ -571,7 +574,7 @@ class PartyRoomController extends Controller
                 $seatCoinsMap = [];
                 $seatCoinRows = DB::table('gift_transactions')
                     ->where('room_type', 'party')
-                    ->where('room_id', (string) $this->prop($room, 'id'))
+                    ->whereIn('room_id', $roomIds)
                     ->whereNotNull('receiver_id')
                     ->select('receiver_id', DB::raw('SUM(diamonds) as total_coins'))
                     ->groupBy('receiver_id')
