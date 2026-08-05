@@ -431,12 +431,27 @@ class WalletController extends Controller
 
         return DB::transaction(function () use ($sender, $data) {
             $sender = $sender->lockForUpdate()->find($sender->id);
-            if ((int) $sender->diamonds < $data['diamonds']) {
+            $cost = (int) $data['diamonds'];
+
+            $currentDiamonds = (int) ($sender->diamonds ?? 0);
+            $currentRCoins = (int) ($sender->r_coins ?? 0);
+            $totalBalance = $currentDiamonds + $currentRCoins;
+
+            if ($totalBalance < $cost) {
                 return response()->json(['message' => 'পর্যাপ্ত ব্যালেন্স না থাকায় গিফট সেন্ড করা সম্ভব হচ্ছে না।'], 422);
             }
-            $sender->diamonds -= $data['diamonds'];
+
+            // Deduct from diamonds (Top-Up balance) first. If diamonds is less than cost, deduct remaining from r_coins.
+            if ($currentDiamonds >= $cost) {
+                $sender->diamonds = $currentDiamonds - $cost;
+            } else {
+                $remainder = $cost - $currentDiamonds;
+                $sender->diamonds = 0;
+                $sender->r_coins = max(0, $currentRCoins - $remainder);
+            }
+
             if (Schema::hasColumn('users', 'coins')) {
-                $sender->coins = max(0, (int) ($sender->coins ?? 0) - (int) $data['diamonds']);
+                $sender->coins = max(0, (int) ($sender->coins ?? 0) - $cost);
             }
             $sender->save();
 

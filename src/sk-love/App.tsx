@@ -7379,10 +7379,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     recentGiftEvent?: PartyBroadcastEvent;
   }> => {
     const costAmount = Number(params.diamonds || params.rCoins || 0);
-    const currentBalance = userWalletRef.current?.diamonds ?? userWallet.diamonds;
+    const currentDiamonds = userWalletRef.current?.diamonds ?? userWallet.diamonds ?? 0;
+    const currentRCoins = userWalletRef.current?.rCoins ?? userWallet.rCoins ?? 0;
+    const totalBalance = currentDiamonds + currentRCoins;
 
     // Strict balance check before making API call
-    if (currentBalance < costAmount) {
+    if (totalBalance < costAmount) {
       const msg = "পর্যাপ্ত ব্যালেন্স না থাকায় গিফট সেন্ড করা সম্ভব হচ্ছে না।";
       try { toast.error(msg); } catch {}
       setToastAlert(msg);
@@ -7391,12 +7393,25 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       return null;
     }
 
-    // Optimistic balance deduction so sender sees instant balance drop in UI & memory
-    const newOptimisticBalance = Math.max(0, currentBalance - costAmount);
-    if (userWalletRef.current) userWalletRef.current.diamonds = newOptimisticBalance;
+    // Optimistic balance deduction: deduct from diamonds first, remainder from rCoins
+    let optDiamonds = currentDiamonds;
+    let optRCoins = currentRCoins;
+    if (currentDiamonds >= costAmount) {
+      optDiamonds = currentDiamonds - costAmount;
+    } else {
+      const rem = costAmount - currentDiamonds;
+      optDiamonds = 0;
+      optRCoins = Math.max(0, currentRCoins - rem);
+    }
+
+    if (userWalletRef.current) {
+      userWalletRef.current.diamonds = optDiamonds;
+      userWalletRef.current.rCoins = optRCoins;
+    }
     setUserWallet((prev) => ({
       ...prev,
-      diamonds: newOptimisticBalance,
+      diamonds: optDiamonds,
+      rCoins: optRCoins,
     }));
 
     try {
@@ -7413,16 +7428,19 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         rCoins: costAmount,
       });
 
-      const remainingRecharge = res.diamonds !== undefined
-        ? Number(res.diamonds)
-        : newOptimisticBalance;
+      const remainingDiamonds = res.diamonds !== undefined ? Number(res.diamonds) : optDiamonds;
+      const remainingRCoins = res.rCoins !== undefined ? Number(res.rCoins) : optRCoins;
 
-      if (userWalletRef.current) userWalletRef.current.diamonds = remainingRecharge;
+      if (userWalletRef.current) {
+        userWalletRef.current.diamonds = remainingDiamonds;
+        userWalletRef.current.rCoins = remainingRCoins;
+      }
       setUserWallet((prev) => ({
         ...prev,
-        diamonds: remainingRecharge,
+        diamonds: remainingDiamonds,
+        rCoins: remainingRCoins,
       }));
-      // FIX: server-confirmed wallet সাথে সাথে refetch করে sync করি
+      // Server-confirmed wallet synchronization
       void fetchUserWalletData();
 
       const receiverId = res?.receiver?.id ? Number(res.receiver.id) : null;
