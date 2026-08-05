@@ -413,6 +413,31 @@ class PartyRoomController extends Controller
             $rawSeats = $seatQuery->get();
         }
 
+        $roomId = (int) $this->prop($room, 'id', 0);
+        $roomIdVal = $this->prop($room, 'id');
+        $roomIds = array_values(array_filter(array_unique([(string)$roomIdVal, (string)(int)$roomIdVal])));
+
+        // Per-receiver seat coins summary for this room (pre-calculated so each seat object has coins field)
+        $seatCoinsMap = [];
+        if ($this->tableExists('gift_transactions') && !empty($roomIds)) {
+            try {
+                $seatCoinRows = DB::table('gift_transactions')
+                    ->where('room_type', 'party')
+                    ->whereIn('room_id', $roomIds)
+                    ->whereNotNull('receiver_id')
+                    ->select('receiver_id', DB::raw('SUM(diamonds) as total_coins'))
+                    ->groupBy('receiver_id')
+                    ->get();
+                foreach ($seatCoinRows as $scr) {
+                    if (!empty($scr->receiver_id)) {
+                        $seatCoinsMap[(int) $scr->receiver_id] = (int) $scr->total_coins;
+                    }
+                }
+            } catch (Throwable $e) {
+                $seatCoinsMap = [];
+            }
+        }
+
         // Batch-fetch equipped frames for host + all seat occupants (avoids N+1).
         $frameIds = [ $hostId ];
         foreach ($rawSeats as $seat) {
@@ -422,7 +447,6 @@ class PartyRoomController extends Controller
         $framesMap = $this->userFramesFor($frameIds);
         $hostFrame = $framesMap[$hostId] ?? null;
         $lockedSeats = $this->normalizeLockedSeats($this->prop($room, 'locked_seats', []));
-        $roomId = (int) $this->prop($room, 'id', 0);
         $liveReactions = $roomId > 0 ? $this->liveSeatReactions($roomId) : [];
 
         // Deduplicate: only ONE active row per seat_num AND per user_id.
@@ -452,6 +476,7 @@ class PartyRoomController extends Controller
             $muted  = (bool) $this->prop($seat, 'muted', false);
             $joined = $this->prop($seat, 'joined_at');
             $reactionEmoji = $liveReactions[$sn] ?? null;
+            $userCoins = ($uid > 0 && isset($seatCoinsMap[$uid])) ? (int) $seatCoinsMap[$uid] : 0;
 
             // Emit BOTH camelCase and snake_case aliases so every code path
             // in the frontend (host + guest) can resolve seat data.
@@ -479,6 +504,9 @@ class PartyRoomController extends Controller
                 'reaction_emoji' => $reactionEmoji,
                 'isHost'         => ($uid > 0 && $uid === $hostId),
                 'is_host'        => ($uid > 0 && $uid === $hostId),
+                'coins'          => $userCoins,
+                'r_coins'        => $userCoins,
+                'received_coins' => $userCoins,
             ], $this->frameShape($seatFrame, $u));
         }
         usort($seatsArr, fn ($a, $b) => $a['seatNum'] <=> $b['seatNum']);
@@ -570,24 +598,9 @@ class PartyRoomController extends Controller
                     }
                 }
 
-                // Per-receiver seat coins summary for this room
-                $seatCoinsMap = [];
-                $seatCoinRows = DB::table('gift_transactions')
-                    ->where('room_type', 'party')
-                    ->whereIn('room_id', $roomIds)
-                    ->whereNotNull('receiver_id')
-                    ->select('receiver_id', DB::raw('SUM(diamonds) as total_coins'))
-                    ->groupBy('receiver_id')
-                    ->get();
-                foreach ($seatCoinRows as $scr) {
-                    if (!empty($scr->receiver_id)) {
-                        $seatCoinsMap[(int) $scr->receiver_id] = (int) $scr->total_coins;
-                    }
-                }
             } catch (Throwable $e) {
                 $recentGiftEvents = [];
                 $giftersSummary = [];
-                $seatCoinsMap = [];
             }
         }
 
