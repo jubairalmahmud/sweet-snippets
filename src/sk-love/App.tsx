@@ -1306,7 +1306,7 @@ export default function App() {
   >("home");
   const appSectionRef = useRef(appSection);
   const [vipStoreTab, setVipStoreTab] = useState<"avatar" | "party" | "rides">("avatar");
-  const [vipStoreSelected, setVipStoreSelected] = useState<string>("avatar-ring");
+  const [vipStoreSelected, setVipStoreSelected] = useState<string>("avatar-egol");
   const [levelPageTab, setLevelPageTab] = useState<"wealth" | "charm">("wealth");
   const [dailyCheckInClaimed, setDailyCheckInClaimed] = useState<boolean>(true);
   const [homeSubTab, setHomeSubTab] = useState<"explore" | "live" | "game" | "party" | "pk">(
@@ -25882,55 +25882,61 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
                         {vipSelection === "frames" ? (
                           <div className="space-y-2">
-                            {vipInventory.frames.map((frame) => (
-                              <div
-                                key={frame.id}
-                                className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl flex items-center justify-between gap-3 text-[10px] font-sans"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xl bg-slate-800 p-1.5 rounded-lg border border-slate-705">
-                                    {frame.icon}
-                                  </span>
-                                  <div className="text-left">
-                                    <h4 className="text-white font-bold">{frame.name}</h4>
-                                    <p className="text-[9px] text-slate-405">Duration: 30 Days</p>
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={async () => {
-                                    if (userWallet.diamonds < frame.price) {
-                                      triggerSystemAnnouncement("❌ Insufficient Coin balance!");
-                                      return;
-                                    }
-                                    try {
-                                      const res = await api.post<{
-                                        diamonds: number;
-                                        avatarFrame: string;
-                                      }>("/api/wallet/buy-item", {
-                                        kind: "frame",
-                                        name: frame.name,
-                                        price: frame.price,
-                                      });
-                                      setUserWallet((p) => ({
-                                        ...p,
-                                        diamonds: res.diamonds,
-                                        avatarFrame: res.avatarFrame,
-                                      }));
-                                      triggerSystemAnnouncement(
-                                        `🎉 Purchased and equipped the ${frame.name}!`,
-                                      );
-                                    } catch (e: any) {
-                                      triggerSystemAnnouncement(
-                                        `❌ ${e?.message || "Purchase failed"}`,
-                                      );
-                                    }
-                                  }}
-                                  className="bg-emerald-500 text-slate-950 font-extrabold px-2.5 py-1.5 rounded-lg border-none cursor-pointer text-[9.5px]"
+                            {AVATAR_FRAME_CATALOG.map((frame) => {
+                              const isOwned = !!ownedAvatarFrames[frame.id];
+                              const isEquipped = equippedAvatarFrame === frame.id;
+                              return (
+                                <div
+                                  key={frame.id}
+                                  className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl flex items-center justify-between gap-3 text-[10px] font-sans"
                                 >
-                                  {frame.price} 🪙
-                                </button>
-                              </div>
-                            ))}
+                                  <div className="flex items-center gap-2">
+                                    <div className="relative w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center shrink-0">
+                                      <img
+                                        src={frame.image}
+                                        alt={frame.name}
+                                        className="w-full h-full object-contain pointer-events-none"
+                                        onError={(e) => {
+                                          const clean = frame.id.replace(/^avatar-/, "");
+                                          e.currentTarget.src = `/frames/${clean}.png`;
+                                        }}
+                                      />
+                                    </div>
+                                    <div className="text-left">
+                                      <h4 className="text-white font-bold">{frame.name}</h4>
+                                      <p className="text-[9px] text-slate-400">
+                                        {frame.adminOnly
+                                          ? "Official Granted Badge"
+                                          : `Duration: ${frame.durationDays} Days`}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  {isEquipped ? (
+                                    <span className="bg-emerald-500 text-slate-950 font-black px-2.5 py-1 rounded-lg text-[9.5px]">
+                                      EQUIPPED
+                                    </span>
+                                  ) : isOwned ? (
+                                    <button
+                                      onClick={() => equipAvatarFrame(frame.id)}
+                                      className="bg-amber-500 text-slate-950 font-black px-2.5 py-1 rounded-lg border-none cursor-pointer text-[9.5px]"
+                                    >
+                                      EQUIP
+                                    </button>
+                                  ) : frame.adminOnly ? (
+                                    <span className="bg-amber-950/60 text-amber-300 font-bold px-2 py-1 rounded-lg text-[9px] border border-amber-500/30">
+                                      OFFICIAL
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => buyAvatarFrame(frame.id)}
+                                      className="bg-purple-600 hover:bg-purple-500 text-white font-black px-2.5 py-1 rounded-lg border-none cursor-pointer text-[9.5px]"
+                                    >
+                                      {(frame.price / 1000).toLocaleString()}K 🪙
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : (
                           <div className="space-y-2">
