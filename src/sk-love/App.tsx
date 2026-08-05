@@ -5463,8 +5463,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
             [uid]: user.audioTrack,
           };
           try {
-            if (!hostMutedLiveUserIds.includes(Number(uid))) {
+            const isMuted = hostMutedLiveUserIds.some((id) => String(id) === uid);
+            if (!isMuted) {
               user.audioTrack.play();
+            } else {
+              try {
+                if (typeof user.audioTrack.setVolume === "function") user.audioTrack.setVolume(0);
+                user.audioTrack.stop?.();
+              } catch {}
             }
             setAgoraStatus((current) =>
               current === "Waiting for host video..." ? "Live audio connected." : current,
@@ -5645,13 +5651,29 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 ...agoraRemoteAudioTracksByUidRef.current,
                 [uid]: track,
               };
-              if (!hostMutedLiveUserIds.includes(Number(uid)) && !isLiveAudioMuted) {
+              const isMuted = hostMutedLiveUserIds.some((id) => String(id) === uid);
+              if (isMuted) {
+                try {
+                  if (typeof track.setVolume === "function") track.setVolume(0);
+                  track.stop?.();
+                } catch {}
+              } else if (!isLiveAudioMuted) {
                 try { track.play(); } catch {}
               }
             }).catch(() => undefined);
           } catch {}
-        } else if (remoteUser.audioTrack && !hostMutedLiveUserIds.includes(Number(uid)) && !isLiveAudioMuted) {
-          try { remoteUser.audioTrack.play(); } catch {}
+        } else if (remoteUser.audioTrack) {
+          const track = remoteUser.audioTrack;
+          agoraRemoteAudioTracksByUidRef.current[uid] = track;
+          const isMuted = hostMutedLiveUserIds.some((id) => String(id) === uid);
+          if (isMuted) {
+            try {
+              if (typeof track.setVolume === "function") track.setVolume(0);
+              track.stop?.();
+            } catch {}
+          } else if (!isLiveAudioMuted) {
+            try { track.play(); } catch {}
+          }
         }
       });
     }, 2000);
@@ -11057,30 +11079,42 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
   // ---- হ্যান্ডলার: লাইভ রুম (toggleLiveCohostMuteForHost) ----
   const toggleLiveCohostMuteForHost = (userId: number) => {
-    const uid = String(userId);
-    const track = agoraRemoteAudioTracksByUidRef.current[uid];
+    const numUid = Number(userId);
+    const uidStr = String(userId);
+
+    let track = agoraRemoteAudioTracksByUidRef.current[uidStr] || agoraRemoteAudioTracksByUidRef.current[numUid as any];
+    if (!track) {
+      const client = agoraClientRef.current as any;
+      const remoteUser = client?.remoteUsers?.find(
+        (u: any) => String(u.uid) === uidStr || Number(u.uid) === numUid
+      );
+      if (remoteUser?.audioTrack) {
+        track = remoteUser.audioTrack;
+        agoraRemoteAudioTracksByUidRef.current[uidStr] = track;
+      }
+    }
+
     setHostMutedLiveUserIds((current) => {
-      const muted = current.includes(userId);
-      if (muted) {
-        try {
-          if (track) {
+      const isMuted = current.some((id) => String(id) === uidStr);
+      if (isMuted) {
+        if (track) {
+          try {
             if (typeof track.setVolume === "function") track.setVolume(100);
             track.play?.();
+          } catch {
+            setAgoraStatus("Tap Enable Audio if this co-host stays silent.");
           }
-        } catch {
-          setAgoraStatus("Tap Enable Audio if this co-host stays silent.");
         }
-        return current.filter((id) => id !== userId);
-      }
-      try {
+        return current.filter((id) => String(id) !== uidStr);
+      } else {
         if (track) {
-          if (typeof track.setVolume === "function") track.setVolume(0);
-          else track.stop?.();
+          try {
+            if (typeof track.setVolume === "function") track.setVolume(0);
+            track.stop?.();
+          } catch {}
         }
-      } catch {
-        // Remote audio handle error
+        return [...current, numUid];
       }
-      return [...current, userId];
     });
   };
 
@@ -11132,16 +11166,28 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
   // ---- ইফেক্ট: useEffect — hostMutedLiveUserIds sync ----
   useEffect(() => {
-    Object.entries(agoraRemoteAudioTracksByUidRef.current).forEach(([uid, track]) => {
+    const client = agoraClientRef.current as any;
+    const remoteUsers = client?.remoteUsers || [];
+    const allTracksMap: Record<string, any> = { ...agoraRemoteAudioTracksByUidRef.current };
+
+    remoteUsers.forEach((u: any) => {
+      if (u?.audioTrack) {
+        const uUid = String(u.uid);
+        allTracksMap[uUid] = u.audioTrack;
+        agoraRemoteAudioTracksByUidRef.current[uUid] = u.audioTrack;
+      }
+    });
+
+    Object.entries(allTracksMap).forEach(([uid, track]) => {
       if (!track) return;
-      const isMuted = hostMutedLiveUserIds.includes(Number(uid));
+      const isMuted = hostMutedLiveUserIds.some((id) => String(id) === String(uid));
       try {
         if (isMuted) {
           if (typeof track.setVolume === "function") track.setVolume(0);
-          else track.stop?.();
+          try { track.stop?.(); } catch {}
         } else {
           if (typeof track.setVolume === "function") track.setVolume(100);
-          track.play?.();
+          try { track.play?.(); } catch {}
         }
       } catch {}
     });
@@ -21892,7 +21938,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                       if (!cohost) return null;
                                       const cohostUserId = Number(cohost?.userId ?? cohost?.id ?? cohost?.user_id ?? 0);
                                       if (!cohostUserId) return null;
-                                      const muted = hostMutedLiveUserIds.includes(cohostUserId);
+                                      const muted = hostMutedLiveUserIds.some((id) => String(id) === String(cohostUserId));
                                       const cName = cohost?.name || `Guest ${cohostUserId}`;
                                       const cAvatar = cohost?.avatar || null;
                                       return (
@@ -29133,12 +29179,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   setCohostManageUser(null);
                 }}
                 className={`flex items-center justify-center gap-2 rounded-xl py-2.5 px-3 text-xs font-bold transition active:scale-95 cursor-pointer ${
-                  hostMutedLiveUserIds.includes(cohostManageUser.userId)
+                  hostMutedLiveUserIds.some((id) => String(id) === String(cohostManageUser.userId))
                     ? "bg-amber-500 text-slate-950 hover:bg-amber-400"
                     : "bg-slate-800 text-slate-200 hover:bg-slate-700"
                 }`}
               >
-                <span>{hostMutedLiveUserIds.includes(cohostManageUser.userId) ? "🔇 Unmute Audio" : "🎙️ Mute Audio"}</span>
+                <span>{hostMutedLiveUserIds.some((id) => String(id) === String(cohostManageUser.userId)) ? "🔇 Unmute Audio" : "🎙️ Mute Audio"}</span>
               </button>
 
               {/* Kick */}
