@@ -31,6 +31,18 @@ type SafeStreamIconProps = {
   glowColor?: string;
 };
 
+function getCanonicalIconFileName(alt: string): string {
+  const lower = alt.toLowerCase();
+  if (lower.includes("comment")) return "comment";
+  if (lower.includes("gift")) return "gift";
+  if (lower.includes("react") || lower.includes("emoji") || lower.includes("smile")) return "react";
+  if (lower.includes("game")) return "game";
+  if (lower.includes("menu") || lower.includes("hamburger")) return "menu";
+  if (lower.includes("seat") || lower.includes("sofa")) return "seat";
+  if (lower.includes("call") || lower.includes("phone") || lower.includes("co-host") || lower.includes("cohost")) return "phone";
+  return lower.replace(/[^a-z]/g, "") || "comment";
+}
+
 export function SafeStreamIcon({
   src,
   alt,
@@ -58,13 +70,20 @@ export function SafeStreamIcon({
       alt={alt}
       onError={(e) => {
         const target = e.currentTarget;
-        const cleanName = alt.toLowerCase().replace(/[^a-z]/g, "");
-        if (!target.dataset.tried) {
+        const iconName = getCanonicalIconFileName(alt);
+        const step = parseInt(target.dataset.tried || "0", 10);
+        if (step === 0) {
           target.dataset.tried = "1";
-          target.src = `stream-icons/${cleanName}.png`;
-        } else if (target.dataset.tried === "1") {
+          target.src = `/stream-icons/${iconName}.png`;
+        } else if (step === 1) {
           target.dataset.tried = "2";
-          target.src = `/stream-icons/${cleanName}.png`;
+          target.src = `stream-icons/${iconName}.png`;
+        } else if (step === 2) {
+          target.dataset.tried = "3";
+          target.src = `./stream-icons/${iconName}.png`;
+        } else if (step === 3) {
+          target.dataset.tried = "4";
+          target.src = `assets/stream-icons/${iconName}.png`;
         } else {
           setHasError(true);
         }

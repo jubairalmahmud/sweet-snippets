@@ -100,7 +100,7 @@ class PartyRoomController extends Controller
 
         // Keep party room stable even if the optional UserFrames helper is not
         // present on the server. Missing helper was causing /api/party-rooms 500.
-        if (class_exists('App\\Support\\UserFrames', false)) {
+        if (class_exists('App\\Support\\UserFrames')) {
             try {
                 return \App\Support\UserFrames::forUsers($ids);
             } catch (Throwable $e) {

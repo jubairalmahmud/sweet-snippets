@@ -28269,7 +28269,23 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                     draggable={false}
                     className="block w-full h-auto pointer-events-none z-10 relative opacity-100"
                     onError={(e) => {
-                      (e.target as HTMLElement).style.display = "none";
+                      const target = e.currentTarget;
+                      const step = parseInt(target.dataset.tried || "0", 10);
+                      if (step === 0) {
+                        target.dataset.tried = "1";
+                        target.src = "/nav-gem-bar.png";
+                      } else if (step === 1) {
+                        target.dataset.tried = "2";
+                        target.src = "nav-gem-bar.png";
+                      } else if (step === 2) {
+                        target.dataset.tried = "3";
+                        target.src = "./nav-gem-bar.png";
+                      } else if (step === 3) {
+                        target.dataset.tried = "4";
+                        target.src = "assets/nav-gem-bar.png";
+                      } else {
+                        target.style.display = "none";
+                      }
                     }}
                   />
 
