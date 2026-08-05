@@ -27313,7 +27313,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 className="pointer-events-none absolute inset-0 w-full h-full object-contain drop-shadow-[0_0_12px_rgba(255,200,80,0.65)] animate-pulse"
                                 onError={(e) => {
                                   const clean = selected.id.replace(/^avatar-/, "");
-                                  e.currentTarget.src = `/frames/${clean}.png`;
+                                  const target = e.currentTarget;
+                                  if (!target.dataset.tried) {
+                                    target.dataset.tried = "1";
+                                    target.src = `frames/${clean}.png`;
+                                  } else if (target.dataset.tried === "1") {
+                                    target.dataset.tried = "2";
+                                    target.src = `/frames/${clean}.png`;
+                                  }
                                 }}
                               />
                             </>
@@ -27360,7 +27367,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                       className="w-[92%] h-[92%] object-contain"
                                       onError={(e) => {
                                         const clean = item.id.replace(/^avatar-/, "");
-                                        e.currentTarget.src = `/frames/${clean}.png`;
+                                        const target = e.currentTarget;
+                                        if (!target.dataset.tried) {
+                                          target.dataset.tried = "1";
+                                          target.src = `frames/${clean}.png`;
+                                        } else if (target.dataset.tried === "1") {
+                                          target.dataset.tried = "2";
+                                          target.src = `/frames/${clean}.png`;
+                                        }
                                       }}
                                     />
                                   ) : (
