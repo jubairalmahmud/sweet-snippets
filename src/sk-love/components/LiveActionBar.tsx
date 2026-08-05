@@ -317,7 +317,7 @@ export default function LiveActionBar({
   }
 
   return (
-    <div className="relative flex items-center justify-between w-full max-w-lg mx-auto">
+    <div className="relative flex items-center justify-between w-full max-w-lg mx-auto shrink-0 z-40 select-none pointer-events-auto pb-1">
       {actionItems.map((item) => (
         <div key={item.key} className="flex flex-1 items-center justify-center">
           {item.content}

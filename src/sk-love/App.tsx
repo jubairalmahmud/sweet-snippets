@@ -15694,7 +15694,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 PNG-icon buttons as the video-streaming LiveActionBar. All
                 existing handlers/state/popups are preserved unchanged; only
                 the button visuals were swapped to match the stream footer. */}
-            <div className="relative flex flex-1 items-center justify-between gap-1 px-1 pb-0">
+            <div className="relative flex flex-1 shrink-0 z-40 items-center justify-between gap-1 px-1 pb-1">
               {isPartyCommentPopupOpen ? (
                 <div
                   className="relative z-[80] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md"
@@ -22081,7 +22081,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               </div>
                             )}
 
-                            <div className="flex items-center justify-between gap-1 px-1">
+                            <div className="flex items-center justify-between gap-1 px-1 shrink-0 w-full z-40 pb-1">
                               {/* Always-visible input bar */}
                               <div className="relative flex min-w-0 flex-1 items-center gap-1">
                                 {isCommentInputPopupOpen ? (
@@ -23584,7 +23584,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                           )}
 
                           {/* Floating bottom command input / micro transaction shortcuts */}
-                          <div className="relative flex items-center justify-between gap-2 sm:gap-3 w-full max-w-lg mx-auto">
+                          <div className="relative flex items-center justify-between gap-2 sm:gap-3 w-full max-w-lg mx-auto shrink-0 z-40 pb-1">
                             <div className="flex items-center gap-2 sm:gap-3 min-w-0 w-full">
                               {isCommentInputPopupOpen ? (
                                 <>
@@ -28056,13 +28056,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                     alt="Navigation Bar"
                     aria-hidden="true"
                     draggable={false}
-                    className="block w-full h-auto pointer-events-none z-10 relative"
+                    className="block w-full h-auto pointer-events-none z-10 relative opacity-100"
                     onError={(e) => {
                       (e.target as HTMLElement).style.display = "none";
                     }}
                   />
 
-                  {/* Fallback CSS Navigation Bar — visible if image fails or is loading */}
+                  {/* Fallback CSS Navigation Bar — smoothly rendered in background (z-0) as fallback */}
                   <div className="absolute inset-0 z-0 flex items-center justify-around px-2 bg-gradient-to-r from-[#0d0922] via-[#140e34] to-[#0d0922]">
                     <button
                       type="button"
