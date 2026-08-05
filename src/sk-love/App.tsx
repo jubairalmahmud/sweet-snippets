@@ -8373,6 +8373,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
             }
           }
         });
+        if (changed && room?.id) {
+          saveStoredPartyRoomCoins(room.id, next);
+        }
         return changed ? next : prev;
       });
     }
