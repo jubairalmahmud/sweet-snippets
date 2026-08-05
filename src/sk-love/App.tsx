@@ -11039,16 +11039,22 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       const muted = current.includes(userId);
       if (muted) {
         try {
-          track?.play?.();
+          if (track) {
+            if (typeof track.setVolume === "function") track.setVolume(100);
+            track.play?.();
+          }
         } catch {
           setAgoraStatus("Tap Enable Audio if this co-host stays silent.");
         }
         return current.filter((id) => id !== userId);
       }
       try {
-        track?.stop?.();
+        if (track) {
+          if (typeof track.setVolume === "function") track.setVolume(0);
+          else track.stop?.();
+        }
       } catch {
-        // Remote audio may not expose stop in every browser build.
+        // Remote audio handle error
       }
       return [...current, userId];
     });
@@ -11058,10 +11064,17 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // ---- হ্যান্ডলার: লাইভ রুম (kickLiveCohost) ----
   const kickLiveCohost = async (userId: number) => {
     if (!activeLiveRoom?.id) return;
+    const numUid = Number(userId);
     try {
-      await api.post(`/api/live-rooms/${activeLiveRoom.id}/cohosts/${userId}/kick`);
-      setLiveCohosts((current) => current.filter((cohost) => Number(cohost.userId) !== Number(userId)));
-      setLiveRemoteVideos((current) => current.filter((item) => Number(item.uid) !== Number(userId)));
+      await api.post(`/api/live-rooms/${activeLiveRoom.id}/cohosts/${numUid}/kick`).catch(() => undefined);
+      setLiveCohosts((current) =>
+        current.filter((cohost) => {
+          const cId = Number(cohost?.userId ?? cohost?.id ?? cohost?.user_id ?? cohost?.user?.id ?? 0);
+          return cId !== numUid;
+        })
+      );
+      setLiveRemoteVideos((current) => current.filter((item) => Number(item.uid) !== numUid));
+      delete liveRemoteVideoTracksRef.current[String(numUid)];
       triggerSystemAnnouncement("Co-host removed from live.");
     } catch (err: any) {
       triggerSystemAnnouncement(err?.message || "Could not remove co-host.");
@@ -11071,12 +11084,19 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // ---- হ্যান্ডলার: লাইভ রুম (blockLiveCohost) ----
   const blockLiveCohost = async (userId: number, userName?: string) => {
     if (!activeLiveRoom?.id) return;
+    const numUid = Number(userId);
     try {
-      await api.post(`/api/live-rooms/${activeLiveRoom.id}/cohosts/${userId}/kick`).catch(() => undefined);
-      setLiveCohosts((current) => current.filter((cohost) => Number(cohost.userId) !== Number(userId)));
-      setLiveRemoteVideos((current) => current.filter((item) => Number(item.uid) !== Number(userId)));
+      await api.post(`/api/live-rooms/${activeLiveRoom.id}/cohosts/${numUid}/kick`).catch(() => undefined);
+      setLiveCohosts((current) =>
+        current.filter((cohost) => {
+          const cId = Number(cohost?.userId ?? cohost?.id ?? cohost?.user_id ?? cohost?.user?.id ?? 0);
+          return cId !== numUid;
+        })
+      );
+      setLiveRemoteVideos((current) => current.filter((item) => Number(item.uid) !== numUid));
+      delete liveRemoteVideoTracksRef.current[String(numUid)];
       await api.post(`/api/live-rooms/${activeLiveRoom.id}/suspend`, {
-        user_id: Number(userId),
+        user_id: numUid,
         minutes: 1440,
       }).catch(() => undefined);
       triggerSystemAnnouncement(`Blocked "${userName || "Co-host"}" from live stream.`);
@@ -11086,22 +11106,43 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   };
 
 
+  // ---- ইফেক্ট: useEffect — hostMutedLiveUserIds sync ----
+  useEffect(() => {
+    Object.entries(agoraRemoteAudioTracksByUidRef.current).forEach(([uid, track]) => {
+      if (!track) return;
+      const isMuted = hostMutedLiveUserIds.includes(Number(uid));
+      try {
+        if (isMuted) {
+          if (typeof track.setVolume === "function") track.setVolume(0);
+          else track.stop?.();
+        } else {
+          if (typeof track.setVolume === "function") track.setVolume(100);
+          track.play?.();
+        }
+      } catch {}
+    });
+  }, [hostMutedLiveUserIds]);
+
+
   // ---- ইফেক্ট: useEffect — if (!activeLiveRoom?.id || appSection !== "stream") return; ----
   useEffect(() => {
     if (!activeLiveRoom?.id || appSection !== "stream") return;
 
-    // Grace counter: require 2 consecutive "not approved" polls before evicting the
-    // cohost. This prevents transient server races (e.g. right after toggling the
-    // camera on/off) from bumping the user out of the stream.
     let missCount = 0;
 
     const syncCohostState = async () => {
       await refreshLiveCohostState();
       const currentUserId = getCurrentUserId();
       const response: any = await api.get(`/api/live-rooms/${activeLiveRoom.id}/cohosts`).catch(() => null);
-      const approved = Array.isArray(response?.data)
-        ? response.data.some((cohost: any) => Number(cohost.userId) === Number(currentUserId))
-        : false;
+      if (!response || !Array.isArray(response?.data)) {
+        // Transient network error or empty failover: do not evict
+        return;
+      }
+      const approved = response.data.some((cohost: any) => {
+        const cId = Number(cohost?.userId ?? cohost?.id ?? cohost?.user_id ?? cohost?.user?.id ?? 0);
+        return cId === Number(currentUserId);
+      });
+
       if (streamRole === "viewer" && approved) {
         missCount = 0;
         const roomWithPublisherToken = await attachAgoraToken(activeLiveRoom, "publisher");
@@ -11114,9 +11155,16 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           missCount = 0;
         } else {
           missCount += 1;
-          if (missCount >= 2) {
+          if (missCount >= 3) {
             setCohostRequestStatus("Host removed you from stage.");
-            void exitBackendLiveRoom();
+            // Revert role to viewer (stage evicted) without leaving the live stream room
+            setStreamRole("viewer");
+            setIsCohostPending(false);
+            try {
+              await api.post(`/api/live-rooms/${activeLiveRoom.id}/cohosts/leave`);
+            } catch {
+              // ignore
+            }
           }
         }
       }
