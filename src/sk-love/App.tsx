@@ -7403,6 +7403,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     }));
 
     try {
+      const { rCoins: _discardRCoins, ...restParams } = params;
       const res = await api.post<{
         diamonds: number;
         rCoins: number;
@@ -7410,10 +7411,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         receiver: { id: number; rCoins: number } | null;
         recentGiftEvent?: PartyBroadcastEvent;
       }>("/api/wallet/gift", {
-        ...params,
+        ...restParams,
         coins: costAmount,
         diamonds: costAmount,
-        rCoins: costAmount,
+        cost: costAmount,
       });
 
       const remainingDiamonds = res.diamonds !== undefined ? Number(res.diamonds) : optDiamonds;
