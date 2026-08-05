@@ -1656,6 +1656,17 @@ export default function App() {
   const [liveCohostRequests, setLiveCohostRequests] = useState<any[]>([]);
   const [liveCohosts, setLiveCohosts] = useState<any[]>([]);
   const liveCohostsRef = useRef<any[]>([]);
+  const getRemoteCohostMeta = (uidValue: unknown) => {
+    const uid = String(uidValue ?? "");
+    const cohost = liveCohostsRef.current.find((item: any) => {
+      const cId = String(item?.userId ?? item?.id ?? item?.user_id ?? "");
+      return cId === uid;
+    });
+    return {
+      name: cohost?.name || "Co-host",
+      avatar: cohost?.avatar ?? null,
+    };
+  };
   const [liveInvites, setLiveInvites] = useState<any[]>([]);
   const [liveInviteSearchQuery, setLiveInviteSearchQuery] = useState<string>("");
   const [liveInviteSearchResults, setLiveInviteSearchResults] = useState<any[]>([]);
@@ -5400,15 +5411,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     }
 
     let cancelled = false;
-
-    const getRemoteCohostMeta = (uidValue: unknown) => {
-      const uid = String(uidValue ?? "");
-      const cohost = liveCohostsRef.current.find((item: any) => String(item?.userId) === uid);
-      return {
-        name: cohost?.name || "Co-host",
-        avatar: cohost?.avatar ?? null,
-      };
-    };
 
     const subscribeRemoteUserMedia = async (client: any, remoteUser: any, mediaType: "audio" | "video") => {
       if (!client || !remoteUser) return;
