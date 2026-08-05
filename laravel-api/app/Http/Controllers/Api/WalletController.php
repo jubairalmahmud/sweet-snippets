@@ -434,21 +434,13 @@ class WalletController extends Controller
             $cost = (int) $data['diamonds'];
 
             $currentDiamonds = (int) ($sender->diamonds ?? 0);
-            $currentRCoins = (int) ($sender->r_coins ?? 0);
-            $totalBalance = $currentDiamonds + $currentRCoins;
 
-            if ($totalBalance < $cost) {
+            if ($currentDiamonds < $cost) {
                 return response()->json(['message' => 'পর্যাপ্ত ব্যালেন্স না থাকায় গিফট সেন্ড করা সম্ভব হচ্ছে না।'], 422);
             }
 
-            // Deduct from diamonds (Top-Up balance) first. If diamonds is less than cost, deduct remaining from r_coins.
-            if ($currentDiamonds >= $cost) {
-                $sender->diamonds = $currentDiamonds - $cost;
-            } else {
-                $remainder = $cost - $currentDiamonds;
-                $sender->diamonds = 0;
-                $sender->r_coins = max(0, $currentRCoins - $remainder);
-            }
+            // Deduct strictly from diamonds (Top-Up balance). Under no circumstances is C-Coin (r_coins) used.
+            $sender->diamonds = $currentDiamonds - $cost;
 
             if (Schema::hasColumn('users', 'coins')) {
                 $sender->coins = max(0, (int) ($sender->coins ?? 0) - $cost);

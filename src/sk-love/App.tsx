@@ -7380,11 +7380,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   }> => {
     const costAmount = Number(params.diamonds || params.rCoins || 0);
     const currentDiamonds = userWalletRef.current?.diamonds ?? userWallet.diamonds ?? 0;
-    const currentRCoins = userWalletRef.current?.rCoins ?? userWallet.rCoins ?? 0;
-    const totalBalance = currentDiamonds + currentRCoins;
 
-    // Strict balance check before making API call
-    if (totalBalance < costAmount) {
+    // Strict balance check for diamonds (Top-Up) before making API call
+    if (currentDiamonds < costAmount) {
       const msg = "পর্যাপ্ত ব্যালেন্স না থাকায় গিফট সেন্ড করা সম্ভব হচ্ছে না।";
       try { toast.error(msg); } catch {}
       setToastAlert(msg);
@@ -7393,25 +7391,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       return null;
     }
 
-    // Optimistic balance deduction: deduct from diamonds first, remainder from rCoins
-    let optDiamonds = currentDiamonds;
-    let optRCoins = currentRCoins;
-    if (currentDiamonds >= costAmount) {
-      optDiamonds = currentDiamonds - costAmount;
-    } else {
-      const rem = costAmount - currentDiamonds;
-      optDiamonds = 0;
-      optRCoins = Math.max(0, currentRCoins - rem);
-    }
+    // Optimistic balance deduction strictly from diamonds (Top-Up balance)
+    const optDiamonds = Math.max(0, currentDiamonds - costAmount);
 
     if (userWalletRef.current) {
       userWalletRef.current.diamonds = optDiamonds;
-      userWalletRef.current.rCoins = optRCoins;
     }
     setUserWallet((prev) => ({
       ...prev,
       diamonds: optDiamonds,
-      rCoins: optRCoins,
     }));
 
     try {
@@ -7429,16 +7417,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       });
 
       const remainingDiamonds = res.diamonds !== undefined ? Number(res.diamonds) : optDiamonds;
-      const remainingRCoins = res.rCoins !== undefined ? Number(res.rCoins) : optRCoins;
 
       if (userWalletRef.current) {
         userWalletRef.current.diamonds = remainingDiamonds;
-        userWalletRef.current.rCoins = remainingRCoins;
       }
       setUserWallet((prev) => ({
         ...prev,
         diamonds: remainingDiamonds,
-        rCoins: remainingRCoins,
       }));
       // Server-confirmed wallet synchronization
       void fetchUserWalletData();
