@@ -4,7 +4,8 @@
 // Failover Backup: https://api.keno70.com
 
 export const DEFAULT_PRIMARY_API = "https://api.sklove.nit.bd";
-export const DEFAULT_BACKUP_API = "https://api.keno70.com";
+// export const DEFAULT_BACKUP_API = "https://api.keno70.com";
+export const DEFAULT_BACKUP_API = "";
 
 export function getBackendCandidates(): string[] {
   let custom: string | null = null;
