@@ -441,7 +441,7 @@ class WalletController extends Controller
             $sender->save();
 
             $receiverWallet = null;
-            if (!empty($data['receiverId']) && $data['receiverId'] !== $sender->id) {
+            if (!empty($data['receiverId']) && (int) $data['receiverId'] !== (int) $sender->id) {
                 $receiver = \App\Models\User::lockForUpdate()->find($data['receiverId']);
                 if ($receiver) {
                     $receiver->r_coins = (int) $receiver->r_coins + (int) $data['rCoins'];

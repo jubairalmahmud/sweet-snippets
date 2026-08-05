@@ -15627,14 +15627,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-950/80 border border-amber-400/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
-                      <span className="text-xs">💎</span>
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/90 border border-amber-400/60 shadow-[0_0_12px_rgba(245,158,11,0.25)]">
+                      <span className="text-xs">🪙</span>
+                      <span className="text-[9.5px] font-black text-amber-200 uppercase tracking-wider">Top-Up:</span>
                       <span className="text-xs font-black text-amber-300 tracking-tight">
                         {(userWallet.diamonds || 0).toLocaleString()}
                       </span>
-                      {/* <span className="text-[10px] text-pink-400/90 font-bold ml-1 flex items-center gap-0.5">
-                        🪙 {(userWallet.rCoins || 0).toLocaleString()}
-                      </span> */}
                     </div>
                     <button
                       onClick={() => {
@@ -22792,14 +22790,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                         </div>
                                       </div>
                                       <div className="flex items-center gap-1.5 shrink-0">
-                                        <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-950/80 border border-amber-400/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
-                                          <span className="text-xs">💎</span>
+                                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/90 border border-amber-400/60 shadow-[0_0_12px_rgba(245,158,11,0.25)]">
+                                          <span className="text-xs">🪙</span>
+                                          <span className="text-[9.5px] font-black text-amber-200 uppercase tracking-wider">Top-Up:</span>
                                           <span className="text-xs font-black text-amber-300 tracking-tight">
                                             {(userWallet.diamonds || 0).toLocaleString()}
                                           </span>
-                                          {/* <span className="text-[10px] text-pink-400/90 font-bold ml-1 flex items-center gap-0.5">
-                                            🪙 {(userWallet.rCoins || 0).toLocaleString()}
-                                          </span> */}
                                         </div>
                                         <button
                                           onClick={() => {
@@ -23602,14 +23598,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0">
-                                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-950/80 border border-amber-400/50 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
-                                        <span className="text-xs">💎</span>
+                                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/90 border border-amber-400/60 shadow-[0_0_12px_rgba(245,158,11,0.25)]">
+                                        <span className="text-xs">🪙</span>
+                                        <span className="text-[9.5px] font-black text-amber-200 uppercase tracking-wider">Top-Up:</span>
                                         <span className="text-xs font-black text-amber-300 tracking-tight">
                                           {(userWallet.diamonds || 0).toLocaleString()}
                                         </span>
-                                        {/* <span className="text-[10px] text-pink-400/90 font-bold ml-1 flex items-center gap-0.5">
-                                          🪙 {(userWallet.rCoins || 0).toLocaleString()}
-                                        </span> */}
                                       </div>
                                       <button
                                         onClick={() => {
