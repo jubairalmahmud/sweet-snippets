@@ -28290,7 +28290,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               {/* BOTTOM PREMIUM GEM NAV BAR — image reference with resilient fallback */}
               {appSection !== "stream" && !isCommentInputPopupOpen && !isPartyCommentPopupOpen && (
                 <div
-                  className="relative w-full max-w-full select-none shrink-0 overflow-visible min-h-[58px] bg-[#0c0a1e] border-t border-purple-900/30 flex items-center justify-between"
+                  className="relative w-full max-w-full select-none shrink-0 overflow-visible min-h-[58px] pb-[env(safe-area-inset-bottom,0px)] bg-[#0c0a1e] border-t border-purple-900/30 flex items-center justify-between"
                 >
                   <img
                     src={navGemBarImg}
