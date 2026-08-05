@@ -1659,7 +1659,7 @@ export default function App() {
   const getRemoteCohostMeta = (uidValue: unknown) => {
     const uid = String(uidValue ?? "");
     const cohost = liveCohostsRef.current.find((item: any) => {
-      const cId = String(item?.userId ?? item?.id ?? item?.user_id ?? "");
+      const cId = String(item?.userId ?? item?.user_id ?? item?.user?.id ?? item?.id ?? "");
       return cId === uid;
     });
     return {
@@ -7097,7 +7097,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         .then((res: any) => {
           const latest = res?.data;
           if (!latest) return;
-          if (!latest.live || latest.endedAt) {
+          const isEnded =
+            latest.live === false ||
+            latest.is_live === false ||
+            latest.isLive === false ||
+            latest.status === "ended" ||
+            latest.status === "closed" ||
+            Boolean(latest.endedAt || latest.ended_at || latest.closed_at);
+          if (isEnded) {
             void handleHostEndedLiveStream(roomId);
             return;
           }
@@ -11137,7 +11144,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       await api.post(`/api/live-rooms/${activeLiveRoom.id}/cohosts/${numUid}/kick`).catch(() => undefined);
       setLiveCohosts((current) =>
         current.filter((cohost) => {
-          const cId = Number(cohost?.userId ?? cohost?.id ?? cohost?.user_id ?? cohost?.user?.id ?? 0);
+          const cId = Number(cohost?.userId ?? cohost?.user_id ?? cohost?.user?.id ?? cohost?.id ?? 0);
           return cId !== numUid;
         })
       );
@@ -11157,7 +11164,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       await api.post(`/api/live-rooms/${activeLiveRoom.id}/cohosts/${numUid}/kick`).catch(() => undefined);
       setLiveCohosts((current) =>
         current.filter((cohost) => {
-          const cId = Number(cohost?.userId ?? cohost?.id ?? cohost?.user_id ?? cohost?.user?.id ?? 0);
+          const cId = Number(cohost?.userId ?? cohost?.user_id ?? cohost?.user?.id ?? cohost?.id ?? 0);
           return cId !== numUid;
         })
       );
@@ -11214,12 +11221,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       await refreshLiveCohostState();
       const currentUserId = getCurrentUserId();
       const response: any = await api.get(`/api/live-rooms/${activeLiveRoom.id}/cohosts`).catch(() => null);
-      if (!response || !Array.isArray(response?.data)) {
+      const rawList = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : null;
+      if (!rawList) {
         // Transient network error or empty failover: do not evict
         return;
       }
-      const approved = response.data.some((cohost: any) => {
-        const cId = Number(cohost?.userId ?? cohost?.id ?? cohost?.user_id ?? cohost?.user?.id ?? 0);
+      const approved = rawList.some((cohost: any) => {
+        const cId = Number(cohost?.userId ?? cohost?.user_id ?? cohost?.user?.id ?? cohost?.id ?? 0);
         return cId === Number(currentUserId);
       });
 
@@ -21848,7 +21856,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               const map = new Map<string, { uid: string; name: string; avatar: string | null; track: any | null }>();
 
                               (liveCohosts || []).forEach((c: any) => {
-                                const uidStr = String(c?.userId ?? c?.id ?? "").trim();
+                                const uidStr = String(c?.userId ?? c?.user_id ?? c?.user?.id ?? c?.id ?? "").trim();
                                 const uidNum = Number(uidStr);
                                 if (!uidStr) return;
                                 if (hostIdNum && uidNum === hostIdNum) return;
@@ -21992,7 +22000,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                     <p className="text-[8px] font-black uppercase text-cyan-300">On stage controls</p>
                                     {liveCohosts.slice(0, 6).map((cohost) => {
                                       if (!cohost) return null;
-                                      const cohostUserId = Number(cohost?.userId ?? cohost?.id ?? cohost?.user_id ?? 0);
+                                      const cohostUserId = Number(cohost?.userId ?? cohost?.user_id ?? cohost?.user?.id ?? cohost?.id ?? 0);
                                       if (!cohostUserId) return null;
                                       const muted = hostMutedLiveUserIds.some((id) => String(id) === String(cohostUserId));
                                       const cName = cohost?.name || `Guest ${cohostUserId}`;
@@ -23301,7 +23309,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                             const map = new Map<string, { uid: string; name: string; avatar: string | null; track: any | null }>();
 
                             (liveCohosts || []).forEach((c: any) => {
-                              const uidStr = String(c?.userId ?? c?.id ?? "").trim();
+                              const uidStr = String(c?.userId ?? c?.user_id ?? c?.user?.id ?? c?.id ?? "").trim();
                               const uidNum = Number(uidStr);
                               if (!uidStr) return;
                               if (hostIdNum && uidNum === hostIdNum) return;
