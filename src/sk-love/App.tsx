@@ -5534,11 +5534,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
         if (streamRole !== "viewer") {
           const tracks: Array<IMicrophoneAudioTrack | ICameraVideoTrack> = [];
+          let audioTrack: IMicrophoneAudioTrack | null = null;
+          let videoTrack: ICameraVideoTrack | null = null;
 
           try {
-            const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+            audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
             agoraLocalAudioTrackRef.current = audioTrack;
-            await audioTrack.setEnabled(!isStreamMicMuted);
             tracks.push(audioTrack);
           } catch (err: any) {
             const msg = String(err?.name || err?.message || err || "");
@@ -5549,29 +5550,44 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
             }
           }
 
-          if (!isStreamCameraOff) {
-            try {
-              const videoTrack = await AgoraRTC.createCameraVideoTrack({
-                encoderConfig: "480p_1",
-              });
-              agoraLocalVideoTrackRef.current = videoTrack;
-              if (agoraLocalVideoRef.current) {
+          try {
+            videoTrack = await AgoraRTC.createCameraVideoTrack({
+              encoderConfig: "480p_1",
+            });
+            agoraLocalVideoTrackRef.current = videoTrack;
+            if (agoraLocalVideoRef.current && !isStreamCameraOff) {
+              try {
                 agoraLocalVideoRef.current.innerHTML = "";
                 videoTrack.play(agoraLocalVideoRef.current);
-              }
-              tracks.push(videoTrack);
-            } catch (err: any) {
-              const msg = String(err?.name || err?.message || err || "");
-              if (/PERMISSION_DENIED|NotAllowed|Permission dismissed/i.test(msg)) {
-                setAgoraStatus("Camera permission denied. Streaming without video.");
-              } else {
-                setAgoraStatus(err?.message || "Camera permission failed.");
-              }
+              } catch {}
+            }
+            tracks.push(videoTrack);
+          } catch (err: any) {
+            const msg = String(err?.name || err?.message || err || "");
+            if (/PERMISSION_DENIED|NotAllowed|Permission dismissed/i.test(msg)) {
+              setAgoraStatus("Camera permission denied. Streaming without video.");
+            } else {
+              setAgoraStatus(err?.message || "Camera permission failed.");
             }
           }
 
           if (tracks.length > 0) {
             await client.publish(tracks);
+
+            // Apply mute / camera off states after successful publish
+            if (audioTrack && isStreamMicMuted) {
+              try { void audioTrack.setEnabled(false).catch(() => {}); } catch {}
+            }
+            if (videoTrack && isStreamCameraOff) {
+              try {
+                if (typeof (videoTrack as any).setMuted === "function") {
+                  void (videoTrack as any).setMuted(true).catch(() => {});
+                } else if (typeof videoTrack.setEnabled === "function") {
+                  void videoTrack.setEnabled(false).catch(() => {});
+                }
+              } catch {}
+            }
+
             setAgoraStatus(streamRole === "cohost" ? "Co-host audio/video connected." : "Live broadcast is publishing.");
             // Auto-hide the publishing status after a few seconds so it doesn't linger on host screen.
             window.setTimeout(() => {
@@ -10279,6 +10295,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       if (room?.id) {
         const roomWithToken = await attachAgoraToken(room, "publisher");
         setStreamRole("streamer");
+        setIsStreamMicMuted(false);
+        setIsStreamCameraOff(false);
         setIsLiveStreamMinimized(false);
         setAppSection("stream");
         setActiveLiveRoom(roomWithToken);
@@ -10483,6 +10501,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       const hostId = Number(room?.hostId || 0);
       if (myId && hostId && myId === hostId) {
         setStreamRole("streamer");
+        setIsStreamMicMuted(false);
+        setIsStreamCameraOff(false);
         setIsLiveStreamMinimized(false);
         setAppSection("stream");
         setIsStreamCameraOff(false);
@@ -10939,6 +10959,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           const publisherRoom = await attachAgoraToken(joined, "publisher");
           setActiveLiveRoom(publisherRoom);
           setStreamRole("cohost");
+          setIsStreamMicMuted(false);
+          setIsStreamCameraOff(false);
           setAppSection("stream");
           setCohostRequestStatus("Invite accepted. You are now on stage.");
         }
@@ -11148,6 +11170,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         const roomWithPublisherToken = await attachAgoraToken(activeLiveRoom, "publisher");
         setActiveLiveRoom(roomWithPublisherToken);
         setStreamRole("cohost");
+        setIsStreamMicMuted(false);
+        setIsStreamCameraOff(false);
         setCohostRequestStatus("Host approved your request. You are on stage.");
       }
       if (streamRole === "cohost") {
@@ -21863,17 +21887,21 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                   <div className="absolute left-3 right-3 bottom-44 z-30 max-h-40 space-y-1 overflow-y-auto rounded-2xl border border-cyan-400/25 bg-slate-950/92 p-2 shadow-xl backdrop-blur">
                                     <p className="text-[8px] font-black uppercase text-cyan-300">On stage controls</p>
                                     {liveCohosts.slice(0, 6).map((cohost) => {
-                                      const cohostUserId = Number(cohost.userId);
+                                      if (!cohost) return null;
+                                      const cohostUserId = Number(cohost?.userId ?? cohost?.id ?? cohost?.user_id ?? 0);
+                                      if (!cohostUserId) return null;
                                       const muted = hostMutedLiveUserIds.includes(cohostUserId);
+                                      const cName = cohost?.name || `Guest ${cohostUserId}`;
+                                      const cAvatar = cohost?.avatar || null;
                                       return (
                                         <div key={`host-cohost-control-${cohostUserId}`} className="flex items-center gap-1.5 rounded-lg bg-black/40 p-1">
                                           <img
-                                            src={getUserAvatarUrl({ name: cohost.name, avatar: cohost.avatar })}
-                                            alt={cohost.name || "Guest"}
+                                            src={getUserAvatarUrl({ name: cName, avatar: cAvatar })}
+                                            alt={cName}
                                             className="h-7 w-7 rounded-full object-cover"
                                           />
                                           <span className="min-w-0 flex-1 truncate text-[9px] font-black text-white">
-                                            {cohost.name || "Guest"}
+                                            {cName}
                                           </span>
                                           <button
                                             type="button"
