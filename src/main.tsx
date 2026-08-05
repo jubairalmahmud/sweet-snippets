@@ -7,9 +7,22 @@ import { Toaster } from "sonner";
 import SKLoveApp from "./sk-love/App";
 import { AdminLoginPage } from "./pages/AdminLoginPage";
 import { AdminPanelPage } from "./pages/AdminPanelPage";
+import { useKeepScreenAwake } from "./hooks/useKeepScreenAwake";
 import "./styles.css";
 
 const queryClient = new QueryClient();
+
+function AppRoutes() {
+  useKeepScreenAwake();
+
+  return (
+    <Routes>
+      <Route path="/" element={<SKLoveApp />} />
+      <Route path="/admin" element={<AdminLoginPage />} />
+      <Route path="/admin-panel" element={<AdminPanelPage />} />
+    </Routes>
+  );
+}
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Root element not found");
@@ -18,11 +31,7 @@ createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<SKLoveApp />} />
-          <Route path="/admin" element={<AdminLoginPage />} />
-          <Route path="/admin-panel" element={<AdminPanelPage />} />
-        </Routes>
+        <AppRoutes />
       </BrowserRouter>
       <Toaster position="top-center" richColors closeButton />
     </QueryClientProvider>
