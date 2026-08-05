@@ -56,7 +56,19 @@ export function SafeStreamIcon({
     <img
       src={src}
       alt={alt}
-      onError={() => setHasError(true)}
+      onError={(e) => {
+        const target = e.currentTarget;
+        const cleanName = alt.toLowerCase().replace(/[^a-z]/g, "");
+        if (!target.dataset.tried) {
+          target.dataset.tried = "1";
+          target.src = `stream-icons/${cleanName}.png`;
+        } else if (target.dataset.tried === "1") {
+          target.dataset.tried = "2";
+          target.src = `/stream-icons/${cleanName}.png`;
+        } else {
+          setHasError(true);
+        }
+      }}
       className={className}
     />
   );
