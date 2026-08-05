@@ -68,7 +68,25 @@ class UserFrames
             ])
             ->first();
 
-        if (!$row) return self::$cache[$key] = null;
+        if (!$row) {
+            // Fallback: check users table directly if avatar_frame is set on user record
+            if (Schema::hasTable('users') && Schema::hasColumn('users', 'avatar_frame')) {
+                $userCol = DB::table('users')->where('id', $key)->select(['avatar_frame', 'avatar_frame_id'])->first();
+                $val = $userCol->avatar_frame ?? ($userCol->avatar_frame_id ?? null);
+                if ($val && String($val) !== '' && $val !== 'None' && $val !== 'Default') {
+                    return self::$cache[$key] = [
+                        'id'        => 0,
+                        'frameId'   => (string) $val,
+                        'code'      => (string) $val,
+                        'name'      => (string) $val,
+                        'imageUrl'  => null,
+                        'rarity'    => 'common',
+                        'expiresAt' => null,
+                    ];
+                }
+            }
+            return self::$cache[$key] = null;
+        }
 
         return self::$cache[$key] = [
             'id'        => (int) $row->uf_id,
@@ -129,6 +147,29 @@ class UserFrames
             $out[$uid] = $shape;
             self::$cache[$uid] = $shape;
         }
+        // Fallback for users missing from user_frames table
+        $missingIds = array_filter($ids, fn($uid) => empty($out[$uid]));
+        if (!empty($missingIds) && Schema::hasTable('users') && Schema::hasColumn('users', 'avatar_frame')) {
+            $userCols = DB::table('users')->whereIn('id', $missingIds)->select(['id', 'avatar_frame', 'avatar_frame_id'])->get();
+            foreach ($userCols as $uc) {
+                $uid = (int) $uc->id;
+                $val = $uc->avatar_frame ?? ($uc->avatar_frame_id ?? null);
+                if ($val && (string)$val !== '' && $val !== 'None' && $val !== 'Default') {
+                    $shape = [
+                        'id'        => 0,
+                        'frameId'   => (string) $val,
+                        'code'      => (string) $val,
+                        'name'      => (string) $val,
+                        'imageUrl'  => null,
+                        'rarity'    => 'common',
+                        'expiresAt' => null,
+                    ];
+                    $out[$uid] = $shape;
+                    self::$cache[$uid] = $shape;
+                }
+            }
+        }
+
         // Cache negatives too.
         foreach ($ids as $uid) {
             if (!array_key_exists($uid, self::$cache)) self::$cache[$uid] = null;

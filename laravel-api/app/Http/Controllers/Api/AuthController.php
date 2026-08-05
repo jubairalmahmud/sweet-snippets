@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\UserFrames;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Hash;
@@ -92,8 +93,9 @@ class AuthController extends Controller
     private function shape(User $u): array
     {
         $role = $this->resolveRole($u);
+        $frameFields = UserFrames::shape($u->id);
 
-        return [
+        return array_merge([
             'id'        => $u->id,
             'name'      => $u->name,
             'email'     => $u->email,
@@ -113,7 +115,10 @@ class AuthController extends Controller
             'work'       => $u->work,
             'education'  => $u->education,
             'bloodGroup' => $u->blood_group,
-        ];
+            'avatarFrame'  => $frameFields['activeFrame'] ?? ($u->avatar_frame ?? null),
+            'entryEffect'  => Schema::hasColumn('users', 'entry_effect') ? ($u->entry_effect ?? null) : null,
+            'entry_effect' => Schema::hasColumn('users', 'entry_effect') ? ($u->entry_effect ?? null) : null,
+        ], $frameFields);
     }
 
     private function resolveRole(User $u): string

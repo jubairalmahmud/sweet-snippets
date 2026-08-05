@@ -15,11 +15,17 @@ class WalletController extends Controller
     public function show(Request $request)
     {
         $u = $request->user();
+        $frameFields = \App\Support\UserFrames::shape($u->id);
         return response()->json([
-            'diamonds'   => (int) $u->diamonds,
-            'rCoins'     => (int) $u->r_coins,
-            'earnings'   => (int) ($u->host_earnings ?? 0),
-            'vipLevel'   => (int) $u->vip_level,
+            'diamonds'       => (int) $u->diamonds,
+            'rCoins'         => (int) $u->r_coins,
+            'earnings'       => (int) ($u->host_earnings ?? 0),
+            'vipLevel'       => (int) $u->vip_level,
+            'avatarFrame'    => $frameFields['activeFrame'] ?? ($u->avatar_frame ?? null),
+            'activeFrame'    => $frameFields['activeFrame'] ?? ($u->avatar_frame ?? null),
+            'activeFrameImg' => $frameFields['activeFrameImg'] ?? null,
+            'entryEffect'    => Schema::hasColumn('users', 'entry_effect') ? ($u->entry_effect ?? null) : null,
+            'entry_effect'   => Schema::hasColumn('users', 'entry_effect') ? ($u->entry_effect ?? null) : null,
         ]);
     }
 

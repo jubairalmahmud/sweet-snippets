@@ -2386,6 +2386,7 @@ export default function App() {
   useEffect(() => {
     if (!equippedAvatarFrame) return;
     const catItem = getFrameCatalogItem(equippedAvatarFrame);
+    if (catItem) return; // Catalog item or valid frame image URL
     const candidateKeys = [
       equippedAvatarFrame,
       catItem?.id,
@@ -2395,7 +2396,7 @@ export default function App() {
 
     const now = Date.now();
     const isOwned = candidateKeys.some((k) => (ownedAvatarFrames[k] || 0) > now);
-    if (!isOwned) {
+    if (!isOwned && Object.keys(ownedAvatarFrames).length > 0) {
       setEquippedAvatarFrame(null);
     }
   }, [equippedAvatarFrame, ownedAvatarFrames]);
@@ -2445,7 +2446,10 @@ export default function App() {
 
   // Un-equip ride if expired / not owned
   useEffect(() => {
-    if (equippedRide && !ownedRides[equippedRide]) {
+    if (!equippedRide) return;
+    const rideItem = getRideCatalogItem(equippedRide);
+    if (rideItem) return; // Catalog ride valid
+    if (!ownedRides[equippedRide] && Object.keys(ownedRides).length > 0) {
       setEquippedRide(null);
     }
   }, [equippedRide, ownedRides]);
@@ -4249,9 +4253,29 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         rCoins: walletInfo.rCoins !== undefined ? Number(walletInfo.rCoins) : prev.rCoins,
         earnings: walletInfo.earnings !== undefined ? Number(walletInfo.earnings) : (walletInfo.host_earnings !== undefined ? Number(walletInfo.host_earnings) : prev.earnings),
         vipLevel: walletInfo.vipLevel !== undefined ? Number(walletInfo.vipLevel) : prev.vipLevel,
-        avatarFrame: walletInfo.avatarFrame || prev.avatarFrame,
-        entryEffect: walletInfo.entryEffect || prev.entryEffect,
+        avatarFrame: walletInfo.avatarFrame || walletInfo.activeFrame || walletInfo.avatar_frame || prev.avatarFrame,
+        entryEffect: walletInfo.entryEffect || walletInfo.entry_effect || prev.entryEffect,
       }));
+
+      const serverFrame = walletInfo.avatarFrame || walletInfo.activeFrame || walletInfo.avatar_frame;
+      if (serverFrame && String(serverFrame).trim() !== "" && serverFrame !== "Default" && serverFrame !== "None" && serverFrame !== "null") {
+        const sFrameStr = String(serverFrame).trim();
+        setEquippedAvatarFrame(sFrameStr);
+        setOwnedAvatarFrames((prev) => ({
+          ...prev,
+          [sFrameStr]: Date.now() + 3650 * 86400 * 1000,
+        }));
+      }
+
+      const serverEffect = walletInfo.entryEffect || walletInfo.entry_effect;
+      if (serverEffect && String(serverEffect).trim() !== "" && serverEffect !== "None" && serverEffect !== "default" && serverEffect !== "null") {
+        const sEffectStr = String(serverEffect).trim();
+        setEquippedRide(sEffectStr);
+        setOwnedRides((prev) => ({
+          ...prev,
+          [sEffectStr]: Date.now() + 3650 * 86400 * 1000,
+        }));
+      }
 
       if (walletInfo.name) setRegisterName(walletInfo.name);
       if (walletInfo.email) setRegisterEmail(walletInfo.email);
@@ -8017,12 +8041,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
         const occKey = normalizedOccupant ? normalizedOccupant.trim().toLowerCase() : null;
         const rawFrameId =
-          seat.frameId ?? seat.frame ?? seat.frameCode ?? seat.frame_code ?? seatUser?.frameId ?? seatUser?.frame ?? seatUser?.activeFrame ?? seatUser?.avatarFrame ?? null;
+          seat.frameId ?? seat.frame ?? seat.avatarFrame ?? seat.avatar_frame ?? seat.frameCode ?? seat.frame_code ?? seatUser?.frameId ?? seatUser?.frame ?? seatUser?.activeFrame ?? seatUser?.avatarFrame ?? seatUser?.avatar_frame ?? null;
         const rememberedFrame = occKey ? seatFrameMapRef.current.get(occKey) : null;
         const effectiveFrameId = rawFrameId ?? rememberedFrame ?? null;
         if (occKey && rawFrameId) {
           seatFrameMapRef.current.set(occKey, String(rawFrameId));
         }
+
+        const seatEntryEffect = seat.entryEffect ?? seat.entry_effect ?? seatUser?.entryEffect ?? seatUser?.entry_effect ?? null;
 
         nextSeats[index] = {
           seatNum: index + 1,
@@ -8033,7 +8059,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           // Carry the frame so other viewers can render it (resolveUserFrameImg).
           frameId: effectiveFrameId,
           frame: effectiveFrameId,
+          avatarFrame: effectiveFrameId,
+          avatar_frame: effectiveFrameId,
           frameImg: seat.frameImg ?? seat.frameImage ?? seat.frameImageUrl ?? null,
+          entryEffect: seatEntryEffect,
+          entry_effect: seatEntryEffect,
         } as any;
       }
     });

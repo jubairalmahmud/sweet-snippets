@@ -127,6 +127,9 @@ class ProfileController extends Controller
             'work'       => $u->work,
             'education'  => $u->education,
             'bloodGroup' => $u->blood_group,
+            'avatarFrame' => $frameFields['activeFrame'] ?? ($u->avatar_frame ?? null),
+            'entryEffect' => Schema::hasColumn('users', 'entry_effect') ? ($u->entry_effect ?? null) : null,
+            'entry_effect' => Schema::hasColumn('users', 'entry_effect') ? ($u->entry_effect ?? null) : null,
         ], $frameFields);
     }
 }

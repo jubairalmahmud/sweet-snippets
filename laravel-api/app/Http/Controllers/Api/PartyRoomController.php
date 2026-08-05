@@ -69,27 +69,25 @@ class PartyRoomController extends Controller
         return null;
     }
 
-    private function frameShape(?array $frame): array
+    private function frameShape(?array $frame, ?object $user = null): array
     {
-        if (!$frame) {
-            return [
-                'frame' => null,
-                'frameId' => null,
-                'frameImg' => null,
-                'frameImage' => null,
-                'frameImageUrl' => null,
-            ];
-        }
-
         $code = $frame['code'] ?? ($frame['frameId'] ?? null);
+        if (!$code && $user) {
+            $code = $user->avatar_frame ?? ($user->avatar_frame_id ?? null);
+        }
         $imageUrl = $frame['imageUrl'] ?? null;
+        $entryEffect = $user->entry_effect ?? null;
 
         return [
             'frame' => $code,
             'frameId' => $code,
+            'avatarFrame' => $code,
+            'avatar_frame' => $code,
             'frameImg' => $imageUrl,
             'frameImage' => $imageUrl,
             'frameImageUrl' => $imageUrl,
+            'entryEffect' => $entryEffect,
+            'entry_effect' => $entryEffect,
         ];
     }
 
@@ -481,7 +479,7 @@ class PartyRoomController extends Controller
                 'reaction_emoji' => $reactionEmoji,
                 'isHost'         => ($uid > 0 && $uid === $hostId),
                 'is_host'        => ($uid > 0 && $uid === $hostId),
-            ], $this->frameShape($seatFrame));
+            ], $this->frameShape($seatFrame, $u));
         }
         usort($seatsArr, fn ($a, $b) => $a['seatNum'] <=> $b['seatNum']);
 
@@ -549,8 +547,9 @@ class PartyRoomController extends Controller
             'host_id'          => $hostId,
             'hostName'         => $host->name ?? null,
             'hostAvatar'       => $this->pickAvatar($host),
-            'hostFrame'        => $hostFrame['code']     ?? ($hostFrame['frameId'] ?? null),
+            'hostFrame'        => $hostFrame['code'] ?? ($hostFrame['frameId'] ?? ($host->avatar_frame ?? null)),
             'hostFrameImg'     => $hostFrame['imageUrl'] ?? null,
+            'hostEntryEffect'  => $host->entry_effect ?? null,
             'title'            => $this->prop($room, 'title', 'Party Room'),
             'privacy'          => (string) ($this->prop($room, 'privacy', 'public') ?: 'public'),
             'isPrivate'        => ((string) $this->prop($room, 'privacy', 'public')) === 'private',
