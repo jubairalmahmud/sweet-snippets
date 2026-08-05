@@ -7378,7 +7378,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
     // Strict balance check before making API call
     if (userWallet.diamonds < costAmount) {
-      triggerSystemAnnouncement("⚠️ পর্যাপ্ত ব্যালেন্স না থাকায় গিফট পাঠানো সম্ভব হচ্ছে না।");
+      const msg = "পর্যাপ্ত ব্যালেন্স না থাকায় গিফট সেন্ড করা সম্ভব হচ্ছে না।";
+      try { toast.error(msg); } catch {}
+      setToastAlert(msg);
+      setTimeout(() => setToastAlert(null), 3500);
+      triggerSystemAnnouncement(`⚠️ ${msg}`);
       return null;
     }
 
@@ -7463,7 +7467,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
       return res;
     } catch (e: any) {
-      triggerSystemAnnouncement("⚠️ পর্যাপ্ত ব্যালেন্স না থাকায় গিফট পাঠানো সম্ভব হচ্ছে না।");
+      const serverMsg = e?.response?.data?.message || "পর্যাপ্ত ব্যালেন্স না থাকায় গিফট সেন্ড করা সম্ভব হচ্ছে না।";
+      try { toast.error(serverMsg); } catch {}
+      setToastAlert(serverMsg);
+      setTimeout(() => setToastAlert(null), 3500);
+      triggerSystemAnnouncement(`⚠️ ${serverMsg}`);
       return null;
     }
   };
@@ -7547,7 +7555,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
     const totalCost = (gift.diamonds || 0) * targets.length;
     if (userWallet.diamonds < totalCost) {
-      triggerSystemAnnouncement(`Low recharge coins — sending ${gift.name} to ${targets.length} user(s) anyway.`);
+      const msg = "পর্যাপ্ত ব্যালেন্স না থাকায় গিফট সেন্ড করা সম্ভব হচ্ছে না।";
+      try { toast.error(msg); } catch {}
+      setToastAlert(msg);
+      setTimeout(() => setToastAlert(null), 3500);
+      triggerSystemAnnouncement(`⚠️ ${msg}`);
+      return;
     }
 
     const recipientNames = targets.map((t) => t.name).join(", ");
@@ -9340,7 +9353,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // ---- হ্যান্ডলার: গিফট পাঠানো / রিসিভ (handlePartyGiftSend) ----
   const handlePartyGiftSend = async (gift: any) => {
     if (userWallet.diamonds < gift.diamonds) {
-      triggerSystemAnnouncement("⚠️ পর্যাপ্ত ব্যালেন্স না থাকায় গিফট পাঠানো সম্ভব হচ্ছে না।");
+      const msg = "পর্যাপ্ত ব্যালেন্স না থাকায় গিফট সেন্ড করা সম্ভব হচ্ছে না।";
+      try { toast.error(msg); } catch {}
+      setToastAlert(msg);
+      setTimeout(() => setToastAlert(null), 3500);
+      triggerSystemAnnouncement(`⚠️ ${msg}`);
       return;
     }
 
@@ -9433,7 +9450,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     }
 
     if (userWallet.diamonds < gift.diamonds) {
-      triggerSystemAnnouncement("⚠️ পর্যাপ্ত ব্যালেন্স না থাকায় গিফট পাঠানো সম্ভব হচ্ছে না।");
+      const msg = "পর্যাপ্ত ব্যালেন্স না থাকায় গিফট সেন্ড করা সম্ভব হচ্ছে না।";
+      try { toast.error(msg); } catch {}
+      setToastAlert(msg);
+      setTimeout(() => setToastAlert(null), 3500);
+      triggerSystemAnnouncement(`⚠️ ${msg}`);
       return;
     }
 
@@ -9523,7 +9544,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     const totalCost = (gift.diamonds || 0) * count;
 
     if (userWallet.diamonds < totalCost) {
-      triggerSystemAnnouncement("⚠️ পর্যাপ্ত ব্যালেন্স না থাকায় গিফট পাঠানো সম্ভব হচ্ছে না।");
+      const msg = "পর্যাপ্ত ব্যালেন্স না থাকায় গিফট সেন্ড করা সম্ভব হচ্ছে না।";
+      try { toast.error(msg); } catch {}
+      setToastAlert(msg);
+      setTimeout(() => setToastAlert(null), 3500);
+      triggerSystemAnnouncement(`⚠️ ${msg}`);
       return;
     }
 

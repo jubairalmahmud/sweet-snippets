@@ -432,9 +432,12 @@ class WalletController extends Controller
         return DB::transaction(function () use ($sender, $data) {
             $sender = $sender->lockForUpdate()->find($sender->id);
             if ((int) $sender->diamonds < $data['diamonds']) {
-                return response()->json(['message' => 'Insufficient diamonds'], 422);
+                return response()->json(['message' => 'পর্যাপ্ত ব্যালেন্স না থাকায় গিফট সেন্ড করা সম্ভব হচ্ছে না।'], 422);
             }
             $sender->diamonds -= $data['diamonds'];
+            if (Schema::hasColumn('users', 'coins')) {
+                $sender->coins = max(0, (int) ($sender->coins ?? 0) - (int) $data['diamonds']);
+            }
             $sender->save();
 
             $receiverWallet = null;

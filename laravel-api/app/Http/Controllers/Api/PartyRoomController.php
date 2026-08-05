@@ -566,11 +566,29 @@ class PartyRoomController extends Controller
                         ];
                     }
                 }
+
+                // Per-receiver seat coins summary for this room
+                $seatCoinsMap = [];
+                $seatCoinRows = DB::table('gift_transactions')
+                    ->where('room_type', 'party')
+                    ->where('room_id', (string) $this->prop($room, 'id'))
+                    ->whereNotNull('receiver_id')
+                    ->select('receiver_id', DB::raw('SUM(diamonds) as total_coins'))
+                    ->groupBy('receiver_id')
+                    ->get();
+                foreach ($seatCoinRows as $scr) {
+                    if (!empty($scr->receiver_id)) {
+                        $seatCoinsMap[(int) $scr->receiver_id] = (int) $scr->total_coins;
+                    }
+                }
             } catch (Throwable $e) {
                 $recentGiftEvents = [];
                 $giftersSummary = [];
+                $seatCoinsMap = [];
             }
         }
+
+        $totalDiamondsVal = (int) $this->prop($room, 'total_diamonds', 0);
 
         return array_merge([
             'id'               => (int) $room->id,
@@ -588,7 +606,12 @@ class PartyRoomController extends Controller
             'max_guest_seats'  => (int) $this->prop($room, 'max_guest_seats', 10),
             'live'             => (bool) $this->prop($room, 'live', true),
             'viewerCount'      => (int) $this->prop($room, 'viewer_count', count($seatsArr)),
-            'totalDiamonds'    => (int) $this->prop($room, 'total_diamonds', 0),
+            'totalDiamonds'    => $totalDiamondsVal,
+            'total_diamonds'   => $totalDiamondsVal,
+            'totalCoins'       => $totalDiamondsVal,
+            'total_coins'      => $totalDiamondsVal,
+            'seatCoinsMap'     => $seatCoinsMap,
+            'seat_coins_map'   => $seatCoinsMap,
             'startedAt'        => $this->prop($room, 'started_at'),
             'endedAt'          => $this->prop($room, 'ended_at'),
             'updatedAt'        => $this->prop($room, 'updated_at'),
