@@ -7374,27 +7374,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     receiver: { id: number; rCoins: number } | null;
     recentGiftEvent?: PartyBroadcastEvent;
   }> => {
-    // Helper: enqueue local broadcast for party room gifts.
-    const enqueueLocalBroadcast = (localId: number) => {
-      if (params.roomType === "party" && params.roomId) {
-        enqueuePartyBroadcast({
-          id: localId,
-          kind: "gift",
-          giverName: registerName || "SK Love User",
-          giverAvatar: profileAvatarImg || null,
-          giftIcon: params.giftIcon || "🎁",
-          giftImage: null,
-          giftName: params.giftName,
-          coins: Number(params.diamonds || 0),
-          receiverName: params.receiverName || null,
-          receiverId: params.receiverId ? Number(params.receiverId) : null,
-          createdAt: Date.now(),
-        });
-      }
-    };
+    const costAmount = Number(params.diamonds || params.rCoins || 0);
+
+    // Strict balance check before making API call
+    if (userWallet.diamonds < costAmount) {
+      triggerSystemAnnouncement("⚠️ পর্যাপ্ত ব্যালেন্স না থাকায় গিফট পাঠানো সম্ভব হচ্ছে না।");
+      return null;
+    }
 
     try {
-      const costAmount = Number(params.diamonds || params.rCoins || 0);
       const res = await api.post<{
         diamonds: number;
         rCoins: number;
@@ -7416,8 +7404,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         ...prev,
         diamonds: remainingRecharge,
       }));
-      // FIX (Batch 1): server-confirmed wallet সাথে সাথে refetch করে
-      // C-Coin card + gift box balance সব যায়গায় sync করি (host side)।
+      // FIX: server-confirmed wallet সাথে সাথে refetch করে sync করি
       void fetchUserWalletData();
 
       const receiverId = res?.receiver?.id ? Number(res.receiver.id) : null;
@@ -7476,31 +7463,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
       return res;
     } catch (e: any) {
-      // FIX: Backend gift endpoint failed / unavailable — degrade gracefully
-      // so the UI still reflects the gift (deduct locally, show banner)
-      // instead of blocking downstream logic (seat booking, animations).
-      const localId = -Date.now();
-      const costAmount = Number(params.diamonds || params.rCoins || 0);
-      const localRemaining = Math.max(0, userWallet.diamonds - costAmount);
-
-      setUserWallet((prev) => ({
-        ...prev,
-        diamonds: localRemaining,
-      }));
-      enqueueLocalBroadcast(localId);
-
-      const rawMsg = e?.message || "Gift server unreachable — sent locally.";
-      const userFriendlyMsg = rawMsg
-        .replace(/diamonds/gi, "coins")
-        .replace(/diamond/gi, "coin");
-
-      triggerSystemAnnouncement(`⚠️ ${userFriendlyMsg}`);
-      return {
-        diamonds: localRemaining,
-        rCoins: userWallet.rCoins,
-        id: localId,
-        receiver: params.receiverId ? { id: Number(params.receiverId), rCoins: 0 } : null,
-      };
+      triggerSystemAnnouncement("⚠️ পর্যাপ্ত ব্যালেন্স না থাকায় গিফট পাঠানো সম্ভব হচ্ছে না।");
+      return null;
     }
   };
 
@@ -7717,10 +7681,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       return;
     }
     if (userWallet.diamonds < gift.diamonds) {
-      triggerSystemAnnouncement("Low recharge coins — sending gift anyway.");
+      triggerSystemAnnouncement("⚠️ পর্যাপ্ত ব্যালেন্স না থাকায় গিফট পাঠানো সম্ভব হচ্ছে না।");
+      return;
     }
 
-    await sendGiftApi({
+    const ok = await sendGiftApi({
       giftName: gift.name,
       giftIcon: gift.icon,
       diamonds: gift.diamonds,
@@ -7729,6 +7694,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       roomType: "pk",
       roomId: String(battleId),
     });
+
+    if (!ok) return;
 
     try {
       await api.post(`/api/pk/${battleId}/gift`, {
@@ -7787,9 +7754,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
   // ---- হ্যান্ডলার: গিফট পাঠানো / রিসিভ (handleSendGift) ----
   const handleSendGift = async (gift: GiftItem) => {
-    // FIX: don't block send on low balance — degrade gracefully.
     if (userWallet.diamonds < gift.diamonds) {
-      triggerSystemAnnouncement("Low recharge coins — sending gift anyway.");
+      triggerSystemAnnouncement("⚠️ পর্যাপ্ত ব্যালেন্স না থাকায় গিফট পাঠানো সম্ভব হচ্ছে না।");
+      return;
     }
 
     const ok = await sendGiftApi({
@@ -7799,8 +7766,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       rCoins: gift.rCoins,
       roomType: "pk",
     });
-    // FIX: sendGiftApi degrades gracefully; always show banner + animation.
-    void ok;
+    if (!ok) return;
 
 
     // Raise PK score and add comment
@@ -8318,6 +8284,38 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       (seat) => seat.userId && currentUserId && Number(seat.userId) === Number(currentUserId),
     );
 
+    // Sync Gifters summary from server so late-joiners get complete board state
+    const summaryArr = Array.isArray(room?.giftersSummary)
+      ? room.giftersSummary
+      : (Array.isArray(room?.top_gifters) ? room.top_gifters : []);
+
+    if (summaryArr.length > 0) {
+      const gifterMap = new Map<string, { name: string; avatar: string; totalSpent: number }>();
+      let topLeader: { name: string; avatar: string; totalSpent: number } | null = null;
+
+      summaryArr.forEach((g: any) => {
+        if (g && g.name) {
+          const entry = {
+            name: String(g.name),
+            avatar: g.avatar || "🎁",
+            totalSpent: Number(g.totalSpent || 0),
+          };
+          gifterMap.set(entry.name.trim().toLowerCase(), entry);
+          if (!topLeader || entry.totalSpent > topLeader.totalSpent) {
+            topLeader = entry;
+          }
+        }
+      });
+
+      partyGifterTotalsRef.current = gifterMap;
+      setTopGifter(topLeader);
+      setPartyGifterTick((t) => t + 1);
+
+      if (room?.id) {
+        saveStoredPartyRoomGifters(room.id, Array.from(gifterMap.values()));
+      }
+    }
+
     // FIX #3 + #4: Consume broadcast events from backend polling payload.
     // Backend contract (to be implemented server-side):
     //   room.recentGiftEvents: Array<{
@@ -8366,6 +8364,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     if (partyBroadcastActiveRef.current) return;
     const next = partyBroadcastQueueRef.current.shift();
     if (!next) return;
+
+    // Skip pop-up banner animation for historical events older than 20s (e.g. late joiner syncing)
+    if (next.createdAt && Date.now() - Number(next.createdAt) > 20000) {
+      playNextPartyBroadcast();
+      return;
+    }
+
     partyBroadcastActiveRef.current = true;
     setPartyBroadcastBanner(next);
     setPartyBroadcastAnim(next);
@@ -8831,13 +8836,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // ---- হ্যান্ডলার: অ্যাভাটার আপডেট (joinPartySeatWithAvatar) ----
   const joinPartySeatWithAvatar = async (seatIndex: number, avatarGift: GiftItem) => {
     if (!activePartyRoom?.id) return;
-    // FIX: Do NOT block seat booking on wallet balance. sendGiftApi
-    // degrades gracefully (local deduction / synthetic success) so the
-    // seat + banner + animation must always proceed. Just warn once.
     if (userWallet.diamonds < avatarGift.diamonds) {
-      triggerSystemAnnouncement(
-        `Low recharge coins — booking ${avatarGift.name} seat anyway.`,
-      );
+      triggerSystemAnnouncement("⚠️ পর্যাপ্ত ব্যালেন্স না থাকায় গিফট পাঠানো সম্ভব হচ্ছে না।");
+      return;
     }
 
 
@@ -9338,10 +9339,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
   // ---- হ্যান্ডলার: গিফট পাঠানো / রিসিভ (handlePartyGiftSend) ----
   const handlePartyGiftSend = async (gift: any) => {
-    // FIX: Don't block gift sending on wallet balance. sendGiftApi degrades
-    // gracefully so the banner + animation + broadcast must always run.
     if (userWallet.diamonds < gift.diamonds) {
-      triggerSystemAnnouncement("Low recharge coins — sending gift anyway.");
+      triggerSystemAnnouncement("⚠️ পর্যাপ্ত ব্যালেন্স না থাকায় গিফট পাঠানো সম্ভব হচ্ছে না।");
+      return;
     }
 
     const senderName = registerName || "Zubayer";
@@ -9357,6 +9357,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       roomType: "party",
       roomId: activePartyRoom?.id ? String(activePartyRoom.id) : undefined,
     });
+
+    if (!ok) return;
     // FIX: sendGiftApi degrades gracefully; always show banner + animation.
     void ok;
 
@@ -9426,16 +9428,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   ) => {
     const recipient = recipientArg || selectedPartyGiftRecipient;
     if (!recipient) return;
-    // FIX: allow gifting even when the guest has no backend userId — the
-    // banner + local wallet deduction still runs; server-side crediting
-    // resumes once the guest links a real account.
     if (!recipient.userId) {
       triggerSystemAnnouncement("Gift sent locally — recipient not linked to a backend account.");
     }
 
-    // FIX: degrade gracefully — allow send even with low balance.
     if (userWallet.diamonds < gift.diamonds) {
-      triggerSystemAnnouncement("Low recharge coins — sending gift anyway.");
+      triggerSystemAnnouncement("⚠️ পর্যাপ্ত ব্যালেন্স না থাকায় গিফট পাঠানো সম্ভব হচ্ছে না।");
+      return;
     }
 
     const senderName = registerName || "SK Love User";
@@ -9452,8 +9451,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       roomType: "party",
       roomId: activePartyRoom?.id ? String(activePartyRoom.id) : undefined,
     });
-    // FIX: sendGiftApi degrades gracefully; always show banner + animation.
-    void ok;
+
+    if (!ok) return;
 
     // Append gift comment to party chat feed
     const giftChatText = `🎁 Sent ${gift.icon || "🎁"} ${gift.name} to ${recipient.name}! 🎉`;
@@ -9524,7 +9523,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     const totalCost = (gift.diamonds || 0) * count;
 
     if (userWallet.diamonds < totalCost) {
-      triggerSystemAnnouncement(`Low recharge coins — sending ${gift.name} to ${count} users anyway.`);
+      triggerSystemAnnouncement("⚠️ পর্যাপ্ত ব্যালেন্স না থাকায় গিফট পাঠানো সম্ভব হচ্ছে না।");
+      return;
     }
 
     const recipientNames = targets.map((r) => r.name).join(", ");
@@ -21597,8 +21597,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 onClick={async () => {
                                    if (userWallet.diamonds < gift.price) {
                                      triggerSystemAnnouncement(
-                                       "Low recharge coins — sending gift anyway.",
+                                       "⚠️ পর্যাপ্ত ব্যালেন্স না থাকায় গিফট পাঠানো সম্ভব হচ্ছে না。",
                                      );
+                                     return;
                                    }
                                    const ok = await sendGiftApi({
                                      giftName: gift.item,
@@ -27408,8 +27409,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               onClick={() => {
                                 if (userWallet.diamonds < gift.price) {
                                   triggerSystemAnnouncement(
-                                    `Low recharge coins — sending ${gift.name} anyway.`,
+                                    "⚠️ পর্যাপ্ত ব্যালেন্স না থাকায় গিফট পাঠানো সম্ভব হচ্ছে না。",
                                   );
+                                  return;
                                 }
 
                                 // Deduct user wallet
@@ -27769,7 +27771,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                             <button
                               onClick={() => {
                                 if (userWallet.diamonds < cost) {
-                                  triggerSystemAnnouncement(`Low recharge coins — purchasing ${selected.name} anyway!`);
+                                  triggerSystemAnnouncement("⚠️ পর্যাপ্ত ব্যালেন্স না থাকায় কেনা সম্ভব হচ্ছে না।");
+                                  return;
                                 }
                                 setUserWallet((prev) => ({
                                   ...prev,

@@ -483,8 +483,9 @@ class PartyRoomController extends Controller
         }
         usort($seatsArr, fn ($a, $b) => $a['seatNum'] <=> $b['seatNum']);
 
-        // ---- Recent gift events (last 10 min) for banner + wallet refresh ------
+        // ---- Recent gift events (last 12 hours) for banner + wallet refresh ------
         $recentGiftEvents = [];
+        $giftersSummary = [];
         if ($this->tableExists('gift_transactions')) {
             try {
                 $avatarCols = $this->userAvatarColumns();
@@ -515,9 +516,9 @@ class PartyRoomController extends Controller
                     ->leftJoin('users as receiver', 'receiver.id', '=', 'g.receiver_id')
                     ->where('g.room_type', 'party')
                     ->where('g.room_id', (string) $this->prop($room, 'id'))
-                    ->where('g.created_at', '>=', now()->subMinutes(10))
+                    ->where('g.created_at', '>=', now()->subHours(12))
                     ->orderByDesc('g.id')
-                    ->limit(20)
+                    ->limit(50)
                     ->select($selects)
                     ->get();
 
@@ -536,8 +537,38 @@ class PartyRoomController extends Controller
                         'createdAt'    => $r->created_at ? strtotime($r->created_at) * 1000 : null,
                     ];
                 }
+
+                // Cumulative Gifters Summary for this party room (all-time/session)
+                $avatarExpr = !empty($avatarCols)
+                    ? 'COALESCE(' . implode(',', array_map(fn ($c) => "NULLIF(sender.`{$c}`, '')", $avatarCols)) . ')'
+                    : 'NULL';
+
+                $summaryRows = DB::table('gift_transactions as g')
+                    ->leftJoin('users as sender', 'sender.id', '=', 'g.sender_id')
+                    ->where('g.room_type', 'party')
+                    ->where('g.room_id', (string) $this->prop($room, 'id'))
+                    ->select([
+                        'g.sender_id',
+                        'sender.name as name',
+                        DB::raw("{$avatarExpr} as avatar"),
+                        DB::raw('SUM(g.diamonds) as totalSpent'),
+                    ])
+                    ->groupBy('g.sender_id', 'sender.name', DB::raw("{$avatarExpr}"))
+                    ->orderByDesc('totalSpent')
+                    ->get();
+
+                foreach ($summaryRows as $sr) {
+                    if (!empty($sr->name)) {
+                        $giftersSummary[] = [
+                            'name'       => (string) $sr->name,
+                            'avatar'     => $sr->avatar ?? null,
+                            'totalSpent' => (int) $sr->totalSpent,
+                        ];
+                    }
+                }
             } catch (Throwable $e) {
                 $recentGiftEvents = [];
+                $giftersSummary = [];
             }
         }
 
@@ -565,6 +596,8 @@ class PartyRoomController extends Controller
             'lockedSeats'      => $lockedSeats,
             'locked_seats'     => $lockedSeats,
             'recentGiftEvents' => $recentGiftEvents,
+            'giftersSummary'   => $giftersSummary,
+            'top_gifters'      => $giftersSummary,
             'recentChat'       => $roomId > 0 ? $this->recentPartyChat($roomId) : [],
         ]);
     }
