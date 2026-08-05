@@ -1654,6 +1654,14 @@ export default function App() {
   const isHandlingLiveEndedRef = useRef<boolean>(false);
   const [agoraStatus, setAgoraStatus] = useState<string>("");
   const [liveCohostRequests, setLiveCohostRequests] = useState<any[]>([]);
+  const [isCohostBannerDismissed, setIsCohostBannerDismissed] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (liveCohostRequests.length > 0) {
+      setIsCohostBannerDismissed(false);
+    }
+  }, [liveCohostRequests.length]);
+
   const [liveCohosts, setLiveCohosts] = useState<any[]>([]);
   const liveCohostsRef = useRef<any[]>([]);
   const getRemoteCohostMeta = (uidValue: unknown) => {
@@ -22008,20 +22016,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 {agoraStatus}
                               </div>
                             )}
-                            {liveCohostRequests.length > 0 && (
-                              <div className="absolute left-3 top-16 z-30 w-48 rounded-xl border border-rose-400/30 bg-slate-950/90 p-2 shadow-xl backdrop-blur">
-                                <p className="text-[8px] font-black uppercase text-rose-300">Co-host requests</p>
-                                {liveCohostRequests.slice(0, 3).map((request) => (
-                                  <div key={request.id} className="mt-2 flex items-center justify-between gap-1 text-[8px] text-white">
-                                    <span className="truncate">{request.name}</span>
-                                    <span className="flex gap-1">
-                                      <button onClick={() => void respondToLiveCohostRequest(request.id, "approve")} className="rounded bg-emerald-500 px-1.5 py-1 font-black text-slate-950" aria-label="Approve" title="Approve">✅</button>
-                                      <button onClick={() => void respondToLiveCohostRequest(request.id, "reject")} className="rounded bg-rose-500 px-1.5 py-1 font-black text-white" aria-label="Reject" title="Reject">❌</button>
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                            
                             {liveCohosts.length > 0 && (
                               <>
 
@@ -22129,10 +22124,56 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 </div>
                               </div>
 
-                              {/* Diamond / Coins Pill below name/ID */}
-                              <div className="bg-black/50 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-sky-400/30 text-sky-300 text-xs font-bold flex items-center gap-1 shadow w-fit select-none">
-                                <span className="text-sm leading-none">💎</span>
-                                <span>{streamStats.rCoinsGained || 0}</span>
+                              {/* Diamond / Coins Pill & Real-time Co-host Request Banner */}
+                              <div className="flex items-center gap-2">
+                                <div className="bg-black/50 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-sky-400/30 text-sky-300 text-xs font-bold flex items-center gap-1 shadow w-fit select-none">
+                                  <span className="text-sm leading-none">💎</span>
+                                  <span>{streamStats.rCoinsGained || 0}</span>
+                                </div>
+
+                                {/* Real-time Co-host Request Banner (beside Coin Pill) */}
+                                {liveCohostRequests.length > 0 && !isCohostBannerDismissed && (() => {
+                                  const latestReq = liveCohostRequests[liveCohostRequests.length - 1];
+                                  return (
+                                    <div className="relative z-30 flex items-center gap-2 rounded-full border border-teal-400/60 bg-slate-950/92 py-1 pl-1.5 pr-2 shadow-[0_0_18px_rgba(45,212,191,0.4)] backdrop-blur-md animate-pulse">
+                                      {/* Calling animation ring around requester avatar */}
+                                      <div className="relative shrink-0 flex items-center justify-center">
+                                        <span className="absolute -inset-1 rounded-full bg-teal-400/50 animate-ping" />
+                                        <img
+                                          src={getUserAvatarUrl({ name: latestReq?.name, avatar: latestReq?.avatar })}
+                                          alt={latestReq?.name || "Requester"}
+                                          className="relative h-6 w-6 rounded-full object-cover border border-teal-300 shadow"
+                                        />
+                                      </div>
+
+                                      {/* Requester Name & Calling animation */}
+                                      <div className="flex flex-col min-w-0 max-w-[90px]">
+                                        <span className="truncate text-[9.5px] font-black text-white leading-tight">
+                                          {latestReq?.name || "Viewer"}
+                                        </span>
+                                        <span className="flex items-center gap-1 text-[8px] font-bold text-teal-300 leading-none mt-0.5">
+                                          <span className="flex items-center gap-0.5">
+                                            <span className="h-2 w-0.5 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+                                            <span className="h-3 w-0.5 rounded-full bg-teal-300 animate-bounce" style={{ animationDelay: "150ms" }} />
+                                            <span className="h-1.5 w-0.5 rounded-full bg-teal-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                                          </span>
+                                          <span>Calling...</span>
+                                        </span>
+                                      </div>
+
+                                      {/* Close/Cross icon (Dismisses banner, does NOT reject call) */}
+                                      <button
+                                        type="button"
+                                        onClick={() => setIsCohostBannerDismissed(true)}
+                                        className="ml-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition cursor-pointer"
+                                        aria-label="Dismiss banner"
+                                        title="Dismiss banner"
+                                      >
+                                        <X className="h-2.5 w-2.5" />
+                                      </button>
+                                    </div>
+                                  );
+                                })()}
                               </div>
 
                               {/* Stream Duration Pill below diamonds */}
