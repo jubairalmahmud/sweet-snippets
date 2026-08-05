@@ -25898,7 +25898,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                         className="w-full h-full object-contain pointer-events-none"
                                         onError={(e) => {
                                           const clean = frame.id.replace(/^avatar-/, "");
-                                          e.currentTarget.src = `/frames/${clean}.png`;
+                                          const target = e.currentTarget;
+                                          if (!target.dataset.tried) {
+                                            target.dataset.tried = "1";
+                                            target.src = `frames/${clean}.png`;
+                                          } else if (target.dataset.tried === "1") {
+                                            target.dataset.tried = "2";
+                                            target.src = `/frames/${clean}.png`;
+                                          }
                                         }}
                                       />
                                     </div>
