@@ -1,10 +1,10 @@
 // @ts-nocheck
 // Centralized Laravel API client for SK Love with Dual / Failover Server Support.
-// Primary: https://api.keno70.com (or user config)
-// Failover Backup: https://api.sklove.nit.bd
+// Primary: https://api.sklove.nit.bd (or user config)
+// Failover Backup: https://api.keno70.com
 
-export const DEFAULT_PRIMARY_API = "https://api.keno70.com";
-export const DEFAULT_BACKUP_API = "https://api.sklove.nit.bd";
+export const DEFAULT_PRIMARY_API = "https://api.sklove.nit.bd";
+export const DEFAULT_BACKUP_API = "https://api.keno70.com";
 
 export function getBackendCandidates(): string[] {
   let custom: string | null = null;
@@ -15,7 +15,7 @@ export function getBackendCandidates(): string[] {
   const envUrl = (import.meta as any).env?.VITE_API_BASE_URL || (import.meta as any).env?.VITE_LARAVEL_API_URL;
   const primaryCandidate = (custom && custom.trim()) ? custom.trim().replace(/\/+$/, "") : ((envUrl && envUrl.trim()) ? envUrl.trim().replace(/\/+$/, "") : DEFAULT_PRIMARY_API);
 
-  const backupCandidate = primaryCandidate.includes("sklove.nit.bd") ? DEFAULT_PRIMARY_API : DEFAULT_BACKUP_API;
+  const backupCandidate = primaryCandidate.includes("sklove.nit.bd") ? DEFAULT_BACKUP_API : DEFAULT_PRIMARY_API;
 
   const list = [primaryCandidate, backupCandidate, DEFAULT_PRIMARY_API, DEFAULT_BACKUP_API]
     .map((url) => (url ? url.trim().replace(/\/+$/, "") : ""))
