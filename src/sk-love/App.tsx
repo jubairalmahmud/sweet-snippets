@@ -23127,15 +23127,19 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                       {/* Guest Streamer Dashboard Layout - matching Host side UI */}
                         {/* Full-bleed Video Container / Background Stage */}
                         <div className={`absolute inset-0 z-0 bg-black ${liveDisplayFilterClass}`}>
-                          {liveRemoteVideos.slice(0, 1).map(({ uid }) => (
-                            <div
-                              key={uid}
-                              ref={(element) => {
-                                liveRemoteVideoRefs.current[uid] = element;
-                              }}
-                              className="h-full w-full overflow-hidden bg-slate-950"
-                            />
-                          ))}
+                          {liveRemoteVideos.slice(0, 1).map(({ uid, track }) => {
+                            const activeTrack = track || liveRemoteVideoTracksRef.current[uid];
+                            return (
+                              <div
+                                key={uid}
+                                ref={(element) => {
+                                  liveRemoteVideoRefs.current[uid] = element;
+                                  if (element) playLiveRemoteVideoTrack(uid, activeTrack);
+                                }}
+                                className="h-full w-full overflow-hidden bg-slate-950"
+                              />
+                            );
+                          })}
                           {liveRemoteVideos.length === 0 && (
                             <div className="relative h-full w-full overflow-hidden bg-gradient-to-b from-purple-950 via-[#0d0722] to-black flex flex-col items-center justify-center p-4 text-center select-none">
                               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-fuchsia-600/20 via-pink-600/10 to-transparent animate-pulse pointer-events-none" />
