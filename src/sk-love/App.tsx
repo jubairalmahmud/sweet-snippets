@@ -14986,9 +14986,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                           ? `Send Gift to ${partyGiftBoxRecipients[0].name}`
                           : `Send Gift to ${partyGiftBoxRecipients.length} Selected Users`}
                       </h4>
-                      <p className="text-[9px] text-pink-300/80 font-bold">
-                        Multi-Select Active • {partyGiftBoxRecipients.length === 0 ? "All Seats" : `${partyGiftBoxRecipients.length} User(s)`}
-                      </p>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                        <p className="text-[9px] text-pink-300/80 font-bold">
+                          Multi-Select Active • {partyGiftBoxRecipients.length === 0 ? "All Seats" : `${partyGiftBoxRecipients.length} User(s)`}
+                        </p>
+                        <span className="text-[9px] font-extrabold text-amber-300 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-400/40 px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-sm">
+                          💎 Top-Up Balance: {Number(userWallet.diamonds || 0).toLocaleString()}
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <button
@@ -21945,9 +21950,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                               ? `Send Gift to ${streamGiftBoxRecipients[0].name}`
                                               : `Send Gift to ${streamGiftBoxRecipients.length} Selected Users`}
                                           </h4>
-                                          <p className="text-[9px] text-pink-300/80 font-bold">
-                                            Multi-Select Active • {streamGiftBoxRecipients.length === 0 ? "All On-Stage" : `${streamGiftBoxRecipients.length} User(s)`}
-                                          </p>
+                                          <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                            <p className="text-[9px] text-pink-300/80 font-bold">
+                                              Multi-Select Active • {streamGiftBoxRecipients.length === 0 ? "All On-Stage" : `${streamGiftBoxRecipients.length} User(s)`}
+                                            </p>
+                                            <span className="text-[9px] font-extrabold text-amber-300 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-400/40 px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-sm">
+                                              💎 Top-Up Balance: {Number(userWallet.diamonds || 0).toLocaleString()}
+                                            </span>
+                                          </div>
                                         </div>
                                       </div>
                                       <button
@@ -22748,9 +22758,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                             ? `Send Gift to ${streamGiftBoxRecipients[0].name}`
                                             : `Send Gift to ${streamGiftBoxRecipients.length} Selected Users`}
                                         </h4>
-                                        <p className="text-[9px] text-pink-300/80 font-bold">
-                                          Multi-Select Active • {streamGiftBoxRecipients.length === 0 ? "All On-Stage" : `${streamGiftBoxRecipients.length} User(s)`}
-                                        </p>
+                                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                            <p className="text-[9px] text-pink-300/80 font-bold">
+                                              Multi-Select Active • {streamGiftBoxRecipients.length === 0 ? "All On-Stage" : `${streamGiftBoxRecipients.length} User(s)`}
+                                            </p>
+                                            <span className="text-[9px] font-extrabold text-amber-300 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-amber-400/40 px-1.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-sm">
+                                              💎 Top-Up Balance: {Number(userWallet.diamonds || 0).toLocaleString()}
+                                            </span>
+                                          </div>
                                       </div>
                                     </div>
                                     <button
