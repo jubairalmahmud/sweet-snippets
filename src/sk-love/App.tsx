@@ -4081,7 +4081,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         ...prev,
         id: walletInfo.id !== undefined ? Number(walletInfo.id) : prev.id,
         diamonds: walletInfo.diamonds !== undefined ? Number(walletInfo.diamonds) : (walletInfo.coins !== undefined ? Number(walletInfo.coins) : prev.diamonds),
-        rCoins: walletInfo.rCoins !== undefined ? Number(walletInfo.rCoins) : prev.rCoins,
+        rCoins: walletInfo.rCoins !== undefined ? Number(walletInfo.rCoins) : (walletInfo.r_coins !== undefined ? Number(walletInfo.r_coins) : prev.rCoins),
         earnings: walletInfo.earnings !== undefined ? Number(walletInfo.earnings) : (walletInfo.host_earnings !== undefined ? Number(walletInfo.host_earnings) : prev.earnings),
         vipLevel: walletInfo.vipLevel !== undefined ? Number(walletInfo.vipLevel) : prev.vipLevel,
         avatarFrame: walletInfo.avatarFrame || prev.avatarFrame,
@@ -28526,6 +28526,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         onClose={() => setIsFullGamesOpen(false)}
         initialGame={fullGamesInitial}
         compact={gamesLauncherCompact}
+        userBalance={userWallet.diamonds}
+        onBalanceChange={(newBal) => {
+          setUserWallet((prev) => ({ ...prev, diamonds: newBal }));
+        }}
       />
     </div>
 

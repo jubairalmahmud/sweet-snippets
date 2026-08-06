@@ -72,7 +72,7 @@ export default function FerryWheelGame({ chips, slots, balance: balanceProp, onB
   }, [balanceProp]);
 
   useEffect(() => {
-    if (typeof balanceProp === "number" && balanceProp > 0) return;
+    if (typeof balanceProp === "number") return;
     (async () => {
       try {
         const res: any = await api.get("/api/games/balance");

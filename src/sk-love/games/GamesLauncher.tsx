@@ -186,6 +186,10 @@ type Props = {
   initialGame?: GameKey | null;
   /** When true (e.g. inside Party Room), open at ~70% screen instead of full-screen */
   compact?: boolean;
+  /** Pass parent user balance for immediate zero-latency sync */
+  userBalance?: number;
+  /** Sync balance changes back to parent userWallet */
+  onBalanceChange?: (newBalance: number) => void;
 };
 
 const GAMES: { key: GameKey; title: string; emoji: string; tagline: string; gradient: string }[] = [
@@ -194,23 +198,40 @@ const GAMES: { key: GameKey; title: string; emoji: string; tagline: string; grad
   { key: "teenpatti", title: "Teen Patti", emoji: "🃏", tagline: "3 Hand Battle", gradient: "from-emerald-500 via-teal-600 to-cyan-700" },
 ];
 
-export function GamesLauncher({ open, onClose, initialGame = null, compact = false }: Props) {
+export function GamesLauncher({ open, onClose, initialGame = null, compact = false, userBalance, onBalanceChange }: Props) {
   const [selected, setSelected] = useState<GameKey | null>(initialGame);
   const [config, setConfig] = useState<GameConfig | null>(null);
-  const [balance, setBalance] = useState<number | null>(null);
+  const [balance, setBalanceState] = useState<number | null>(userBalance ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleUpdateBalance = useCallback(
+    (newBal: number) => {
+      setBalanceState(newBal);
+      if (onBalanceChange) {
+        onBalanceChange(newBal);
+      }
+    },
+    [onBalanceChange],
+  );
+
+  useEffect(() => {
+    if (typeof userBalance === "number") {
+      setBalanceState(userBalance);
+    }
+  }, [userBalance]);
 
   const normalizedConfig = useMemo(() => normalizeConfig(config), [config]);
 
   const loadBalance = useCallback(async () => {
     try {
       const res = await api.get<{ coins: number }>("/api/games/balance");
-      setBalance(safeBalance(res));
+      const bal = safeBalance(res);
+      handleUpdateBalance(bal);
     } catch (e: any) {
       setError(e?.message || "Balance load failed");
     }
-  }, []);
+  }, [handleUpdateBalance]);
 
   useEffect(() => {
     if (!open) return;
@@ -318,8 +339,9 @@ export function GamesLauncher({ open, onClose, initialGame = null, compact = fal
                 <CasinoGame
                   chips={normalizedConfig.casino.chips}
                   timerSeconds={normalizedConfig.casino.timer_seconds}
-                  balance={balance ?? 0}
-                  onBalance={setBalance}
+                  balance={balance ?? userBalance ?? 0}
+                  onBalance={handleUpdateBalance}
+                  onBalanceChange={handleUpdateBalance}
                 />
               </FitToViewport>
             </GameCrashBoundary>
@@ -337,8 +359,9 @@ export function GamesLauncher({ open, onClose, initialGame = null, compact = fal
                     color: s.color ?? "bg-pink-500",
                     icon: s.icon,
                   }))}
-                  balance={balance ?? 0}
-                  onBalance={setBalance}
+                  balance={balance ?? userBalance ?? 0}
+                  onBalance={handleUpdateBalance}
+                  onBalanceChange={handleUpdateBalance}
                 />
               </FitToViewport>
             </GameCrashBoundary>
@@ -349,8 +372,9 @@ export function GamesLauncher({ open, onClose, initialGame = null, compact = fal
                 <TeenPattiGame
                   chips={normalizedConfig.teenpatti.chips}
                   timerSeconds={normalizedConfig.teenpatti.timer_seconds}
-                  balance={balance ?? 0}
-                  onBalance={setBalance}
+                  balance={balance ?? userBalance ?? 0}
+                  onBalance={handleUpdateBalance}
+                  onBalanceChange={handleUpdateBalance}
                 />
               </FitToViewport>
             </GameCrashBoundary>

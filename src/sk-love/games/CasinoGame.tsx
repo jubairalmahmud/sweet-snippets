@@ -70,7 +70,7 @@ export default function CasinoGame({ chips, balance: balanceProp, onBalance, onB
 
   // Fallback self-fetch only if parent didn't provide
   useEffect(() => {
-    if (typeof balanceProp === "number" && balanceProp > 0) return;
+    if (typeof balanceProp === "number") return;
     (async () => {
       try {
         const res: any = await api.get("/api/games/balance");

@@ -121,12 +121,12 @@ export default function TeenPattiGame({
 
   // Fetch initial balance
   useEffect(() => {
-    if (typeof balanceProp === "number" && balanceProp > 0) return;
+    if (typeof balanceProp === "number") return;
     (async () => {
       try {
         const res: any = await api.get("/api/games/balance");
         const b = parseBalance(res);
-        if (b > 0) pushBalance(b);
+        pushBalance(b);
       } catch {}
     })();
   }, [balanceProp, pushBalance]);
