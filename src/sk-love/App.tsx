@@ -28419,7 +28419,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       {/* Floating Mini Window (Picture-in-Picture) for Live Stream */}
       {activeLiveRoom && (isLiveStreamMinimized || appSection !== "stream") && (
         <div
-          className="fixed bottom-20 right-3 z-[110] w-36 sm:w-44 h-52 sm:h-60 rounded-2xl border-2 border-rose-500/80 bg-slate-950/95 shadow-[0_10px_35px_rgba(225,29,72,0.45)] backdrop-blur-md overflow-hidden flex flex-col group cursor-pointer active:scale-95 transition-all duration-300 select-none hover:border-rose-400"
+          className="fixed bottom-20 right-6 sm:right-8 z-[110] w-22 sm:w-26 h-34 sm:h-40 rounded-xl border-2 border-rose-500/80 bg-slate-950/95 shadow-[0_8px_25px_rgba(225,29,72,0.5)] backdrop-blur-md overflow-hidden flex flex-col group cursor-pointer active:scale-95 transition-all duration-300 select-none hover:border-rose-400"
           onClick={() => {
             setIsLiveStreamMinimized(false);
             if (streamRole === "streamer") setIsStreamCameraOff(false);
@@ -28441,25 +28441,25 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 className="h-full w-full object-cover"
               />
             ) : (
-              <div className="relative flex flex-col items-center justify-center w-full h-full p-2 text-center">
-                <div className="relative mb-1">
-                  <div className="absolute -inset-1.5 rounded-full bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500 blur-sm opacity-80 animate-pulse" />
+              <div className="relative flex flex-col items-center justify-center w-full h-full p-1 text-center">
+                <div className="relative mb-0.5">
+                  <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500 blur-sm opacity-80 animate-pulse" />
                   <img
                     src={getUserAvatarUrl({ name: activeLiveRoom?.hostName || "Host", avatar: activeLiveRoom?.hostAvatar })}
                     alt={activeLiveRoom?.hostName || "Host"}
-                    className="relative h-12 w-12 rounded-full object-cover border-2 border-amber-300 shadow-lg"
+                    className="relative h-8 w-8 rounded-full object-cover border border-amber-300 shadow-md"
                   />
                 </div>
-                <span className="text-[10px] font-black text-white truncate max-w-[90%]">
+                <span className="text-[8px] font-black text-white truncate max-w-[90%]">
                   {activeLiveRoom?.hostName || "Host"}
                 </span>
               </div>
             )}
 
             {/* Top Bar Overlay: LIVE badge + Expand & Close Controls */}
-            <div className="absolute top-1.5 left-1.5 right-1.5 z-20 flex items-center justify-between pointer-events-auto">
-              <span className="flex items-center gap-1 rounded-full bg-rose-600/90 border border-white/20 px-2 py-0.5 text-[8px] font-black text-white shadow-[0_0_10px_rgba(225,29,72,0.6)] animate-pulse">
-                <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping" />
+            <div className="absolute top-1 left-1 right-1 z-20 flex items-center justify-between pointer-events-auto">
+              <span className="flex items-center gap-0.5 rounded-full bg-rose-600/90 border border-white/20 px-1.5 py-0.5 text-[7px] font-black text-white shadow animate-pulse">
+                <span className="h-1 w-1 rounded-full bg-white animate-ping" />
                 LIVE
               </span>
               <button
@@ -28470,20 +28470,17 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   if (streamRole === "streamer") setIsStreamCameraOff(false);
                   setAppSection("stream");
                 }}
-                className="h-6 w-6 rounded-full bg-black/60 border border-white/20 text-white hover:bg-rose-600 flex items-center justify-center transition shadow"
+                className="h-5 w-5 rounded-full bg-black/60 border border-white/20 text-white hover:bg-rose-600 flex items-center justify-center transition shadow"
                 title="Expand Full Screen"
               >
-                <Maximize2 className="h-3 w-3" />
+                <Maximize2 className="h-2.5 w-2.5" />
               </button>
             </div>
 
             {/* Bottom Info Bar Overlay */}
-            <div className="absolute bottom-0 inset-x-0 z-20 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-2 pt-3 flex flex-col">
-              <p className="text-[10px] font-extrabold text-white truncate drop-shadow">
+            <div className="absolute bottom-0 inset-x-0 z-20 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-1 pt-2 flex flex-col">
+              <p className="text-[8px] font-extrabold text-white truncate drop-shadow">
                 {activeLiveRoom?.title || "Live Broadcast"}
-              </p>
-              <p className="text-[8px] font-bold text-rose-300/90 flex items-center gap-1 mt-0.5">
-                <span>Tap to expand ↗</span>
               </p>
             </div>
           </div>
