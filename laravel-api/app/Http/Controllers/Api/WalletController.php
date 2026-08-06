@@ -421,11 +421,15 @@ class WalletController extends Controller
             'giftName'   => 'required|string|max:255',
             'giftIcon'   => 'nullable|string|max:1000',
             'diamonds'   => 'required|integer|min:0',
-            'rCoins'     => 'required|integer|min:0',
+            'rCoins'     => 'nullable|integer|min:0',
             'receiverId' => 'nullable|integer',
             'roomType'   => 'nullable|string|max:64',
             'roomId'     => 'nullable|string|max:64',
         ]);
+
+        if (!isset($data['rCoins']) || $data['rCoins'] === null) {
+            $data['rCoins'] = (int) $data['diamonds'];
+        }
 
         $sender = $request->user();
 

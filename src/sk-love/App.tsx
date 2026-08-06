@@ -7403,7 +7403,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     }));
 
     try {
-      const { rCoins: _discardRCoins, ...restParams } = params;
       const res = await api.post<{
         diamonds: number;
         rCoins: number;
@@ -7411,7 +7410,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         receiver: { id: number; rCoins: number } | null;
         recentGiftEvent?: PartyBroadcastEvent;
       }>("/api/wallet/gift", {
-        ...restParams,
+        ...params,
+        rCoins: params.rCoins ?? params.diamonds ?? costAmount,
         coins: costAmount,
         diamonds: costAmount,
         cost: costAmount,
@@ -9648,8 +9648,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     const senderName = registerName || "SK Love User";
     const coinsPerRecipient = Number(gift.diamonds || 0);
 
+    let sentCount = 0;
     for (const recipient of targets) {
-      await sendGiftApi({
+      const ok = await sendGiftApi({
         giftName: gift.name,
         giftIcon: gift.icon,
         diamonds: gift.diamonds,
@@ -9659,7 +9660,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         roomType: "party",
         roomId: activePartyRoom?.id ? String(activePartyRoom.id) : undefined,
       });
+      if (!ok) break;
+      sentCount++;
     }
+
+    if (sentCount === 0) return;
 
     // Append gift comment to party chat feed
     const giftChatText = `🎁 Sent ${gift.icon || "🎁"} ${gift.name} to ${count} users (${recipientNames})! 🎉`;
