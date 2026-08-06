@@ -1775,6 +1775,11 @@ export default function App() {
     avatar?: string | null;
   } | null>(null);
   const [isLiveStreamMinimized, setIsLiveStreamMinimized] = useState<boolean>(false);
+  useEffect(() => {
+    if (isLiveStreamMinimized && appSection === "stream") {
+      setAppSection("home");
+    }
+  }, [isLiveStreamMinimized, appSection]);
   const [isPartyRoomMinimized, setIsPartyRoomMinimized] = useState<boolean>(false);
   const [isPartyExitMenuOpen, setIsPartyExitMenuOpen] = useState<boolean>(false);
   // FIX: New popups & host summary state for party room premium redesign
@@ -28426,26 +28431,78 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         </div>
       )}
 
-      {/* Floating "Return to Live" indicator — host OR guest is in a live room but navigated away */}
-      {activeLiveRoom && appSection !== "stream" && (
-        <button
-          type="button"
+      {/* Floating Mini Window (Picture-in-Picture) for Live Stream */}
+      {activeLiveRoom && (isLiveStreamMinimized || appSection !== "stream") && (
+        <div
+          className="fixed bottom-20 right-3 z-[110] w-36 sm:w-44 h-52 sm:h-60 rounded-2xl border-2 border-rose-500/80 bg-slate-950/95 shadow-[0_10px_35px_rgba(225,29,72,0.45)] backdrop-blur-md overflow-hidden flex flex-col group cursor-pointer active:scale-95 transition-all duration-300 select-none hover:border-rose-400"
           onClick={() => {
             setIsLiveStreamMinimized(false);
             if (streamRole === "streamer") setIsStreamCameraOff(false);
             setAppSection("stream");
           }}
-          className={`fixed bottom-24 right-4 z-[90] flex h-14 w-14 items-center justify-center rounded-full border-2 text-white shadow-2xl active:scale-95 transition animate-pulse ${
-            streamRole === "streamer"
-              ? "border-rose-400/50 bg-gradient-to-br from-rose-600 to-red-700 shadow-rose-500/40"
-              : "border-cyan-400/50 bg-gradient-to-br from-cyan-600 to-indigo-700 shadow-cyan-500/40"
-          }`}
-          aria-label="Return to live"
-          title={streamRole === "streamer" ? "Return to your live stream" : "Return to the live stream you're watching"}
+          title="Tap to return to full-screen live stream"
         >
-          <span className="absolute -top-1 -right-1 rounded-full bg-white px-1.5 py-0.5 text-[8px] font-black text-rose-600 shadow">LIVE</span>
-          <Video className="h-6 w-6" />
-        </button>
+          {/* Video / Visual Stage Container */}
+          <div className="relative flex-1 w-full bg-gradient-to-b from-purple-950 via-slate-900 to-black overflow-hidden flex items-center justify-center">
+            {streamRole === "streamer" ? (
+              <div ref={attachLiveLocalVideoElement} className="h-full w-full object-cover" />
+            ) : liveRemoteVideos && liveRemoteVideos.length > 0 ? (
+              <div
+                ref={(element) => {
+                  if (element && liveRemoteVideos[0]) {
+                    liveRemoteVideoRefs.current[liveRemoteVideos[0].uid] = element;
+                  }
+                }}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="relative flex flex-col items-center justify-center w-full h-full p-2 text-center">
+                <div className="relative mb-1">
+                  <div className="absolute -inset-1.5 rounded-full bg-gradient-to-r from-rose-500 via-pink-500 to-amber-500 blur-sm opacity-80 animate-pulse" />
+                  <img
+                    src={getUserAvatarUrl({ name: activeLiveRoom?.hostName || "Host", avatar: activeLiveRoom?.hostAvatar })}
+                    alt={activeLiveRoom?.hostName || "Host"}
+                    className="relative h-12 w-12 rounded-full object-cover border-2 border-amber-300 shadow-lg"
+                  />
+                </div>
+                <span className="text-[10px] font-black text-white truncate max-w-[90%]">
+                  {activeLiveRoom?.hostName || "Host"}
+                </span>
+              </div>
+            )}
+
+            {/* Top Bar Overlay: LIVE badge + Expand & Close Controls */}
+            <div className="absolute top-1.5 left-1.5 right-1.5 z-20 flex items-center justify-between pointer-events-auto">
+              <span className="flex items-center gap-1 rounded-full bg-rose-600/90 border border-white/20 px-2 py-0.5 text-[8px] font-black text-white shadow-[0_0_10px_rgba(225,29,72,0.6)] animate-pulse">
+                <span className="h-1.5 w-1.5 rounded-full bg-white animate-ping" />
+                LIVE
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsLiveStreamMinimized(false);
+                  if (streamRole === "streamer") setIsStreamCameraOff(false);
+                  setAppSection("stream");
+                }}
+                className="h-6 w-6 rounded-full bg-black/60 border border-white/20 text-white hover:bg-rose-600 flex items-center justify-center transition shadow"
+                title="Expand Full Screen"
+              >
+                <Maximize2 className="h-3 w-3" />
+              </button>
+            </div>
+
+            {/* Bottom Info Bar Overlay */}
+            <div className="absolute bottom-0 inset-x-0 z-20 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-2 pt-3 flex flex-col">
+              <p className="text-[10px] font-extrabold text-white truncate drop-shadow">
+                {activeLiveRoom?.title || "Live Broadcast"}
+              </p>
+              <p className="text-[8px] font-bold text-rose-300/90 flex items-center gap-1 mt-0.5">
+                <span>Tap to expand ↗</span>
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Floating "Return to Party Room" indicator — when party room is open and minimized or navigated away */}
