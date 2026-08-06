@@ -153,11 +153,13 @@ const formatCompact = (n: number): string => {
   if (abs >= 1e3) return (n / 1e3).toFixed(abs >= 1e4 ? 0 : 1).replace(/\.0$/, "") + "K";
   return String(Math.round(n));
 };
-const frameEgolImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='none' stroke='%23FFD700' stroke-width='6'/><circle cx='50' cy='50' r='42' fill='none' stroke='%23FF8C00' stroke-width='2' stroke-dasharray='4 2'/></svg>";
-const frameFairImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='none' stroke='%2300FFFF' stroke-width='6'/><circle cx='50' cy='50' r='42' fill='none' stroke='%23FF007F' stroke-width='2'/></svg>";
-const frameKingImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='none' stroke='%23E6C200' stroke-width='7'/><path d='M35 25 L42 35 L50 20 L58 35 L65 25 L65 40 L35 40 Z' fill='%23FFD700'/></svg>";
-const frameQueenImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='none' stroke='%23FF1493' stroke-width='7'/><path d='M35 25 L42 35 L50 20 L58 35 L65 25 L65 40 L35 40 Z' fill='%23FF69B4'/></svg>";
-const frameAgencyPremiumImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='none' stroke='%239370DB' stroke-width='7'/><circle cx='50' cy='50' r='41' fill='none' stroke='%234B0082' stroke-width='3'/></svg>";
+import frameEgolImg from "./assets/frames/egol.png";
+import frameFairImg from "./assets/frames/fair.png";
+import frameKingImg from "./assets/frames/king.png";
+import frameQueenImg from "./assets/frames/queen.png";
+import frameAgencyPremiumImg from "./assets/frames/agency-premium.png";
+import frameHostPremiumImg from "./assets/frames/host-premium.png";
+import frameResellerPremiumImg from "./assets/frames/reseller-premium.png";
 import partyTheme1Img from "./assets/party-themes/theme-1.jpg";
 import partyTheme2Img from "./assets/party-themes/theme-2.jpg";
 import partyTheme3Img from "./assets/party-themes/theme-3.jpg";
@@ -185,6 +187,8 @@ const AVATAR_FRAME_CATALOG: Array<{
   { id: "avatar-fair", name: "Fair", image: frameFairImg, price: 500000, durationDays: 30 },
   { id: "avatar-king", name: "KING", image: frameKingImg, price: 500000, durationDays: 30 },
   { id: "avatar-queen", name: "QUEEN", image: frameQueenImg, price: 500000, durationDays: 30 },
+  { id: "avatar-host-premium", name: "HOST VIP", image: frameHostPremiumImg, price: 600000, durationDays: 30 },
+  { id: "avatar-reseller-premium", name: "RESELLER VIP", image: frameResellerPremiumImg, price: 700000, durationDays: 30 },
   // Admin-granted only — awarded to approved agency owners via Admin Dashboard.
   { id: "avatar-agency-premium", name: "AGENCY", image: frameAgencyPremiumImg, price: 0, durationDays: 3650, adminOnly: true },
 ];
