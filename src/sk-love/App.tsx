@@ -8388,18 +8388,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       });
     }
 
-    const hostIdVal = Number(room?.hostId ?? room?.host_id ?? 0);
-    const roomTotalCoins = Number(
-      room?.totalCoins ??
-      room?.total_coins ??
-      room?.totalDiamonds ??
-      room?.total_diamonds ??
-      0
-    );
-    if (hostIdVal > 0 && roomTotalCoins > 0 && !mergedSeatCoins[hostIdVal]) {
-      mergedSeatCoins[hostIdVal] = roomTotalCoins;
-    }
-
     if (Object.keys(mergedSeatCoins).length > 0) {
       setPartySeatSessionCoins((prev) => {
         const next = { ...prev };
