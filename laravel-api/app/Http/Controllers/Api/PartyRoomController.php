@@ -421,16 +421,17 @@ class PartyRoomController extends Controller
         $seatCoinsMap = [];
         if ($this->tableExists('gift_transactions') && !empty($roomIds)) {
             try {
+                $recExpr = $hostId > 0 ? "COALESCE(NULLIF(receiver_id, 0), {$hostId})" : "receiver_id";
                 $seatCoinRows = DB::table('gift_transactions')
-                    ->where('room_type', 'party')
+                    ->whereIn('room_type', ['party', 'party_room', 'partyRoom'])
                     ->whereIn('room_id', $roomIds)
-                    ->whereNotNull('receiver_id')
-                    ->select('receiver_id', DB::raw('SUM(diamonds) as total_coins'))
-                    ->groupBy('receiver_id')
+                    ->select(DB::raw("{$recExpr} as rec_id"), DB::raw('SUM(diamonds) as total_coins'))
+                    ->groupBy(DB::raw($recExpr))
                     ->get();
                 foreach ($seatCoinRows as $scr) {
-                    if (!empty($scr->receiver_id)) {
-                        $seatCoinsMap[(int) $scr->receiver_id] = (int) $scr->total_coins;
+                    $rId = (int) ($scr->rec_id ?? 0);
+                    if ($rId > 0) {
+                        $seatCoinsMap[$rId] = (int) $scr->total_coins;
                     }
                 }
             } catch (Throwable $e) {
@@ -545,7 +546,7 @@ class PartyRoomController extends Controller
                 $rows = DB::table('gift_transactions as g')
                     ->leftJoin('users as sender',   'sender.id',   '=', 'g.sender_id')
                     ->leftJoin('users as receiver', 'receiver.id', '=', 'g.receiver_id')
-                    ->where('g.room_type', 'party')
+                    ->whereIn('g.room_type', ['party', 'party_room', 'partyRoom'])
                     ->whereIn('g.room_id', $roomIds)
                     ->where('g.created_at', '>=', now()->subHours(12))
                     ->orderByDesc('g.id')
@@ -576,7 +577,7 @@ class PartyRoomController extends Controller
 
                 $summaryRows = DB::table('gift_transactions as g')
                     ->leftJoin('users as sender', 'sender.id', '=', 'g.sender_id')
-                    ->where('g.room_type', 'party')
+                    ->whereIn('g.room_type', ['party', 'party_room', 'partyRoom'])
                     ->whereIn('g.room_id', $roomIds)
                     ->select([
                         'g.sender_id',
@@ -604,7 +605,19 @@ class PartyRoomController extends Controller
             }
         }
 
-        $totalDiamondsVal = (int) $this->prop($room, 'total_diamonds', 0);
+        $calcTotalCoins = 0;
+        if ($this->tableExists('gift_transactions') && !empty($roomIds)) {
+            try {
+                $calcTotalCoins = (int) DB::table('gift_transactions')
+                    ->whereIn('room_type', ['party', 'party_room', 'partyRoom'])
+                    ->whereIn('room_id', $roomIds)
+                    ->sum('diamonds');
+            } catch (Throwable $e) {
+                $calcTotalCoins = 0;
+            }
+        }
+
+        $totalDiamondsVal = max((int) $this->prop($room, 'total_diamonds', 0), $calcTotalCoins);
 
         return array_merge([
             'id'               => (int) $room->id,
@@ -1206,4 +1219,4 @@ class PartyRoomController extends Controller
     }
 }
 
-// Last Updated: 2026-08-06 00:00:00 UTC | Deploy Verification Commit for PartyRoomController
+// Last Updated: 2026-08-06 00:07:00 UTC | Fix party room seat coins and total coins dynamic aggregation from gift_transactions

@@ -489,16 +489,21 @@ class WalletController extends Controller
                 'updated_at'  => now(),
             ]);
 
-            if (($data['roomType'] ?? null) === 'party' && !empty($data['roomId'])) {
-                DB::table('party_rooms')
-                    ->where('id', $data['roomId'])
-                    ->increment('total_diamonds', (int) $data['diamonds'], ['updated_at' => now()]);
+            $rType = strtolower((string) ($data['roomType'] ?? ''));
+            if (in_array($rType, ['party', 'party_room', 'partyroom'], true) && !empty($data['roomId'])) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('party_rooms', 'total_diamonds')) {
+                    DB::table('party_rooms')
+                        ->where('id', $data['roomId'])
+                        ->increment('total_diamonds', (int) $data['diamonds'], ['updated_at' => now()]);
+                }
             }
 
-            if (($data['roomType'] ?? null) === 'live' && !empty($data['roomId'])) {
-                DB::table('live_rooms')
-                    ->where('id', $data['roomId'])
-                    ->increment('total_diamonds', (int) $data['diamonds'], ['updated_at' => now()]);
+            if (in_array($rType, ['live', 'live_room', 'liveroom'], true) && !empty($data['roomId'])) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('live_rooms', 'total_diamonds')) {
+                    DB::table('live_rooms')
+                        ->where('id', $data['roomId'])
+                        ->increment('total_diamonds', (int) $data['diamonds'], ['updated_at' => now()]);
+                }
             }
 
             return response()->json([
