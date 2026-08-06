@@ -33,6 +33,7 @@ if (typeof window !== "undefined" && AgoraRTC && typeof (AgoraRTC as any).setLog
   } catch {}
 }
 import { api } from "./lib/api";
+import { formatCoinCompact } from "./lib/hooks";
 import { toast } from "sonner";
 
 import { PARTY_REACTION_EMOJIS, notoAnimatedUrl } from "./lib/notoEmoji";
@@ -14713,7 +14714,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                       </div>
                       <p className="truncate text-[8.5px] font-black text-white">{gift.name}</p>
                       <p className="mt-0.5 text-[7.5px] font-black text-amber-300">
-                        {gift.diamonds} coins
+                        {formatCoinCompact(gift.diamonds)} coins
                       </p>
                     </button>
                   ))}
@@ -15460,7 +15461,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                           {gift.name}
                         </span>
                         <span className="text-[7.5px] text-amber-200 font-mono font-bold mt-0.5">
-                          🪙 {totalCoins}
+                          🪙 {formatCoinCompact(totalCoins)}
                         </span>
                       </button>
                     );
@@ -15973,7 +15974,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                       {gift.name}
                     </span>
                     <span className="text-[7px] text-amber-400 font-mono mt-0.5">
-                      {gift.diamonds} coins
+                      {formatCoinCompact(gift.diamonds)} coins
                     </span>
                   </button>
                 ))}
@@ -21243,7 +21244,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                   {gift.label}
                                 </span>
                                 <span className="text-[7px] text-pink-400 font-mono font-bold leading-none mt-0.5">
-                                  {gift.price}🪙
+                                  {formatCoinCompact(gift.price)}🪙
                                 </span>
                               </button>
                             ))}
@@ -22417,7 +22418,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                               {gift.name}
                                             </span>
                                             <span className="text-[7.5px] text-amber-200 font-mono font-bold mt-0.5">
-                                              🪙 {totalCost}
+                                              🪙 {formatCoinCompact(totalCost)}
                                             </span>
                                           </button>
                                         );
@@ -23225,7 +23226,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                             {gift.name}
                                           </span>
                                           <span className="text-[7.5px] text-amber-200 font-mono font-bold mt-0.5">
-                                            🪙 {totalCost}
+                                            🪙 {formatCoinCompact(totalCost)}
                                           </span>
                                         </button>
                                       );
@@ -26954,7 +26955,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 {gift.name}
                               </p>
                               <p className="text-[#e91e63] text-[8px] font-mono font-black mt-0.5">
-                                ⚡ {gift.price} 🪙
+                                ⚡ {formatCoinCompact(gift.price)} 🪙
                               </p>
                             </button>
                           ))}

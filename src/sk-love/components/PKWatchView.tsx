@@ -12,6 +12,7 @@ import type { MutableRefObject } from "react";
 import { createPortal } from "react-dom";
 import { X, Send, Gift, Heart, Share2, Star, Plus, CornerDownRight, Reply, AtSign } from "lucide-react";
 import { api } from "../lib/api";
+import { formatCoinCompact } from "../lib/hooks";
 
 // Dynamic Agora import — matches App.tsx SSR-safe pattern
 const AgoraRTCPromise: Promise<typeof import("agora-rtc-sdk-ng").default> =
@@ -1133,7 +1134,7 @@ export default function PKWatchView({
                   >
                     <span className="text-2xl">{g.icon}</span>
                     <span className="text-[9px] font-bold text-white mt-1 truncate">{g.name}</span>
-                    <span className="text-[8px] text-amber-300 font-mono">💎 {g.diamonds}</span>
+                    <span className="text-[8px] text-amber-300 font-mono">💎 {formatCoinCompact(g.diamonds)}</span>
                   </button>
                 ))}
               </div>

@@ -6,6 +6,20 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tansta
 import { api } from "./api";
 import { ENDPOINTS } from "./endpoints";
 
+export function formatCoinCompact(num: number | string | null | undefined): string {
+  const n = Number(num);
+  if (!n || isNaN(n)) return "0";
+  if (n >= 1_000_000) {
+    const val = n / 1_000_000;
+    return val % 1 === 0 ? `${val}M` : `${val.toFixed(1)}M`;
+  }
+  if (n >= 1_000) {
+    const val = n / 1_000;
+    return val % 1 === 0 ? `${val}K` : `${val.toFixed(1)}K`;
+  }
+  return String(n);
+}
+
 // ------------------------------------------------------------------
 // 1. Live Rooms
 // ------------------------------------------------------------------
