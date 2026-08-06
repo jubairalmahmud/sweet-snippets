@@ -14,6 +14,13 @@ export default defineConfig(() => {
     },
     build: {
       target: 'esnext',
+      rollupOptions: {
+        output: {
+          entryFileNames: 'assets/[name].js',
+          chunkFileNames: 'assets/[name].js',
+          assetFileNames: 'assets/[name].[ext]',
+        },
+      },
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.

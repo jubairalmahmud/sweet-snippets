@@ -3,5 +3,5 @@ deployment:
   tasks:
     - export FRONTEND_PATH=/home/national/sklove.nit.bd
     - export BACKEND_PATH=/home/national/api.sklove.nit.bd
-    - /bin/cp -R dist/* $FRONTEND_PATH/
-    - /bin/cp public/.htaccess $FRONTEND_PATH/.htaccess
+    - /bin/cp -rf dist/* $FRONTEND_PATH/
+    - /bin/cp -f public/.htaccess $FRONTEND_PATH/.htaccess
