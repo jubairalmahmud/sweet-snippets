@@ -4259,7 +4259,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     const cleanup = () => {
       try {
         const token = window.localStorage.getItem("sk_love_token") || "";
-        const base = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_LARAVEL_API_URL || "https://api.sklove.nit.bd").replace(/\/+$/, "");
+        const base = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_LARAVEL_API_URL || "https://api.sklove.nit.bd").replace(/\/+$/, "").replace(/\/api$/i, "");
         const send = (path: string) => {
           const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
           const blob = new Blob([JSON.stringify({ token })], { type: "application/json" });
