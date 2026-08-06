@@ -182,15 +182,15 @@ const AVATAR_FRAME_CATALOG: Array<{
   price: number;
   durationDays: number;
   adminOnly?: boolean;
+  isOfficial?: boolean;
 }> = [
   { id: "avatar-egol", name: "Egol", image: frameEgolImg, price: 500000, durationDays: 30 },
   { id: "avatar-fair", name: "Fair", image: frameFairImg, price: 500000, durationDays: 30 },
   { id: "avatar-king", name: "KING", image: frameKingImg, price: 500000, durationDays: 30 },
   { id: "avatar-queen", name: "QUEEN", image: frameQueenImg, price: 500000, durationDays: 30 },
-  { id: "avatar-host-premium", name: "HOST VIP", image: frameHostPremiumImg, price: 600000, durationDays: 30 },
-  { id: "avatar-reseller-premium", name: "RESELLER VIP", image: frameResellerPremiumImg, price: 700000, durationDays: 30 },
-  // Admin-granted only — awarded to approved agency owners via Admin Dashboard.
-  { id: "avatar-agency-premium", name: "AGENCY", image: frameAgencyPremiumImg, price: 0, durationDays: 3650, adminOnly: true },
+  { id: "avatar-host-premium", name: "HOST VIP", image: frameHostPremiumImg, price: 0, durationDays: 3650, isOfficial: true, adminOnly: true },
+  { id: "avatar-reseller-premium", name: "RESELLER VIP", image: frameResellerPremiumImg, price: 0, durationDays: 3650, isOfficial: true, adminOnly: true },
+  { id: "avatar-agency-premium", name: "AGENCY VIP", image: frameAgencyPremiumImg, price: 0, durationDays: 3650, isOfficial: true, adminOnly: true },
 ];
 
 
@@ -26985,13 +26985,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   "avatar" | "party" | "rides",
                   { id: string; name: string; emoji: string; price: string; gradient: string; image?: string }[]
                 > = {
-                  avatar: AVATAR_FRAME_CATALOG.filter((f) => !f.adminOnly).map((f) => ({
+                  avatar: AVATAR_FRAME_CATALOG.map((f) => ({
                     id: f.id,
                     name: f.name,
-                    emoji: "",
+                    emoji: f.isOfficial ? "🛡️" : "",
                     image: f.image,
-                    price: `${(f.price / 1000).toLocaleString()}K/${f.durationDays} d`,
-                    gradient: "from-purple-100 to-pink-50",
+                    price: f.isOfficial
+                      ? "Official Frame"
+                      : `${(f.price / 1000).toLocaleString()}K/${f.durationDays} d`,
+                    gradient: f.isOfficial ? "from-amber-100 to-yellow-50" : "from-purple-100 to-pink-50",
                   })),
 
 
@@ -27310,6 +27312,20 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               className="bg-gradient-to-r from-emerald-500 to-green-500 text-white font-bold text-[13px] px-8 py-2.5 rounded-full border-none cursor-pointer shadow-md hover:opacity-90"
                             >
                               Equip
+                            </button>
+                          );
+                        }
+                        if (catItem?.isOfficial || catItem?.adminOnly) {
+                          return (
+                            <button
+                              onClick={() => {
+                                window.alert(
+                                  "🔒 এই ফ্রেমটি অফিসিয়াল (Host, Reseller, Agency)।\n\nএটি শুধুমাত্র অ্যাডমিন বা সিস্টেম দ্বারা প্রদান করা হয়, স্টোর থেকে কেনা যাবে না।"
+                                );
+                              }}
+                              className="bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[12px] px-6 py-2.5 rounded-full cursor-pointer shadow-sm hover:bg-amber-200 transition"
+                            >
+                              🔒 Official (Not for sale)
                             </button>
                           );
                         }
