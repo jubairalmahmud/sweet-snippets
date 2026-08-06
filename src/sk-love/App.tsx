@@ -15030,7 +15030,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 className="text-[14px] font-black tabular-nums text-amber-300"
                 style={{ textShadow: "0 1px 2px rgba(0,0,0,0.7)" }}
               >
-                {partyEarnedCoins.toLocaleString()}
+                {formatCoinCompact(partyEarnedCoins)}
               </span>
             </button>
           </div>
@@ -15241,7 +15241,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                         )}
                         <span className={`flex items-center gap-0.5 text-[10px] font-black tabular-nums leading-none ${effOccupant ? "text-amber-300" : "text-white/30"}`}>
                           <span className="text-[9px] leading-none">⭐</span>
-                          {(effOccupant ? seatCoins : 0).toLocaleString()}
+                          {formatCoinCompact(effOccupant ? seatCoins : 0)}
                         </span>
                       </div>
                       {isCrown && (
@@ -16054,7 +16054,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 <div className="relative mb-3 flex items-center justify-between rounded-2xl border border-amber-400/20 bg-amber-500/5 px-3 py-2">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-amber-200/80">On-board earned</span>
                   <span className="text-[15px] font-black text-amber-200 tabular-nums">
-                    🪙 {partyEarnedCoins.toLocaleString()}
+                    🪙 {formatCoinCompact(partyEarnedCoins)}
                   </span>
                 </div>
                 <div className="relative max-h-[280px] overflow-y-auto space-y-1.5 pr-1">
@@ -16091,7 +16091,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                       />
                       <span className="min-w-0 flex-1 truncate text-[12px] font-bold text-white">{g.name}</span>
                       <span className="text-[11px] font-black text-amber-200 tabular-nums">
-                        🪙 {g.totalSpent.toLocaleString()}
+                        🪙 {formatCoinCompact(g.totalSpent)}
                       </span>
                     </div>
                   ))}
@@ -16488,7 +16488,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 </div>
               )}
               <p className="text-[10px] text-amber-300 font-black pt-1">
-                🪙 Session coins: {(partySeatSessionCoins[Number(partyProfileView.userId) || -1] || 0).toLocaleString()}
+                🪙 Session coins: {formatCoinCompact(partySeatSessionCoins[Number(partyProfileView.userId) || -1] || 0)}
               </p>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
@@ -21536,7 +21536,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                       )}
                                       {cohostCoins > 0 && (
                                         <span className="absolute top-1 right-1 z-10 flex items-center gap-0.5 rounded-full bg-amber-500/90 border border-amber-300/80 px-1.5 py-0.5 text-[7px] font-black text-slate-950 shadow-md">
-                                          🪙 {cohostCoins}
+                                          🪙 {formatCoinCompact(cohostCoins)}
                                         </span>
                                       )}
                                       <span className="absolute bottom-0.5 left-0.5 z-10 rounded bg-black/70 px-1 py-0.5 text-[6px] font-black text-white">
@@ -21697,7 +21697,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               {/* Diamond / Coins Pill below name/ID */}
                               <div className="bg-black/50 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-sky-400/30 text-sky-300 text-xs font-bold flex items-center gap-1 shadow w-fit select-none">
                                 <span className="text-sm leading-none">💎</span>
-                                <span>{streamStats.rCoinsGained || 0}</span>
+                                <span>{formatCoinCompact(streamStats.rCoinsGained || 0)}</span>
                               </div>
 
                               {/* Stream Duration Pill below diamonds */}
@@ -22783,7 +22783,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                             {/* Diamonds / Coins Pill */}
                             <div className="bg-black/50 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-sky-400/30 text-sky-300 text-xs font-bold flex items-center gap-1 shadow w-fit select-none">
                               <span className="text-sm leading-none">💎</span>
-                              <span>{streamStats.rCoinsGained || 0}</span>
+                              <span>{formatCoinCompact(streamStats.rCoinsGained || 0)}</span>
                             </div>
 
                             {/* Stream Duration Pill */}
@@ -23004,7 +23004,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                         )}
                                         {cohostCoins > 0 && (
                                           <span className="absolute top-0.5 right-0.5 z-10 flex items-center gap-0.5 rounded-full bg-amber-500/90 border border-amber-300/80 px-1 py-0.5 text-[6.5px] font-black text-slate-950 shadow-md">
-                                            🪙 {cohostCoins}
+                                            🪙 {formatCoinCompact(cohostCoins)}
                                           </span>
                                         )}
                                         <span className="absolute bottom-0.5 left-0.5 rounded bg-black/70 px-1 py-0.5 text-[6px] font-black text-white z-10">
