@@ -418,12 +418,12 @@ class WalletController extends Controller
     public function sendGift(Request $request)
     {
         $data = $request->validate([
-            'giftName'   => 'required|string|max:64',
-            'giftIcon'   => 'nullable|string|max:16',
-            'diamonds'   => 'required|integer|min:1',
+            'giftName'   => 'required|string|max:255',
+            'giftIcon'   => 'nullable|string|max:1000',
+            'diamonds'   => 'required|integer|min:0',
             'rCoins'     => 'required|integer|min:0',
-            'receiverId' => 'nullable|integer|exists:users,id',
-            'roomType'   => 'nullable|string|max:32',
+            'receiverId' => 'nullable|integer',
+            'roomType'   => 'nullable|string|max:64',
             'roomId'     => 'nullable|string|max:64',
         ]);
 

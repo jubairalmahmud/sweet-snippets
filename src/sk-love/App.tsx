@@ -7491,7 +7491,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         ...prev,
         diamonds: revertedBalance,
       }));
-      const serverMsg = e?.response?.data?.message || "পর্যাপ্ত ব্যালেন্স না থাকায় গিফট সেন্ড করা সম্ভব হচ্ছে না।";
+      const serverMsg = e?.response?.data?.message || "গিফট পাঠানো সম্ভব হচ্ছে না। দয়া করে আবার চেষ্টা করুন।";
       try { toast.error(serverMsg); } catch {}
       setToastAlert(serverMsg);
       setTimeout(() => setToastAlert(null), 3500);
