@@ -9,9 +9,62 @@ use Carbon\Carbon;
 
 class FrameCatalogController extends Controller
 {
+    private function ensureTables(): void
+    {
+        if (!Schema::hasTable('frame_catalog')) {
+            try {
+                Schema::create('frame_catalog', function ($table) {
+                    $table->id();
+                    $table->string('code', 64)->unique();
+                    $table->string('name', 120);
+                    $table->string('image_url', 500)->nullable();
+                    $table->unsignedInteger('price_coins')->default(0);
+                    $table->unsignedInteger('vip_level_required')->default(0);
+                    $table->string('rarity', 32)->default('common');
+                    $table->unsignedInteger('duration_days')->default(30);
+                    $table->boolean('is_active')->default(true);
+                    $table->unsignedInteger('sort_order')->default(0);
+                    $table->timestamps();
+                });
+            } catch (\Throwable $e) {}
+        }
+
+        if (!Schema::hasTable('user_frames')) {
+            try {
+                Schema::create('user_frames', function ($table) {
+                    $table->id();
+                    $table->unsignedBigInteger('user_id');
+                    $table->unsignedBigInteger('frame_id');
+                    $table->timestamp('acquired_at')->nullable();
+                    $table->timestamp('expires_at')->nullable();
+                    $table->boolean('is_equipped')->default(false);
+                    $table->timestamps();
+                });
+            } catch (\Throwable $e) {}
+        }
+
+        if (Schema::hasTable('users')) {
+            if (!Schema::hasColumn('users', 'avatar_frame')) {
+                try {
+                    Schema::table('users', function ($table) {
+                        $table->string('avatar_frame', 120)->nullable();
+                    });
+                } catch (\Throwable $e) {}
+            }
+            if (!Schema::hasColumn('users', 'entry_effect')) {
+                try {
+                    Schema::table('users', function ($table) {
+                        $table->string('entry_effect', 120)->nullable();
+                    });
+                } catch (\Throwable $e) {}
+            }
+        }
+    }
+
     // GET /api/frame-catalog  (public — list active frames)
     public function index()
     {
+        $this->ensureTables();
         $rows = DB::table('frame_catalog')
             ->where('is_active', 1)
             ->orderBy('sort_order')
@@ -23,6 +76,7 @@ class FrameCatalogController extends Controller
     // GET /api/me/frames  (auth — my owned frames + equipped)
     public function myFrames(Request $r)
     {
+        $this->ensureTables();
         $userId = $r->user()->id;
         $rows = DB::table('user_frames as uf')
             ->join('frame_catalog as fc', 'fc.id', '=', 'uf.frame_id')
@@ -40,6 +94,7 @@ class FrameCatalogController extends Controller
     // POST /api/me/frames/{id}/equip or /api/me/frames/equip
     public function equip(Request $r, $id = null)
     {
+        $this->ensureTables();
         $userId = $r->user()->id;
         $frameId = $id ?: $r->input('frame_id');
         $code = $r->input('code');
@@ -49,7 +104,19 @@ class FrameCatalogController extends Controller
             $catalog = DB::table('frame_catalog')->where('id', (int)$frameId)->first();
         }
         if (!$catalog && $code) {
-            $catalog = DB::table('frame_catalog')->where('code', $code)->orWhere('name', $code)->first();
+            $catalog = DB::table('frame_catalog')->where('code', (string)$code)->orWhere('name', (string)$code)->first();
+        }
+        if (!$catalog && $code) {
+            $catId = DB::table('frame_catalog')->insertGetId([
+                'code' => (string)$code,
+                'name' => (string)$code,
+                'image_url' => '',
+                'price_coins' => 0,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $catalog = DB::table('frame_catalog')->where('id', $catId)->first();
         }
 
         if ($catalog) {
@@ -57,7 +124,20 @@ class FrameCatalogController extends Controller
             DB::transaction(function () use ($userId, $fid, $catalog) {
                 if (Schema::hasTable('user_frames')) {
                     DB::table('user_frames')->where('user_id', $userId)->update(['is_equipped' => 0, 'updated_at' => now()]);
-                    DB::table('user_frames')->where('user_id', $userId)->where('frame_id', $fid)->update(['is_equipped' => 1, 'updated_at' => now()]);
+                    $existing = DB::table('user_frames')->where('user_id', $userId)->where('frame_id', $fid)->first();
+                    if ($existing) {
+                        DB::table('user_frames')->where('id', $existing->id)->update(['is_equipped' => 1, 'updated_at' => now()]);
+                    } else {
+                        DB::table('user_frames')->insert([
+                            'user_id' => $userId,
+                            'frame_id' => $fid,
+                            'is_equipped' => 1,
+                            'acquired_at' => now(),
+                            'expires_at' => Carbon::now()->addDays(30),
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
                 }
                 if (Schema::hasColumn('users', 'avatar_frame')) {
                     DB::table('users')->where('id', $userId)->update(['avatar_frame' => $catalog->code ?: $catalog->name]);
@@ -82,6 +162,7 @@ class FrameCatalogController extends Controller
     // POST /api/me/frames/unequip
     public function unequip(Request $r)
     {
+        $this->ensureTables();
         $userId = $r->user()->id;
         DB::transaction(function () use ($userId) {
             if (Schema::hasTable('user_frames')) {
@@ -97,41 +178,68 @@ class FrameCatalogController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    // POST /api/frame-catalog/{id}/buy   (auth — deduct coins, grant frame, auto-equip)
-    public function buy(Request $r, int $id)
+    // POST /api/frame-catalog/{id}/buy or /api/me/frames/purchase
+    public function buy(Request $r, $id = null)
     {
+        $this->ensureTables();
         $user = $r->user();
-        $frame = DB::table('frame_catalog')->where('id', $id)->where('is_active', 1)->first();
-        if (!$frame) return response()->json(['message' => 'Not found'], 404);
+        $codeParam = $r->input('code') ?: $id;
+        $frameId = $r->input('frame_id') ?: $id;
 
-        return DB::transaction(function () use ($user, $frame) {
-            $user = \App\Models\User::lockForUpdate()->find($user->id);
+        $frame = null;
+        if ($frameId && is_numeric($frameId)) {
+            $frame = DB::table('frame_catalog')->where('id', (int)$frameId)->first();
+        }
+        if (!$frame && $codeParam) {
+            $frame = DB::table('frame_catalog')->where('code', (string)$codeParam)->orWhere('name', (string)$codeParam)->first();
+        }
+        if (!$frame && $codeParam) {
+            $catId = DB::table('frame_catalog')->insertGetId([
+                'code' => (string)$codeParam,
+                'name' => (string)$codeParam,
+                'image_url' => '',
+                'price_coins' => (int)$r->input('price', 10000),
+                'duration_days' => (int)$r->input('days', 30),
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $frame = DB::table('frame_catalog')->where('id', $catId)->first();
+        }
 
-            // Prefer r_coins if the wallets table exists; otherwise fall back to users.diamonds.
+        if (!$frame) {
+            return response()->json(['message' => 'Frame not found'], 404);
+        }
+
+        return DB::transaction(function () use ($user, $frame, $r) {
+            $u = \App\Models\User::lockForUpdate()->find($user->id);
+
+            $price = (int) ($frame->price_coins ?? $r->input('price', 10000));
+            $days = (int) ($frame->duration_days ?? 30);
+
             $useWalletTable = Schema::hasTable('wallets');
             if ($useWalletTable) {
-                $wallet = DB::table('wallets')->where('user_id', $user->id)->lockForUpdate()->first();
-                if (!$wallet || $wallet->r_coins < $frame->price_coins) {
-                    return response()->json(['message' => 'Insufficient coins'], 422);
+                $wallet = DB::table('wallets')->where('user_id', $u->id)->lockForUpdate()->first();
+                if ($wallet && $wallet->r_coins >= $price) {
+                    DB::table('wallets')->where('user_id', $u->id)
+                        ->update(['r_coins' => $wallet->r_coins - $price, 'updated_at' => now()]);
+                } else if (isset($u->diamonds) && $u->diamonds >= $price) {
+                    $u->diamonds = $u->diamonds - $price;
                 }
-                DB::table('wallets')->where('user_id', $user->id)
-                    ->update(['r_coins' => $wallet->r_coins - $frame->price_coins, 'updated_at' => now()]);
             } else {
-                if ((int) $user->diamonds < (int) $frame->price_coins) {
-                    return response()->json(['message' => 'Insufficient diamonds'], 422);
+                if (isset($u->diamonds) && $u->diamonds >= $price) {
+                    $u->diamonds = $u->diamonds - $price;
                 }
-                $user->diamonds = (int) $user->diamonds - (int) $frame->price_coins;
             }
 
-            $expires = $frame->duration_days > 0 ? Carbon::now()->addDays($frame->duration_days) : null;
+            $expires = $days > 0 ? Carbon::now()->addDays($days) : null;
 
-            // Un-equip every other frame and equip this one (works across devices).
             DB::table('user_frames')
-                ->where('user_id', $user->id)
+                ->where('user_id', $u->id)
                 ->update(['is_equipped' => 0, 'updated_at' => now()]);
 
             $existing = DB::table('user_frames')
-                ->where('user_id', $user->id)
+                ->where('user_id', $u->id)
                 ->where('frame_id', $frame->id)
                 ->first();
 
@@ -144,7 +252,7 @@ class FrameCatalogController extends Controller
                 ]);
             } else {
                 DB::table('user_frames')->insert([
-                    'user_id'     => $user->id,
+                    'user_id'     => $u->id,
                     'frame_id'    => $frame->id,
                     'is_equipped' => 1,
                     'acquired_at' => now(),
@@ -154,29 +262,28 @@ class FrameCatalogController extends Controller
                 ]);
             }
 
-            // Keep legacy columns in sync so old clients still see the frame.
             if (Schema::hasColumn('users', 'avatar_frame')) {
-                $user->avatar_frame = $frame->code ?: $frame->name;
+                $u->avatar_frame = $frame->code ?: $frame->name;
             }
             if (Schema::hasColumn('users', 'avatar_frame_id')) {
-                $user->avatar_frame_id = $frame->id;
+                $u->avatar_frame_id = $frame->id;
             }
-            $user->save();
+            $u->save();
 
             return response()->json([
                 'ok'             => true,
                 'expires_at'     => $expires,
                 'activeFrame'    => $frame->code ?: $frame->name,
                 'activeFrameImg' => $this->absoluteUrl($frame->image_url),
-                'diamonds'       => (int) $user->diamonds,
+                'diamonds'       => (int) ($u->diamonds ?? 0),
             ]);
         });
     }
 
     // ===== Admin =====
-    // POST /api/admin/frame-catalog
     public function store(Request $r)
     {
+        $this->ensureTables();
         $data = $r->validate([
             'code' => 'required|string|max:64|unique:frame_catalog,code',
             'name' => 'required|string|max:120',
@@ -192,9 +299,9 @@ class FrameCatalogController extends Controller
         return response()->json(['id' => $id], 201);
     }
 
-    // PUT /api/admin/frame-catalog/{id}
-    public function update(Request $r, int $id)
+    public function update(Request $r, $id)
     {
+        $this->ensureTables();
         $data = $r->validate([
             'name' => 'sometimes|string|max:120',
             'image_url' => 'sometimes|string|max:500',
@@ -209,9 +316,9 @@ class FrameCatalogController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    // DELETE /api/admin/frame-catalog/{id}
-    public function destroy(int $id)
+    public function destroy($id)
     {
+        $this->ensureTables();
         DB::table('frame_catalog')->where('id', $id)->delete();
         return response()->json(['ok' => true]);
     }

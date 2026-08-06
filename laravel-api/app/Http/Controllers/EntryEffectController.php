@@ -43,6 +43,23 @@ class EntryEffectController extends Controller
                 });
             } catch (\Throwable $e) {}
         }
+
+        if (Schema::hasTable('users')) {
+            if (!Schema::hasColumn('users', 'avatar_frame')) {
+                try {
+                    Schema::table('users', function ($table) {
+                        $table->string('avatar_frame', 120)->nullable();
+                    });
+                } catch (\Throwable $e) {}
+            }
+            if (!Schema::hasColumn('users', 'entry_effect')) {
+                try {
+                    Schema::table('users', function ($table) {
+                        $table->string('entry_effect', 120)->nullable();
+                    });
+                } catch (\Throwable $e) {}
+            }
+        }
     }
 
     public function index()

@@ -73,15 +73,16 @@ class UserFrames
             if (Schema::hasTable('users') && Schema::hasColumn('users', 'avatar_frame')) {
                 $userCol = DB::table('users')->where('id', $key)->select(['avatar_frame', 'avatar_frame_id'])->first();
                 $val = $userCol->avatar_frame ?? ($userCol->avatar_frame_id ?? null);
-                if ($val && String($val) !== '' && $val !== 'None' && $val !== 'Default') {
+                if ($val && (string)$val !== '' && $val !== 'None' && $val !== 'Default') {
                     return self::$cache[$key] = [
-                        'id'        => 0,
-                        'frameId'   => (string) $val,
-                        'code'      => (string) $val,
-                        'name'      => (string) $val,
-                        'imageUrl'  => null,
-                        'rarity'    => 'common',
-                        'expiresAt' => null,
+                        'id'          => 0,
+                        'frameId'     => (string) $val,
+                        'code'        => (string) $val,
+                        'name'        => (string) $val,
+                        'imageUrl'    => null,
+                        'rarity'      => 'common',
+                        'expiresAt'   => null,
+                        'activeFrame' => (string) $val,
                     ];
                 }
             }
@@ -89,13 +90,14 @@ class UserFrames
         }
 
         return self::$cache[$key] = [
-            'id'        => (int) $row->uf_id,
-            'frameId'   => (int) $row->frame_id,
-            'code'      => $row->code,
-            'name'      => $row->name,
-            'imageUrl'  => self::absolutize($row->image_url),
-            'rarity'    => $row->rarity,
-            'expiresAt' => $row->expires_at,
+            'id'          => (int) $row->uf_id,
+            'frameId'     => (int) $row->frame_id,
+            'code'        => $row->code,
+            'name'        => $row->name,
+            'imageUrl'    => self::absolutize($row->image_url),
+            'rarity'      => $row->rarity,
+            'expiresAt'   => $row->expires_at,
+            'activeFrame' => $row->code ?: $row->name,
         ];
     }
 
