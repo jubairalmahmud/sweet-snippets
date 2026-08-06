@@ -5091,25 +5091,25 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   useEffect(() => {
     if (streamRole !== "streamer" || !activeLiveRoom) return;
     // NOTE: minimize alone must NOT turn the camera off — the live must keep running.
-    // Only turn the camera off when the host actually navigates away from the stream section.
-    if (appSection !== "stream") {
+    // Only turn the camera off when the host actually navigates away from the stream section without minimizing.
+    if (appSection !== "stream" && !isLiveStreamMinimized) {
       setIsStreamCameraOff(true);
     }
-  }, [appSection, streamRole, activeLiveRoom]);
+  }, [appSection, streamRole, activeLiveRoom, isLiveStreamMinimized]);
 
 
 
 
   // ---- ইফেক্ট: useEffect — if (appSection !== "stream" || !activeLiveRoom) return; ----
   useEffect(() => {
-    if (appSection !== "stream" || !activeLiveRoom) return;
+    if ((appSection !== "stream" && !isLiveStreamMinimized) || !activeLiveRoom) return;
     setStreamStats((prev) => ({
       ...prev,
       viewers: Number(activeLiveRoom.viewerCount || 0),
       likes: Number(activeLiveRoom.likesCount || 0),
       rCoinsGained: Number(activeLiveRoom.totalDiamonds || 0),
     }));
-  }, [activeLiveRoom, appSection]);
+  }, [activeLiveRoom, appSection, isLiveStreamMinimized]);
 
 
   // ---- হ্যান্ডলার: Agora RTC (cleanupAgoraSession) ----
@@ -5197,9 +5197,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   }, [isStreamCameraOff]);
 
 
-  // ---- ইফেক্ট: useEffect — if (appSection !== "stream" || !activeLiveRoom?.agora) { ----
+  // ---- ইফেক্ট: useEffect — if ((appSection !== "stream" && !isLiveStreamMinimized) || !activeLiveRoom?.agora) { ----
   useEffect(() => {
-    if (appSection !== "stream" || !activeLiveRoom?.agora) {
+    if ((appSection !== "stream" && !isLiveStreamMinimized) || !activeLiveRoom?.agora) {
       void cleanupAgoraSession();
       return;
     }
@@ -5448,7 +5448,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       window.clearInterval(cohostMediaInterval);
       void cleanupAgoraSession();
     };
-  }, [activeLiveRoom?.id, activeLiveRoom?.agora?.token, appSection, streamRole]);
+  }, [activeLiveRoom?.id, activeLiveRoom?.agora?.token, appSection, streamRole, isLiveStreamMinimized]);
 
 
   // ---- ইফেক্ট: useEffect — liveRemoteVideos.forEach(({ uid, track }) => { ----
@@ -6718,16 +6718,16 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   }, [isLoggedIn]);
 
 
-  // ---- ইফেক্ট: useEffect — if (!activeLiveRoom?.id || appSection !== "stream") return; ----
+  // ---- ইফেক্ট: useEffect — if (!activeLiveRoom?.id || (appSection !== "stream" && !isLiveStreamMinimized)) return; ----
   useEffect(() => {
-    if (!activeLiveRoom?.id || appSection !== "stream") return;
+    if (!activeLiveRoom?.id || (appSection !== "stream" && !isLiveStreamMinimized)) return;
     const timer = setInterval(() => {
       api
         .post(`/api/live-rooms/${activeLiveRoom.id}/heartbeat`, { role: streamRole })
         .catch(() => undefined);
     }, 15000);
     return () => clearInterval(timer);
-  }, [activeLiveRoom?.id, appSection, streamRole]);
+  }, [activeLiveRoom?.id, appSection, streamRole, isLiveStreamMinimized]);
 
   // ---- ইফেক্ট: নতুন viewer join হলে animated banner দেখাও (কমেন্ট বক্সের উপরে বাম সাইডে) ----
   const knownViewerIdsRef = useRef<Set<string> | null>(null);
@@ -12728,7 +12728,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       )}
 
       {/* 1. LEFT SIDE: SMARTPHONE DEVICE CONTAINER FRAME */}
-      <div className="w-full max-w-md h-full max-h-screen bg-[#0c0a1e] flex flex-col relative overflow-hidden transition-all duration-300 shadow-2xl shrink-0 border-r border-[#15112e]/50 z-10">
+      <div className="w-full sm:max-w-md h-full max-h-screen bg-[#0c0a1e] flex flex-col relative overflow-hidden transition-all duration-300 shadow-2xl shrink-0 sm:border-r border-[#15112e]/50 z-10">
         <div className="flex-1 flex flex-col overflow-hidden">
           {bannedEmails.includes(registerEmail.trim().toLowerCase()) ||
           bannedEmails.includes(registerEmail.trim()) ? (
@@ -14188,7 +14188,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   <div
     className={
       isPartyRoomOpen && !isPartyRoomMinimized
-        ? `fixed inset-y-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] z-[80] bg-[#0b091c] text-slate-100 p-2.5 pb-0 overflow-y-auto flex flex-col shadow-[0_0_60px_rgba(0,0,0,0.6)] ring-1 ring-white/5 ${activePartyThemeImg ? "sk-preserve-dark" : ""}`
+        ? `fixed inset-y-0 left-1/2 -translate-x-1/2 w-full max-w-full sm:max-w-md z-[80] bg-[#0b091c] text-slate-100 p-2.5 pb-0 overflow-y-auto flex flex-col shadow-[0_0_60px_rgba(0,0,0,0.6)] ring-1 ring-white/5 ${activePartyThemeImg ? "sk-preserve-dark" : ""}`
         : `bg-[#0b091c] border border-slate-850 p-3 rounded-2xl text-slate-100 flex flex-col relative overflow-hidden ${activePartyThemeImg ? "sk-preserve-dark" : ""}`
     }
     style={
@@ -15262,7 +15262,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           )}
 
           {/* FIX: Bottom bar is fixed to the party screen bottom; parent padding/scroll can no longer leave a visible gap. */}
-          <div className="fixed bottom-0 left-1/2 z-[60] flex w-full max-w-[480px] -translate-x-1/2 items-end gap-2 px-3 pt-0 pb-0 bg-gradient-to-t from-[#050310] via-[#050310]/95 to-[#050310]/70 backdrop-blur border-t border-pink-500/20">
+          <div className="fixed bottom-0 left-1/2 z-[60] flex w-full max-w-full sm:max-w-md -translate-x-1/2 items-end gap-2 px-3 pt-0 pb-0 bg-gradient-to-t from-[#050310] via-[#050310]/95 to-[#050310]/70 backdrop-blur border-t border-pink-500/20">
 
 
             {/* FIX (UI parity): inline comment input removed; replaced by
@@ -27416,7 +27416,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               {/* BOTTOM PREMIUM GEM NAV BAR — image reference (exact match) */}
               {appSection !== "stream" && !isCommentInputPopupOpen && !isPartyCommentPopupOpen && (
                 <div
-                  className="relative w-screen max-w-full select-none shrink-0 overflow-visible"
+                  className="relative w-full max-w-full select-none shrink-0 overflow-visible"
                 >
                   <img
                     src={navGemBarImg}
