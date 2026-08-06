@@ -12378,6 +12378,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     for (let sNum = 1; sNum <= maxGuestSeats + 1; sNum++) {
       seatCoinsSum += Number(partySeatSessionCoins[sNum] || 0);
     }
+    let userCoinsSum = 0;
+    Object.entries(partySeatSessionCoins).forEach(([k, v]) => {
+      if (k.startsWith("u_")) {
+        userCoinsSum += Number(v || 0);
+      }
+    });
     const backend = Number(
       (activePartyRoom as any)?.totalCoins ??
       (activePartyRoom as any)?.total_coins ??
@@ -12385,7 +12391,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       (activePartyRoom as any)?.room_coins ??
       0
     );
-    return Math.max(localGiftersSum, seatCoinsSum, backend);
+    return Math.max(localGiftersSum, seatCoinsSum, userCoinsSum, backend);
   }, [partyGifterList, partySeatSessionCoins, activePartyRoom, partyGifterTick, maxGuestSeats]);
   const defaultPartySeatAvatars: GiftItem[] = [
     { id: "seat-unicorn", name: "Unicorn", diamonds: 100, rCoins: 100, icon: "🦄", category: "seat_avatar" },
@@ -15040,10 +15046,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   const seatUid = seat.userId ? Number(seat.userId) : null;
                   const seatNum = idx + 1;
                   const isHostSeat = isCrown || Boolean(seat.occupant && _hostId != null && seatUid === _hostId);
-                  const seatCoinsFromSession =
-                    (partySeatSessionCoins[seatNum] || 0) ||
-                    (seatUid ? (partySeatSessionCoins[`u_${seatUid}`] || 0) : 0) ||
-                    0;
+                  const userSessionCoins = seatUid ? Number(partySeatSessionCoins[`u_${seatUid}`] || 0) : 0;
+                  const seatCoinsFromSession = seatUid
+                    ? (userSessionCoins > 0 ? userSessionCoins : Number(partySeatSessionCoins[seatNum] || 0))
+                    : 0;
                   const seatCoinsFromObj = Number(
                     (seat as any)?.coins ??
                     (seat as any)?.seatCoins ??
