@@ -3437,6 +3437,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // Batch 2: Session-scoped coins received per seat (persisted per room ID so re-joining the same room restores coins).
   const [partySeatSessionCoins, setPartySeatSessionCoins] = useState<Record<number, number>>({});
   const activePartyRoomIdRef = useRef<number | string | null>(null);
+  const processedGiftMsgsRef = useRef<Set<string>>(new Set());
 
   const getStoredPartyRoomCoins = (roomId: number | string): Record<number, number> => {
     if (!roomId) return {};
@@ -3538,6 +3539,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // never linger into a new room / new session.
   useEffect(() => {
     activePartyRoomIdRef.current = activePartyRoom?.id ?? null;
+    processedGiftMsgsRef.current.clear();
     if (isPartyRoomOpen && activePartyRoom?.id) {
       const storedCoins = getStoredPartyRoomCoins(activePartyRoom.id);
       setPartySeatSessionCoins(storedCoins);
@@ -8230,6 +8232,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
       if (!isGift) return;
 
+      // Unique message key to prevent re-processing identical messages across renders
+      const msgId = m?.id != null ? String(m.id) : null;
+      const msgKey = msgId ? `id_${msgId}` : `txt_${m?.name || m?.userName || ''}_${text.trim()}`;
+
+      if (processedGiftMsgsRef.current.has(msgKey)) {
+        return; // Already processed this message, skip to avoid compounding coins
+      }
+      processedGiftMsgsRef.current.add(msgKey);
+
       const giverName = String(m?.name ?? m?.userName ?? m?.user_name ?? "Guest");
       const giverAvatar = String(m?.avatar ?? m?.avatarUrl ?? m?.icon ?? "🎁");
 
@@ -12350,7 +12361,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
   const partyEarnedCoins = React.useMemo(() => {
     const localGiftersSum = partyGifterList.reduce((sum, g) => sum + (g.totalSpent || 0), 0);
-    const seatCoinsSum = Object.values(partySeatSessionCoins).reduce((sum, c) => sum + (c || 0), 0);
+    let seatCoinsSum = 0;
+    for (let sNum = 1; sNum <= maxGuestSeats + 1; sNum++) {
+      seatCoinsSum += Number(partySeatSessionCoins[sNum] || 0);
+    }
     const backend = Number(
       (activePartyRoom as any)?.totalCoins ??
       (activePartyRoom as any)?.total_coins ??
@@ -12359,7 +12373,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       0
     );
     return Math.max(localGiftersSum, seatCoinsSum, backend);
-  }, [partyGifterList, partySeatSessionCoins, activePartyRoom, partyGifterTick]);
+  }, [partyGifterList, partySeatSessionCoins, activePartyRoom, partyGifterTick, maxGuestSeats]);
   const defaultPartySeatAvatars: GiftItem[] = [
     { id: "seat-unicorn", name: "Unicorn", diamonds: 100, rCoins: 100, icon: "🦄", category: "seat_avatar" },
     { id: "seat-car", name: "Car", diamonds: 300, rCoins: 300, icon: "🏎️", category: "seat_avatar" },
