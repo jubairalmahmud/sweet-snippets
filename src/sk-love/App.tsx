@@ -8077,9 +8077,21 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         );
         if (event.receiverId) {
           const rxId = Number(event.receiverId);
+          let targetSeatNum = 1;
+          if (partySeats && partySeats.length > 0) {
+            const foundIdx = partySeats.findIndex(
+              (s) => Number(s?.userId || s?.uid || 0) === rxId,
+            );
+            if (foundIdx >= 0) targetSeatNum = foundIdx + 1;
+          }
           setPartySeatSessionCoins((prev) => {
-            const nextCoins = (prev[rxId] || 0) + coins;
-            const nextMap = { ...prev, [rxId]: nextCoins };
+            const nextSeatCoins = (prev[targetSeatNum] || 0) + coins;
+            const nextUserCoins = (prev[`u_${rxId}`] || 0) + coins;
+            const nextMap = {
+              ...prev,
+              [targetSeatNum]: nextSeatCoins,
+              [`u_${rxId}`]: nextUserCoins,
+            };
             const rId = activePartyRoomIdRef.current || activePartyRoom?.id;
             if (rId) {
               saveStoredPartyRoomCoins(rId, nextMap);
@@ -8304,13 +8316,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
         if (matchedSeat) {
           if (matchedSeat.userId) {
-            newCoinsMap[matchedSeat.userId] = (newCoinsMap[matchedSeat.userId] || 0) + coinsPerTarget;
+            const uKey = `u_${matchedSeat.userId}`;
+            newCoinsMap[uKey] = (newCoinsMap[uKey] || 0) + coinsPerTarget;
           }
           newCoinsMap[matchedSeat.seatNum] = (newCoinsMap[matchedSeat.seatNum] || 0) + coinsPerTarget;
         } else if (key === hostNameStr || key === "host") {
           const hostSeat = currentSeats[0];
           if (hostSeat?.userId) {
-            newCoinsMap[Number(hostSeat.userId)] = (newCoinsMap[Number(hostSeat.userId)] || 0) + coinsPerTarget;
+            const uKey = `u_${hostSeat.userId}`;
+            newCoinsMap[uKey] = (newCoinsMap[uKey] || 0) + coinsPerTarget;
           }
           newCoinsMap[1] = (newCoinsMap[1] || 0) + coinsPerTarget;
         } else {
@@ -8331,10 +8345,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         let changed = false;
         const merged = { ...prev };
         Object.entries(newCoinsMap).forEach(([k, v]) => {
-          const key = Number(k);
           const val = Number(v);
-          if (val > 0 && (merged[key] === undefined || merged[key] < val)) {
-            merged[key] = val;
+          if (val > 0 && (merged[k] === undefined || merged[k] < val)) {
+            merged[k] = val;
             changed = true;
           }
         });
@@ -15028,8 +15041,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   const seatNum = idx + 1;
                   const isHostSeat = isCrown || Boolean(seat.occupant && _hostId != null && seatUid === _hostId);
                   const seatCoinsFromSession =
-                    (seatUid ? (partySeatSessionCoins[seatUid] || 0) : 0) ||
                     (partySeatSessionCoins[seatNum] || 0) ||
+                    (seatUid ? (partySeatSessionCoins[`u_${seatUid}`] || 0) : 0) ||
                     0;
                   const seatCoinsFromObj = Number(
                     (seat as any)?.coins ??
