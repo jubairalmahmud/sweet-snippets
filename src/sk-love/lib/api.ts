@@ -1,10 +1,10 @@
 // @ts-nocheck
 // Centralized Laravel API client for SK Love with Dual / Failover Server Support.
-// Primary: https://api.keno70.com (or user config)
-// Failover Backup: https://api.sklove.nit.bd
+// Primary: https://api.sklove.nit.bd
+// Failover Backup: https://api.keno70.com
 
-export const DEFAULT_PRIMARY_API = "https://api.keno70.com";
-export const DEFAULT_BACKUP_API = "https://api.sklove.nit.bd";
+export const DEFAULT_PRIMARY_API = "https://api.sklove.nit.bd";
+export const DEFAULT_BACKUP_API = "https://api.keno70.com";
 
 export function cleanBaseUrl(url: string | null | undefined): string {
   if (!url) return "";
