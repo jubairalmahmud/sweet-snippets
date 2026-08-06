@@ -97,15 +97,17 @@ class GameController extends Controller
     {
         $u = Auth::user();
         if (!$u) return response()->json(['ok' => false, 'message' => 'Unauthorized'], 401);
+        $bal = (int) ($u->diamonds ?? 0);
         return response()->json([
-            'ok'    => true,
-            'coins' => (int) ($u->diamonds ?? $u->coins ?? 0),
+            'ok'       => true,
+            'coins'    => $bal,
+            'diamonds' => $bal,
         ]);
     }
 
     /**
-     * POST /api/games/{game}/round
-     * Body: { bets: [{ target: string, amount: int }, ...], client_seed?: string }
+     * POST /api/games/{game}/round or /api/games/{game}/play
+     * Body: { bets: [{ target: string, amount: int }, ...] or { targetKey: amount, ... }, client_seed?: string }
      * Deducts total bet, rolls result server-side, credits payout, returns full round.
      */
     public function play(Request $request, string $game): JsonResponse
@@ -113,28 +115,48 @@ class GameController extends Controller
         $user = Auth::user();
         if (!$user) return response()->json(['ok' => false, 'message' => 'Unauthorized'], 401);
 
-        if (!in_array($game, ['casino', 'ferry_wheel', 'teen_patti'], true)) {
-            return response()->json(['ok' => false, 'message' => 'Unknown game'], 404);
+        if ($game === 'ferry_wheel') $game = 'ferry';
+        if ($game === 'teen_patti')  $game = 'teenpatti';
+
+        if (!in_array($game, ['casino', 'ferry', 'teenpatti'], true)) {
+            return response()->json(['ok' => false, 'message' => 'Unknown game: ' . $game], 404);
         }
 
-        $bets = $request->input('bets', []);
-        if (!is_array($bets) || count($bets) === 0) {
-            return response()->json(['ok' => false, 'message' => 'No bets provided'], 422);
+        $rawBets = $request->input('bets', []);
+        if (!is_array($rawBets) || count($rawBets) === 0) {
+            $rawBets = $request->input('bets_array', []);
         }
 
-        // Normalize & validate bets
-        $clean   = [];
+        // Normalize & validate bets across array of objects AND key-value map formats
+        $clean    = [];
         $betTotal = 0;
-        foreach ($bets as $b) {
-            $target = isset($b['target']) ? (string) $b['target'] : '';
-            $amount = (int) ($b['amount'] ?? 0);
-            if ($target === '' || $amount <= 0) continue;
-            if (!$this->isValidTarget($game, $target)) {
-                return response()->json(['ok' => false, 'message' => "Invalid target: $target"], 422);
+
+        if (is_array($rawBets)) {
+            foreach ($rawBets as $k => $v) {
+                $target = '';
+                $amount = 0;
+
+                if (is_array($v) && isset($v['target'])) {
+                    $target = (string) $v['target'];
+                    $amount = (int) ($v['amount'] ?? 0);
+                } else if (is_array($v) && isset($v['amount'])) {
+                    $target = (string) $k;
+                    $amount = (int) $v['amount'];
+                } else if (is_numeric($v)) {
+                    $target = (string) $k;
+                    $amount = (int) $v;
+                }
+
+                if ($target === '' || $amount <= 0) continue;
+                if (!$this->isValidTarget($game, $target)) {
+                    continue;
+                }
+
+                $clean[]   = ['target' => $target, 'amount' => $amount];
+                $betTotal += $amount;
             }
-            $clean[]   = ['target' => $target, 'amount' => $amount];
-            $betTotal += $amount;
         }
+
         if ($betTotal <= 0) {
             return response()->json(['ok' => false, 'message' => 'Bet total must be > 0'], 422);
         }
@@ -153,7 +175,7 @@ class GameController extends Controller
                 if (!$row) {
                     return response()->json(['ok' => false, 'message' => 'User not found'], 404);
                 }
-                $balanceBefore = (int) ($row->diamonds ?? $row->coins ?? 0);
+                $balanceBefore = (int) ($row->diamonds ?? 0);
                 if ($balanceBefore < $betTotal) {
                     return response()->json(['ok' => false, 'message' => 'Insufficient coins'], 402);
                 }
@@ -203,7 +225,10 @@ class GameController extends Controller
                         'client_seed'    => $clientSeed,
                         'nonce'          => $nonce,
                     ],
-                    'coins'   => $newBalance,
+                    'coins'    => $newBalance,
+                    'diamonds' => $newBalance,
+                    'payout'   => $payout,
+                    'win'      => $payout,
                 ]);
             });
         } catch (\Throwable $e) {
@@ -218,7 +243,11 @@ class GameController extends Controller
     {
         $user = Auth::user();
         if (!$user) return response()->json(['ok' => false, 'message' => 'Unauthorized'], 401);
-        if (!in_array($game, ['casino', 'ferry_wheel', 'teen_patti'], true)) {
+
+        if ($game === 'ferry_wheel') $game = 'ferry';
+        if ($game === 'teen_patti')  $game = 'teenpatti';
+
+        if (!in_array($game, ['casino', 'ferry', 'teenpatti'], true)) {
             return response()->json(['ok' => false, 'message' => 'Unknown game'], 404);
         }
 
@@ -254,18 +283,20 @@ class GameController extends Controller
     private function isValidTarget(string $game, string $target): bool
     {
         if ($game === 'casino') {
-            if (in_array($target, ['red','black','odd','even','low','high'], true)) return true;
+            if (in_array($target, ['red','black','odd','even','low','high','d1','d2','d3','green'], true)) return true;
             if (ctype_digit($target)) {
                 $n = (int) $target;
                 return $n >= 0 && $n <= 36;
             }
             return false;
         }
-        if ($game === 'ferry_wheel') {
-            foreach (self::FERRY_SLOTS as $s) if ($s['key'] === $target) return true;
+        if ($game === 'ferry' || $game === 'ferry_wheel') {
+            foreach (self::FERRY_SLOTS as $idx => $s) {
+                if ($s['key'] === $target || $target === "slot_$idx" || $target === (string)$idx) return true;
+            }
             return false;
         }
-        if ($game === 'teen_patti') {
+        if ($game === 'teenpatti' || $game === 'teen_patti') {
             return in_array($target, ['A','B','C'], true);
         }
         return false;
@@ -294,21 +325,20 @@ class GameController extends Controller
     {
         $h    = hash('sha256', $serverSeed . ':' . $clientSeed . ':' . $nonce);
         $intA = hexdec(substr($h, 0, 8));
-        $intB = hexdec(substr($h, 8, 8));
-        $intC = hexdec(substr($h, 16, 8));
 
         if ($game === 'casino') {
             $n = $intA % 37; // 0..36
             $color = $n === 0 ? 'green' : (in_array($n, self::ROULETTE_RED, true) ? 'red' : 'black');
             return [
-                'number' => $n,
-                'color'  => $color,
-                'parity' => $n === 0 ? null : ($n % 2 === 0 ? 'even' : 'odd'),
-                'half'   => $n === 0 ? null : ($n <= 18 ? 'low' : 'high'),
+                'number'        => $n,
+                'result_number' => $n,
+                'color'         => $color,
+                'parity'        => $n === 0 ? null : ($n % 2 === 0 ? 'even' : 'odd'),
+                'half'          => $n === 0 ? null : ($n <= 18 ? 'low' : 'high'),
             ];
         }
 
-        if ($game === 'ferry_wheel') {
+        if ($game === 'ferry' || $game === 'ferry_wheel') {
             $totalW = array_sum(self::FERRY_WEIGHTS);
             $pick   = ($intA % $totalW) + 1;
             $acc = 0;
@@ -318,10 +348,17 @@ class GameController extends Controller
                 if ($pick <= $acc) { $idx = $i; break; }
             }
             $slot = self::FERRY_SLOTS[$idx];
-            return ['slot' => $slot['key'], 'label' => $slot['label'], 'mult' => $slot['mult']];
+            return [
+                'slot'         => $slot['key'],
+                'slot_index'   => $idx,
+                'result_index' => $idx,
+                'index'        => $idx,
+                'label'        => $slot['label'],
+                'mult'         => $slot['mult'],
+            ];
         }
 
-        // teen_patti — simulate three 3-card hands, highest wins
+        // teenpatti — simulate three 3-card hands, highest wins
         $deck = [];
         for ($s = 0; $s < 4; $s++) for ($r = 2; $r <= 14; $r++) $deck[] = ['s' => $s, 'r' => $r];
         // seeded shuffle using multiple hash draws
@@ -342,7 +379,11 @@ class GameController extends Controller
         $winner = array_key_first($scores);
         return [
             'winner' => $winner,
-            'hands'  => $hands,
+            'hands'  => [
+                'A' => ['cards' => $hands['A'], 'label' => 'Hand A'],
+                'B' => ['cards' => $hands['B'], 'label' => 'Hand B'],
+                'C' => ['cards' => $hands['C'], 'label' => 'Hand C'],
+            ],
             'scores' => $scores,
         ];
     }
@@ -384,31 +425,45 @@ class GameController extends Controller
                     if ((int) $t === $n) $payout += $a * 36;
                     continue;
                 }
-                if ($n === 0) continue; // outside bets lose on green
+                if ($n === 0) {
+                    if ($t === 'green') $payout += $a * 36;
+                    continue; // outside bets lose on green
+                }
                 $win = match ($t) {
                     'red'   => $color === 'red',
                     'black' => $color === 'black',
+                    'green' => $color === 'green',
                     'odd'   => $parity === 'odd',
                     'even'  => $parity === 'even',
                     'low'   => $half === 'low',
                     'high'  => $half === 'high',
+                    'd1'    => $n >= 1 && $n <= 12,
+                    'd2'    => $n >= 13 && $n <= 24,
+                    'd3'    => $n >= 25 && $n <= 36,
                     default => false,
                 };
-                if ($win) $payout += $a * 2;
+                if ($win) {
+                    $mult = in_array($t, ['d1','d2','d3'], true) ? 3 : 2;
+                    $payout += $a * $mult;
+                }
             }
             return $payout;
         }
 
-        if ($game === 'ferry_wheel') {
+        if ($game === 'ferry' || $game === 'ferry_wheel') {
             $winSlot = $result['slot'];
+            $winIdx  = (int) $result['slot_index'];
             $mult    = (int) $result['mult'];
             foreach ($bets as $b) {
-                if ($b['target'] === $winSlot) $payout += (int) $b['amount'] * $mult;
+                $t = $b['target'];
+                if ($t === $winSlot || $t === "slot_$winIdx" || $t === (string)$winIdx) {
+                    $payout += (int) $b['amount'] * $mult;
+                }
             }
             return $payout;
         }
 
-        if ($game === 'teen_patti') {
+        if ($game === 'teenpatti' || $game === 'teen_patti') {
             $winner = $result['winner'];
             foreach ($bets as $b) {
                 if ($b['target'] === $winner) $payout += (int) $b['amount'] * 2;

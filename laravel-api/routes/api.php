@@ -92,9 +92,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/games/balance',          [GameController::class, 'balance']);
     Route::post('/games/{game}/play',     [GameController::class, 'play'])
-        ->where('game', 'casino|ferry|teenpatti');
+        ->where('game', 'casino|ferry|ferry_wheel|teenpatti|teen_patti');
     Route::get('/games/{game}/history',   [GameController::class, 'history'])
-        ->where('game', 'casino|ferry|teenpatti');
+        ->where('game', 'casino|ferry|ferry_wheel|teenpatti|teen_patti');
 
         
 
