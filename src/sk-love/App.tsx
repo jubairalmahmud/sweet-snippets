@@ -7996,6 +7996,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           void fetchUserWalletData();
         }
       });
+
+    // FIX: Sync historical room gifts, seat coins, gifter totals, and room points for new entrants
+    syncPartyRoomGiftsAndCoins(room);
   };
 
   // FIX #3 + #4: Play queued broadcast events one after another so that
@@ -8120,6 +8123,115 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       return changed ? { ...leader } : current;
     });
     setPartyGifterTick((t) => t + 1);
+  };
+
+  // Helper: Sync historical gift/coin data for seats, gifters, and total room coins from room server payload & messages
+  const syncPartyRoomGiftsAndCoins = (room: any) => {
+    if (!room) return;
+    const newCoinsMap: Record<number, number> = {};
+
+    // 1. Process seats array from server
+    const seats = Array.isArray(room.seats) ? room.seats : [];
+    seats.forEach((s: any) => {
+      const uId = Number(s.userId ?? s.user_id ?? s.uid ?? s.user?.id ?? 0);
+      const rawSeatNum = s.seatNum ?? s.seat_num ?? s.number ?? s.seat;
+      const sNum = Number(rawSeatNum || 0);
+      const c = Number(
+        s.coins ??
+        s.seatCoins ??
+        s.seat_coins ??
+        s.totalCoins ??
+        s.total_coins ??
+        s.stars ??
+        s.diamonds ??
+        s.rCoins ??
+        s.userCoins ??
+        0
+      );
+      if (c > 0) {
+        if (uId > 0) newCoinsMap[uId] = Math.max(newCoinsMap[uId] || 0, c);
+        if (sNum > 0) newCoinsMap[sNum] = Math.max(newCoinsMap[sNum] || 0, c);
+      }
+    });
+
+    // 2. Process room-level userCoins or seatCoins object
+    const roomUserCoins =
+      room.userCoins ??
+      room.user_coins ??
+      room.seatCoins ??
+      room.seat_coins ??
+      room.userTotals ??
+      null;
+    if (roomUserCoins && typeof roomUserCoins === "object") {
+      Object.entries(roomUserCoins).forEach(([k, v]) => {
+        const idKey = Number(k);
+        const val = Number(v || 0);
+        if (idKey > 0 && val > 0) {
+          newCoinsMap[idKey] = Math.max(newCoinsMap[idKey] || 0, val);
+        }
+      });
+    }
+
+    // 3. Process gifter totals from server
+    const gifters = Array.isArray(room.gifters ?? room.gifterTotals ?? room.gifters_list)
+      ? (room.gifters ?? room.gifterTotals ?? room.gifters_list)
+      : [];
+    gifters.forEach((g: any) => {
+      if (g && g.name) {
+        recordPartyGifter(
+          String(g.name),
+          String(g.avatar || g.icon || "🎁"),
+          Number(g.totalSpent ?? g.coins ?? g.amount ?? 0)
+        );
+      }
+    });
+
+    // 4. Parse chat history / comments for past gift messages
+    const chatMsgs = Array.isArray(room.messages ?? room.chat ?? room.comments)
+      ? (room.messages ?? room.chat ?? room.comments)
+      : [];
+    chatMsgs.forEach((m: any) => {
+      const text = String(m?.text ?? m?.body ?? m?.message ?? "");
+      if (!text) return;
+      const giverName = String(m?.name ?? m?.userName ?? m?.user_name ?? "Guest");
+      const giverAvatar = String(m?.avatar ?? m?.avatarUrl ?? m?.icon ?? "🎁");
+
+      const isGift =
+        text.includes("🎁") ||
+        text.toLowerCase().includes("sent ") ||
+        text.toLowerCase().includes("gift");
+      if (isGift) {
+        const match = text.match(/(\d+)\s*(diamonds|coins|rCoins|pts|R)?/i);
+        if (match) {
+          const amt = Number(match[1]);
+          if (amt > 0 && amt <= 1000000) {
+            recordPartyGifter(giverName, giverAvatar, amt);
+          }
+        }
+      }
+    });
+
+    // 5. Save and merge into partySeatSessionCoins
+    if (Object.keys(newCoinsMap).length > 0) {
+      setPartySeatSessionCoins((prev) => {
+        let changed = false;
+        const merged = { ...prev };
+        Object.entries(newCoinsMap).forEach(([k, v]) => {
+          const key = Number(k);
+          const val = Number(v);
+          if (val > 0 && (merged[key] === undefined || merged[key] < val)) {
+            merged[key] = val;
+            changed = true;
+          }
+        });
+        const rId = activePartyRoomIdRef.current || room?.id;
+        if (rId && changed) {
+          saveStoredPartyRoomCoins(rId, merged);
+        }
+        return changed ? merged : prev;
+      });
+      setPartyGifterTick((t) => t + 1);
+    }
   };
 
 
@@ -14795,9 +14907,31 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   const _emojiRaw = seatEmojiOverlay[idx];
                   const emojiOverlay =
                     _emojiRaw && _emojiRaw.until > Date.now() ? _emojiRaw : null;
-                  const seatCoins = seat.userId
-                    ? partySeatSessionCoins[Number(seat.userId)] || 0
+                  const seatUid = seat.userId ? Number(seat.userId) : null;
+                  const seatNum = idx + 1;
+                  const isHostSeat = isCrown || Boolean(seat.occupant && _hostId != null && seatUid === _hostId);
+                  const seatCoinsFromSession =
+                    (seatUid ? (partySeatSessionCoins[seatUid] || 0) : 0) ||
+                    (partySeatSessionCoins[seatNum] || 0) ||
+                    0;
+                  const seatCoinsFromObj = Number(
+                    (seat as any)?.coins ??
+                    (seat as any)?.seatCoins ??
+                    (seat as any)?.seat_coins ??
+                    (seat as any)?.totalCoins ??
+                    (seat as any)?.total_coins ??
+                    (seat as any)?.stars ??
+                    0
+                  );
+                  const hostCoinsFallback = isHostSeat
+                    ? Number(
+                        (activePartyRoom as any)?.hostCoins ??
+                        (activePartyRoom as any)?.host_coins ??
+                        (activePartyRoom as any)?.host_stars ??
+                        0
+                      )
                     : 0;
+                  const seatCoins = Math.max(seatCoinsFromSession, seatCoinsFromObj, hostCoinsFallback);
                   const optimisticSelfSeat = optimisticPartySeatRef.current;
                   const isSelf =
                     (seat.userId &&
