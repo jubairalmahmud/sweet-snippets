@@ -5197,9 +5197,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   }, [isStreamCameraOff]);
 
 
-  // ---- ইফেক্ট: useEffect — if ((appSection !== "stream" && !isLiveStreamMinimized) || !activeLiveRoom?.agora) { ----
+  // ---- ইফেক্ট: useEffect — connect Agora session when activeLiveRoom has token ----
   useEffect(() => {
-    if ((appSection !== "stream" && !isLiveStreamMinimized) || !activeLiveRoom?.agora) {
+    if (!activeLiveRoom?.agora) {
       void cleanupAgoraSession();
       return;
     }
@@ -5448,7 +5448,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       window.clearInterval(cohostMediaInterval);
       void cleanupAgoraSession();
     };
-  }, [activeLiveRoom?.id, activeLiveRoom?.agora?.token, appSection, streamRole, isLiveStreamMinimized]);
+  }, [activeLiveRoom?.id, activeLiveRoom?.agora?.token, streamRole]);
 
 
   // ---- ইফেক্ট: useEffect — liveRemoteVideos.forEach(({ uid, track }) => { ----
@@ -6821,9 +6821,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   }, [isPartyRoomOpen, activePartyRoom?.id, activePartyRoom?.hostId]);
 
 
-  // ---- ইফেক্ট: useEffect — if (!activeLiveRoom?.id || appSection !== "stream") return; ----
+  // ---- ইফেক্ট: useEffect — poll live room status as long as activeLiveRoom exists ----
   useEffect(() => {
-    if (!activeLiveRoom?.id || appSection !== "stream") return;
+    if (!activeLiveRoom?.id) return;
     const roomId = activeLiveRoom.id;
     const timer = setInterval(() => {
       api
@@ -6847,25 +6847,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         .catch(() => undefined);
     }, 3500);
     return () => clearInterval(timer);
-  }, [activeLiveRoom?.id, appSection]);
-
-
-  // ---- ইফেক্ট: useEffect — if (!activeLiveRoom?.id || appSection === "stream") return; ----
-  useEffect(() => {
-    if (!activeLiveRoom?.id || appSection === "stream") return;
-    const roomId = activeLiveRoom.id;
-    const role = streamRole;
-    setActiveLiveRoom(null);
-    void cleanupAgoraSession();
-    if (role === "streamer") {
-      api.post(`/api/live-rooms/${roomId}/end`).finally(() => void refreshLiveRooms());
-    } else {
-      if (role === "cohost") {
-        void api.post(`/api/live-rooms/${roomId}/cohosts/leave`).catch(() => undefined);
-      }
-      api.post(`/api/live-rooms/${roomId}/leave`).finally(() => void refreshLiveRooms());
-    }
-  }, [appSection, activeLiveRoom?.id, streamRole]);
+  }, [activeLiveRoom?.id]);
 
 
   // ---- হ্যান্ডলার: লাইভ রুম (spawnLiveReaction) ----
