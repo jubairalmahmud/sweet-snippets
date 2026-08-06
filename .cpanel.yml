@@ -1,0 +1,11 @@
+---
+deployment:
+  tasks:
+    # Target paths in cPanel hosting
+    - export FRONTEND_PATH=/home/national/sklove.nit.bd
+    - export BACKEND_PATH=/home/national/api.sklove.nit.bd
+    # 1. Deploy Frontend (React SPA dist) to sklove.nit.bd
+    - /bin/cp -R dist/* $FRONTEND_PATH/
+    - if [ -f "dist/.htaccess" ]; then /bin/cp dist/.htaccess $FRONTEND_PATH/.htaccess; elif [ -f "public/.htaccess" ]; then /bin/cp public/.htaccess $FRONTEND_PATH/.htaccess; fi
+    # 2. Deploy Laravel API Backend to api.sklove.nit.bd (if exists)
+    - if [ -d "laravel-api" ]; then /bin/cp -R laravel-api/. $BACKEND_PATH/; fi
