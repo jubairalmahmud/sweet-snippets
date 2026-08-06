@@ -5097,7 +5097,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     if (streamRole !== "streamer" || !activeLiveRoom) return;
     // NOTE: minimize alone must NOT turn the camera off — the live must keep running.
     // Only turn the camera off when the host actually navigates away from the stream section.
-    if (appSection !== "stream") {
+    if (appSection !== "stream" && !isLiveStreamMinimized) {
       setIsStreamCameraOff(true);
     }
   }, [appSection, streamRole, activeLiveRoom]);
@@ -5204,7 +5204,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
   // ---- ইফেক্ট: useEffect — if (appSection !== "stream" || !activeLiveRoom?.agora) { ----
   useEffect(() => {
-    if (appSection !== "stream" || !activeLiveRoom?.agora) {
+    if (!activeLiveRoom?.id || !activeLiveRoom?.agora) {
       void cleanupAgoraSession();
       return;
     }
@@ -5453,7 +5453,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       window.clearInterval(cohostMediaInterval);
       void cleanupAgoraSession();
     };
-  }, [activeLiveRoom?.id, activeLiveRoom?.agora?.token, appSection, streamRole]);
+  }, [activeLiveRoom?.id, activeLiveRoom?.agora?.token, streamRole]);
 
 
   // ---- ইফেক্ট: useEffect — liveRemoteVideos.forEach(({ uid, track }) => { ----
@@ -6723,9 +6723,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   }, [isLoggedIn]);
 
 
-  // ---- ইফেক্ট: useEffect — if (!activeLiveRoom?.id || appSection !== "stream") return; ----
+  // ---- ইফেক্ট: useEffect — if (!activeLiveRoom?.id) return; ----
   useEffect(() => {
-    if (!activeLiveRoom?.id || appSection !== "stream") return;
+    if (!activeLiveRoom?.id) return;
     const timer = setInterval(() => {
       api
         .post(`/api/live-rooms/${activeLiveRoom.id}/heartbeat`, { role: streamRole })
@@ -6756,7 +6756,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     ]);
   };
   useEffect(() => {
-    if (!activeLiveRoom?.id || appSection !== "stream") {
+    if (!activeLiveRoom?.id) {
       knownViewerIdsRef.current = null;
       return;
     }
@@ -6826,9 +6826,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   }, [isPartyRoomOpen, activePartyRoom?.id, activePartyRoom?.hostId]);
 
 
-  // ---- ইফেক্ট: useEffect — if (!activeLiveRoom?.id || appSection !== "stream") return; ----
+  // ---- ইফেক্ট: useEffect — if (!activeLiveRoom?.id) return; ----
   useEffect(() => {
-    if (!activeLiveRoom?.id || appSection !== "stream") return;
+    if (!activeLiveRoom?.id) return;
     const roomId = activeLiveRoom.id;
     const timer = setInterval(() => {
       api
@@ -6855,22 +6855,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   }, [activeLiveRoom?.id, appSection]);
 
 
-  // ---- ইফেক্ট: useEffect — if (!activeLiveRoom?.id || appSection === "stream") return; ----
-  useEffect(() => {
-    if (!activeLiveRoom?.id || appSection === "stream") return;
-    const roomId = activeLiveRoom.id;
-    const role = streamRole;
-    setActiveLiveRoom(null);
-    void cleanupAgoraSession();
-    if (role === "streamer") {
-      api.post(`/api/live-rooms/${roomId}/end`).finally(() => void refreshLiveRooms());
-    } else {
-      if (role === "cohost") {
-        void api.post(`/api/live-rooms/${roomId}/cohosts/leave`).catch(() => undefined);
-      }
-      api.post(`/api/live-rooms/${roomId}/leave`).finally(() => void refreshLiveRooms());
-    }
-  }, [appSection, activeLiveRoom?.id, streamRole]);
+  // Auto-leave removed so minimizing or navigating does NOT close the stream.
 
 
   // ---- হ্যান্ডলার: লাইভ রুম (spawnLiveReaction) ----
@@ -6916,7 +6901,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       },
     ]);
 
-    if (!activeLiveRoom?.id || appSection !== "stream") return;
+    if (!activeLiveRoom?.id) return;
     try {
       const res: any = await api.post(`/api/live-rooms/${activeLiveRoom.id}/messages`, {
         body: emoji,
@@ -6999,7 +6984,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
   // ---- হ্যান্ডলার: লাইভ রুম (refreshLiveRoomMessages) ----
   const refreshLiveRoomMessages = async () => {
-    if (!activeLiveRoom?.id || appSection !== "stream") return;
+    if (!activeLiveRoom?.id) return;
     try {
       const afterId = Math.max(0, ...Array.from(liveRoomMessageIdsRef.current));
       const res: any = await api.get(
@@ -7012,9 +6997,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   };
 
 
-  // ---- ইফেক্ট: useEffect — if (!activeLiveRoom?.id || appSection !== "stream") return; ----
+  // ---- ইফেক্ট: useEffect — if (!activeLiveRoom?.id) return; ----
   useEffect(() => {
-    if (!activeLiveRoom?.id || appSection !== "stream") return;
+    if (!activeLiveRoom?.id) return;
     liveRoomMessageIdsRef.current = new Set();
     setComments([]);
     void refreshLiveRoomMessages();
@@ -10821,9 +10806,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   };
 
 
-  // ---- ইফেক্ট: useEffect — if (!activeLiveRoom?.id || appSection !== "stream") return; ----
+  // ---- ইফেক্ট: useEffect — if (!activeLiveRoom?.id) return; ----
   useEffect(() => {
-    if (!activeLiveRoom?.id || appSection !== "stream") return;
+    if (!activeLiveRoom?.id) return;
 
     // Grace counter: require 2 consecutive "not approved" polls before evicting the
     // cohost. This prevents transient server races (e.g. right after toggling the
