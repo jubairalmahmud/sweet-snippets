@@ -3573,6 +3573,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   const [partyChatMessages, setPartyChatMessages] = useState<PartyChatMsg[]>([]);
   const [partyChatDraft, setPartyChatDraft] = useState<string>("");
   const [partyChatReplyTo, setPartyChatReplyTo] = useState<PartyChatMsg | null>(null);
+
+  // Auto-sync seat coins, top gifters, and room total points from chat history for all viewers
+  useEffect(() => {
+    if (isPartyRoomOpen) {
+      syncPartyRoomGiftsAndCoins(activePartyRoom, partyChatMessages, partySeats);
+    }
+  }, [partyChatMessages, isPartyRoomOpen, activePartyRoom?.id, partySeats]);
   // FIX: default 2 comments visible; toggle to show 5-at-a-time with hidden scroll.
   const [isPartyChatExpanded, setIsPartyChatExpanded] = useState<boolean>(false);
   const [isPartyCommentsOpen, setIsPartyCommentsOpen] = useState<boolean>(true);
@@ -8126,12 +8133,16 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   };
 
   // Helper: Sync historical gift/coin data for seats, gifters, and total room coins from room server payload & messages
-  const syncPartyRoomGiftsAndCoins = (room: any) => {
-    if (!room) return;
+  const syncPartyRoomGiftsAndCoins = (
+    room: any = activePartyRoom,
+    chatList: PartyChatMsg[] = partyChatMessages,
+    seatsList: any[] = partySeats,
+  ) => {
+    if (!room && (!chatList || chatList.length === 0)) return;
     const newCoinsMap: Record<number, number> = {};
 
     // 1. Process seats array from server
-    const seats = Array.isArray(room.seats) ? room.seats : [];
+    const seats = Array.isArray(room?.seats) ? room.seats : [];
     seats.forEach((s: any) => {
       const uId = Number(s.userId ?? s.user_id ?? s.uid ?? s.user?.id ?? 0);
       const rawSeatNum = s.seatNum ?? s.seat_num ?? s.number ?? s.seat;
@@ -8156,11 +8167,11 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
     // 2. Process room-level userCoins or seatCoins object
     const roomUserCoins =
-      room.userCoins ??
-      room.user_coins ??
-      room.seatCoins ??
-      room.seat_coins ??
-      room.userTotals ??
+      room?.userCoins ??
+      room?.user_coins ??
+      room?.seatCoins ??
+      room?.seat_coins ??
+      room?.userTotals ??
       null;
     if (roomUserCoins && typeof roomUserCoins === "object") {
       Object.entries(roomUserCoins).forEach(([k, v]) => {
@@ -8173,7 +8184,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     }
 
     // 3. Process gifter totals from server
-    const gifters = Array.isArray(room.gifters ?? room.gifterTotals ?? room.gifters_list)
+    const gifters = Array.isArray(room?.gifters ?? room?.gifterTotals ?? room?.gifters_list)
       ? (room.gifters ?? room.gifterTotals ?? room.gifters_list)
       : [];
     gifters.forEach((g: any) => {
@@ -8186,28 +8197,120 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       }
     });
 
-    // 4. Parse chat history / comments for past gift messages
-    const chatMsgs = Array.isArray(room.messages ?? room.chat ?? room.comments)
+    // 4. Combine server messages and local chat history
+    const serverChatMsgs = Array.isArray(room?.messages ?? room?.chat ?? room?.comments)
       ? (room.messages ?? room.chat ?? room.comments)
       : [];
-    chatMsgs.forEach((m: any) => {
+    const allMsgs = [...serverChatMsgs, ...(chatList || [])];
+
+    // Build occupant name -> seat mapping
+    const occupantSeatMap: Record<string, { seatNum: number; userId: number | null }> = {};
+    const currentSeats = seatsList && seatsList.length > 0 ? seatsList : partySeats;
+    currentSeats.forEach((seat, idx) => {
+      const occupantName = seat?.occupant || seat?.name || seat?.userName;
+      if (occupantName && typeof occupantName === "string") {
+        const key = occupantName.trim().toLowerCase();
+        occupantSeatMap[key] = {
+          seatNum: idx + 1,
+          userId: seat.userId ? Number(seat.userId) : null,
+        };
+      }
+    });
+
+    const hostNameStr = String(room?.hostName || room?.name || "").trim().toLowerCase();
+
+    allMsgs.forEach((m: any) => {
       const text = String(m?.text ?? m?.body ?? m?.message ?? "");
       if (!text) return;
-      const giverName = String(m?.name ?? m?.userName ?? m?.user_name ?? "Guest");
-      const giverAvatar = String(m?.avatar ?? m?.avatarUrl ?? m?.icon ?? "🎁");
 
       const isGift =
         text.includes("🎁") ||
         text.toLowerCase().includes("sent ") ||
         text.toLowerCase().includes("gift");
-      if (isGift) {
-        const match = text.match(/(\d+)\s*(diamonds|coins|rCoins|pts|R)?/i);
-        if (match) {
-          const amt = Number(match[1]);
-          if (amt > 0 && amt <= 1000000) {
-            recordPartyGifter(giverName, giverAvatar, amt);
+
+      if (!isGift) return;
+
+      const giverName = String(m?.name ?? m?.userName ?? m?.user_name ?? "Guest");
+      const giverAvatar = String(m?.avatar ?? m?.avatarUrl ?? m?.icon ?? "🎁");
+
+      // Step A: Find coin value per target
+      let coinsPerTarget = 0;
+
+      // Check explicit coin number pattern like "(1,000 coins)" or "[1000 coins]"
+      const explicitMatch = text.match(/(\d[\d,]*)\s*(coins|diamonds|rCoins|pts)/i);
+      if (explicitMatch) {
+        coinsPerTarget = Number(explicitMatch[1].replace(/,/g, ""));
+      }
+
+      // If no explicit coin number found, match gift item name from GIFT_ITEMS & configurableGifts
+      if (!coinsPerTarget || isNaN(coinsPerTarget)) {
+        for (const item of [...GIFT_ITEMS, ...configurableGifts]) {
+          if (item && item.name && text.toLowerCase().includes(item.name.toLowerCase())) {
+            coinsPerTarget = Number(item.diamonds || item.rCoins || 0);
+            break;
           }
         }
+      }
+
+      if (!coinsPerTarget || isNaN(coinsPerTarget)) {
+        coinsPerTarget = 1000;
+      }
+
+      // Step B: Extract recipient names
+      const targetNames: string[] = [];
+
+      // Pattern: "users (akash, Test)" or "users (a, b, c)"
+      const groupMatch = text.match(/users\s*\(([^)]+)\)/i);
+      if (groupMatch && groupMatch[1]) {
+        groupMatch[1].split(",").forEach((ns) => {
+          const cleaned = ns.trim();
+          if (cleaned) targetNames.push(cleaned);
+        });
+      }
+
+      // Pattern: "to akash!" or "to Test!"
+      if (targetNames.length === 0) {
+        const singleMatch = text.match(/to\s+([^!(]+)[!.]/i);
+        if (singleMatch && singleMatch[1]) {
+          const recipientStr = singleMatch[1].trim();
+          if (recipientStr && !recipientStr.toLowerCase().includes("party space")) {
+            targetNames.push(recipientStr);
+          }
+        }
+      }
+
+      // Default: "to the party space!" -> Host seat receives
+      if (targetNames.length === 0 || text.toLowerCase().includes("party space")) {
+        if (hostNameStr) targetNames.push(hostNameStr);
+        else targetNames.push("host");
+      }
+
+      // Step C: Credit coins to recipient seats
+      const targetsCount = Math.max(1, targetNames.length);
+      targetNames.forEach((targetName) => {
+        const key = targetName.trim().toLowerCase();
+        const matchedSeat = occupantSeatMap[key];
+
+        if (matchedSeat) {
+          if (matchedSeat.userId) {
+            newCoinsMap[matchedSeat.userId] = (newCoinsMap[matchedSeat.userId] || 0) + coinsPerTarget;
+          }
+          newCoinsMap[matchedSeat.seatNum] = (newCoinsMap[matchedSeat.seatNum] || 0) + coinsPerTarget;
+        } else if (key === hostNameStr || key === "host") {
+          const hostSeat = currentSeats[0];
+          if (hostSeat?.userId) {
+            newCoinsMap[Number(hostSeat.userId)] = (newCoinsMap[Number(hostSeat.userId)] || 0) + coinsPerTarget;
+          }
+          newCoinsMap[1] = (newCoinsMap[1] || 0) + coinsPerTarget;
+        } else {
+          newCoinsMap[1] = (newCoinsMap[1] || 0) + coinsPerTarget;
+        }
+      });
+
+      // Step D: Record gifter total spent
+      const totalCost = coinsPerTarget * targetsCount;
+      if (totalCost > 0) {
+        recordPartyGifter(giverName, giverAvatar, totalCost);
       }
     });
 
