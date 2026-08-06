@@ -423,7 +423,7 @@ class PartyRoomController extends Controller
             try {
                 $recExpr = $hostId > 0 ? "COALESCE(NULLIF(receiver_id, 0), {$hostId})" : "receiver_id";
                 $seatCoinRows = DB::table('gift_transactions')
-                    ->whereIn('room_type', ['party', 'party_room', 'partyRoom'])
+                    ->whereIn('room_type', ['party', 'party_room', 'partyRoom', 'partyroom'])
                     ->whereIn('room_id', $roomIds)
                     ->select(DB::raw("{$recExpr} as rec_id"), DB::raw('SUM(diamonds) as total_coins'))
                     ->groupBy(DB::raw($recExpr))
@@ -609,7 +609,7 @@ class PartyRoomController extends Controller
         if ($this->tableExists('gift_transactions') && !empty($roomIds)) {
             try {
                 $calcTotalCoins = (int) DB::table('gift_transactions')
-                    ->whereIn('room_type', ['party', 'party_room', 'partyRoom'])
+                    ->whereIn('room_type', ['party', 'party_room', 'partyRoom', 'partyroom'])
                     ->whereIn('room_id', $roomIds)
                     ->sum('diamonds');
             } catch (Throwable $e) {

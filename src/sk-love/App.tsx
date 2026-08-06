@@ -3716,7 +3716,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     activePartyRoomIdRef.current = activePartyRoom?.id ?? null;
     if (isPartyRoomOpen && activePartyRoom?.id) {
       const storedCoins = getStoredPartyRoomCoins(activePartyRoom.id);
-      setPartySeatSessionCoins(storedCoins);
+      setPartySeatSessionCoins((prev) => ({ ...storedCoins, ...prev }));
 
       const storedGifters = getStoredPartyRoomGifters(activePartyRoom.id);
       const gifterMap = new Map<string, { name: string; avatar: string; totalSpent: number }>();
@@ -15470,9 +15470,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   const targetSeatUid = seat.userId
                     ? Number(seat.userId)
                     : (isCrown && _hostId ? Number(_hostId) : null);
-                  const seatCoins = targetSeatUid
-                    ? (partySeatSessionCoins[targetSeatUid] ?? (seat as any).coins ?? (seat as any).r_coins ?? (seat as any).received_coins ?? 0)
-                    : ((seat as any).coins ?? (seat as any).r_coins ?? (seat as any).received_coins ?? 0);
+                  const seatCoins = Math.max(
+                    targetSeatUid ? (partySeatSessionCoins[targetSeatUid] || 0) : 0,
+                    Number((seat as any).coins || 0),
+                    Number((seat as any).r_coins || 0),
+                    Number((seat as any).received_coins || 0)
+                  );
                   const optimisticSelfSeat = optimisticPartySeatRef.current;
                   const isSelf =
                     (seat.userId &&
