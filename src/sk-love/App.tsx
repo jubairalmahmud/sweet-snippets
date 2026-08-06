@@ -21107,7 +21107,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               )}
 
               {/* 4. STREAM VIEW (LIVE SPECIFIED VIEW CONCEPTS) */}
-              {appSection === "stream" && (
+              {appSection === "stream" && !isLiveStreamMinimized && (
                 <div className="flex-1 flex flex-col relative bg-gradient-to-b from-purple-950 via-slate-900 to-black overflow-hidden sk-preserve-dark">
                   {/* Join notices — animated pill above the comment box, bottom-left for 2 seconds */}
                   {joinNotices.length > 0 && !isLiveStreamMinimized && (
@@ -21148,32 +21148,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                     </div>
                   )}
 
-                  {isLiveStreamMinimized ? (
-                    <div className="absolute inset-0 z-40 flex items-end justify-center bg-[#070816] p-4">
-                      <button
-                        type="button"
-                        onClick={() => setIsLiveStreamMinimized(false)}
-                        className="w-full max-w-sm rounded-2xl border border-rose-500/30 bg-slate-950/95 p-3 text-left shadow-2xl shadow-rose-500/15"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-rose-500/15 text-rose-300">
-                            <Video className="h-6 w-6" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-[12px] font-black text-white">
-                              {activeLiveRoom?.title || "Live stream minimized"}
-                            </p>
-                            <p className="mt-0.5 text-[9px] font-bold text-slate-400">
-                              Live is still running. Tap to open.
-                            </p>
-                          </div>
-                          <span className="rounded-full bg-rose-600 px-2 py-1 text-[8px] font-black text-white">
-                            LIVE
-                          </span>
-                        </div>
-                      </button>
-                    </div>
-                  ) : streamRole === "streamer" ? (
+                  {streamRole === "streamer" ? (
                     <div
                       id="streamer-dashboard-layout"
                       className="flex-1 flex flex-col relative bg-slate-950 text-slate-100 overflow-hidden h-full"
@@ -21438,7 +21413,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                   <div className="absolute right-0 top-full mt-2 z-[70] w-32 rounded-xl border border-white/10 bg-slate-950/95 p-1.5 shadow-2xl backdrop-blur-md">
                                     <button
                                       type="button"
-                                      onClick={() => { setIsHostCloseMenuOpen(false); setIsLiveStreamMinimized(true); }}
+                                      onClick={() => { setIsHostCloseMenuOpen(false); setIsLiveStreamMinimized(true); setAppSection("home"); }}
                                       className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-[10px] font-black text-slate-200 hover:bg-slate-900"
                                     >
                                       <Minimize2 className="h-3.5 w-3.5" />
@@ -22522,6 +22497,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                     onClick={() => {
                                       setIsViewerExitMenuOpen(false);
                                       setIsLiveStreamMinimized(true);
+                                      setAppSection("home");
                                     }}
                                     className="flex items-center gap-2 rounded-lg bg-black/60 border border-slate-700/60 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-slate-800/80 active:scale-95 transition cursor-pointer"
                                   >
@@ -28412,7 +28388,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       )}
 
       {/* Floating "Return to Live" indicator — host OR guest is in a live room but navigated away */}
-      {activeLiveRoom && appSection !== "stream" && (
+      {activeLiveRoom && (appSection !== "stream" || isLiveStreamMinimized) && (
         <button
           type="button"
           onClick={() => {
@@ -28420,16 +28396,24 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
             if (streamRole === "streamer") setIsStreamCameraOff(false);
             setAppSection("stream");
           }}
-          className={`fixed bottom-24 right-4 z-[90] flex h-14 w-14 items-center justify-center rounded-full border-2 text-white shadow-2xl active:scale-95 transition animate-pulse ${
-            streamRole === "streamer"
-              ? "border-rose-400/50 bg-gradient-to-br from-rose-600 to-red-700 shadow-rose-500/40"
-              : "border-cyan-400/50 bg-gradient-to-br from-cyan-600 to-indigo-700 shadow-cyan-500/40"
-          }`}
+          className="fixed bottom-24 right-4 z-[95] flex items-center gap-2.5 rounded-full border border-rose-500/50 bg-slate-950/95 p-1.5 pr-4 text-white shadow-[0_0_25px_rgba(244,63,94,0.4)] backdrop-blur-md active:scale-95 transition hover:bg-slate-900 cursor-pointer"
           aria-label="Return to live"
           title={streamRole === "streamer" ? "Return to your live stream" : "Return to the live stream you're watching"}
         >
-          <span className="absolute -top-1 -right-1 rounded-full bg-white px-1.5 py-0.5 text-[8px] font-black text-rose-600 shadow">LIVE</span>
-          <Video className="h-6 w-6" />
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-rose-600 to-red-700 ring-2 ring-rose-400/60 animate-pulse">
+            <Video className="h-5 w-5 text-white" />
+            <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75"></span>
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-rose-500"></span>
+            </span>
+          </div>
+          <div className="flex flex-col text-left">
+            <div className="flex items-center gap-1.5">
+              <span className="rounded bg-rose-600 px-1 py-0.2 text-[8px] font-black tracking-wider text-white">LIVE</span>
+              <span className="truncate max-w-[110px] text-[11px] font-black text-slate-100">{activeLiveRoom.title || "Live Stream"}</span>
+            </div>
+            <span className="text-[9px] font-bold text-rose-300">Tap to return</span>
+          </div>
         </button>
       )}
 
