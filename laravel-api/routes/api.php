@@ -404,11 +404,17 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Frames
     Route::get   ('/me/frames',                    [FrameCatalogController::class, 'myFrames']);
+    Route::post  ('/me/frames/equip',              [FrameCatalogController::class, 'equip']);
+    Route::post  ('/me/frames/unequip',            [FrameCatalogController::class, 'unequip']);
+    Route::post  ('/me/frames/purchase',           [FrameCatalogController::class, 'buy']);
     Route::post  ('/me/frames/{id}/equip',         [FrameCatalogController::class, 'equip']);
     Route::post  ('/frame-catalog/{id}/buy',       [FrameCatalogController::class, 'buy']);
 
     // Entry Effects
     Route::get   ('/me/entry-effects',             [EntryEffectController::class, 'myEffects']);
+    Route::post  ('/me/entry-effects/equip',       [EntryEffectController::class, 'equip']);
+    Route::post  ('/me/entry-effects/unequip',     [EntryEffectController::class, 'unequip']);
+    Route::post  ('/me/entry-effects/purchase',    [EntryEffectController::class, 'buy']);
     Route::post  ('/me/entry-effects/{id}/equip',  [EntryEffectController::class, 'equip']);
     Route::post  ('/entry-effects/{id}/buy',       [EntryEffectController::class, 'buy']);
 

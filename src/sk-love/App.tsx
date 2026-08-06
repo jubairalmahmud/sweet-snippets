@@ -3147,8 +3147,10 @@ export default function App() {
   // ╚══════════════════════════════════════════════════════════════════════╝
   const dbSyncHydratedThemesRef = React.useRef(false);
   const dbSyncHydratedFramesRef = React.useRef(false);
+  const dbSyncHydratedRidesRef = React.useRef(false);
   const dbSyncKnownOwnedThemesRef = React.useRef<Record<string, boolean>>({});
   const dbSyncKnownOwnedFramesRef = React.useRef<Record<string, boolean>>({});
+  const dbSyncKnownOwnedRidesRef = React.useRef<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -3158,8 +3160,10 @@ export default function App() {
       // Signed out — reset hydration flags so next login re-syncs.
       dbSyncHydratedThemesRef.current = false;
       dbSyncHydratedFramesRef.current = false;
+      dbSyncHydratedRidesRef.current = false;
       dbSyncKnownOwnedThemesRef.current = {};
       dbSyncKnownOwnedFramesRef.current = {};
+      dbSyncKnownOwnedRidesRef.current = {};
       return;
     }
 
@@ -3263,6 +3267,51 @@ export default function App() {
       }
     })();
 
+    // ────── 4) My owned entry effects / rides + equipped ──────
+    (async () => {
+      try {
+        const res: any = await api.get("/api/me/entry-effects");
+        if (cancelled) return;
+        const rows: any[] = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        const ownedFromServer: Record<string, number> = {};
+        let equippedFromServer: string | null = null;
+
+        rows.forEach((r: any) => {
+          const rawId = String(r.code || r.name || r.effect_id || r.id || "").trim();
+          if (!rawId) return;
+          const exp = r.expires_at
+            ? new Date(r.expires_at).getTime()
+            : Date.now() + 30 * 86400 * 1000;
+
+          ownedFromServer[rawId] = Math.max(ownedFromServer[rawId] || 0, exp);
+          dbSyncKnownOwnedRidesRef.current[rawId] = true;
+
+          if (r.is_equipped) {
+            equippedFromServer = rawId;
+          }
+        });
+
+        setOwnedRides((prev) => {
+          const merged = { ...prev };
+          const now = Date.now();
+          Object.entries(ownedFromServer).forEach(([k, exp]) => {
+            if (exp > now) {
+              merged[k] = Math.max(merged[k] || 0, exp);
+            }
+          });
+          return merged;
+        });
+
+        if (equippedFromServer) {
+          setEquippedRide(equippedFromServer);
+        }
+      } catch {
+        /* offline */
+      } finally {
+        dbSyncHydratedRidesRef.current = true;
+      }
+    })();
+
     return () => {
       cancelled = true;
     };
@@ -3321,6 +3370,26 @@ export default function App() {
       api.post(`/api/me/frames/purchase`, { code, frame_id: dbId, days: cat?.durationDays || 30 }).catch(() => {});
     });
   }, [ownedAvatarFrames]);
+
+  // ────── Push equipped-ride (entry effect) change to server ──────
+  useEffect(() => {
+    if (!dbSyncHydratedRidesRef.current) return;
+    if (equippedRide) {
+      api.post(`/api/me/entry-effects/equip`, { code: equippedRide }).catch(() => {});
+    } else {
+      api.post(`/api/me/entry-effects/unequip`, {}).catch(() => {});
+    }
+  }, [equippedRide]);
+
+  // ────── Push NEW ride purchases to server ──────
+  useEffect(() => {
+    if (!dbSyncHydratedRidesRef.current) return;
+    Object.keys(ownedRides).forEach((id) => {
+      if (dbSyncKnownOwnedRidesRef.current[id]) return;
+      dbSyncKnownOwnedRidesRef.current[id] = true;
+      api.post(`/api/me/entry-effects/purchase`, { code: id, days: 30 }).catch(() => {});
+    });
+  }, [ownedRides]);
 
 
 

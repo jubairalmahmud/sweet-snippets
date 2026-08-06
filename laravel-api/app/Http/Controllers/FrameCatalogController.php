@@ -37,25 +37,61 @@ class FrameCatalogController extends Controller
         return response()->json(['data' => $rows]);
     }
 
-    // POST /api/me/frames/{id}/equip
-    public function equip(Request $r, int $id)
+    // POST /api/me/frames/{id}/equip or /api/me/frames/equip
+    public function equip(Request $r, $id = null)
     {
         $userId = $r->user()->id;
-        $owned = DB::table('user_frames')->where('user_id', $userId)->where('frame_id', $id)->first();
-        if (!$owned) return response()->json(['message' => 'Not owned'], 404);
+        $frameId = $id ?: $r->input('frame_id');
+        $code = $r->input('code');
 
-        DB::transaction(function () use ($userId, $id) {
-            DB::table('user_frames')->where('user_id', $userId)->update(['is_equipped' => 0, 'updated_at' => now()]);
-            DB::table('user_frames')->where('user_id', $userId)->where('frame_id', $id)->update(['is_equipped' => 1, 'updated_at' => now()]);
+        $catalog = null;
+        if ($frameId && is_numeric($frameId)) {
+            $catalog = DB::table('frame_catalog')->where('id', (int)$frameId)->first();
+        }
+        if (!$catalog && $code) {
+            $catalog = DB::table('frame_catalog')->where('code', $code)->orWhere('name', $code)->first();
+        }
 
-            $catalog = DB::table('frame_catalog')->where('id', $id)->first();
-            if ($catalog) {
+        if ($catalog) {
+            $fid = $catalog->id;
+            DB::transaction(function () use ($userId, $fid, $catalog) {
+                if (Schema::hasTable('user_frames')) {
+                    DB::table('user_frames')->where('user_id', $userId)->update(['is_equipped' => 0, 'updated_at' => now()]);
+                    DB::table('user_frames')->where('user_id', $userId)->where('frame_id', $fid)->update(['is_equipped' => 1, 'updated_at' => now()]);
+                }
                 if (Schema::hasColumn('users', 'avatar_frame')) {
                     DB::table('users')->where('id', $userId)->update(['avatar_frame' => $catalog->code ?: $catalog->name]);
                 }
                 if (Schema::hasColumn('users', 'avatar_frame_id')) {
-                    DB::table('users')->where('id', $userId)->update(['avatar_frame_id' => $id]);
+                    DB::table('users')->where('id', $userId)->update(['avatar_frame_id' => $fid]);
                 }
+            });
+            return response()->json(['ok' => true, 'activeFrame' => $catalog->code ?: $catalog->name]);
+        }
+
+        if ($code) {
+            if (Schema::hasColumn('users', 'avatar_frame')) {
+                DB::table('users')->where('id', $userId)->update(['avatar_frame' => $code]);
+            }
+            return response()->json(['ok' => true, 'activeFrame' => $code]);
+        }
+
+        return response()->json(['message' => 'Frame not found'], 404);
+    }
+
+    // POST /api/me/frames/unequip
+    public function unequip(Request $r)
+    {
+        $userId = $r->user()->id;
+        DB::transaction(function () use ($userId) {
+            if (Schema::hasTable('user_frames')) {
+                DB::table('user_frames')->where('user_id', $userId)->update(['is_equipped' => 0, 'updated_at' => now()]);
+            }
+            if (Schema::hasColumn('users', 'avatar_frame')) {
+                DB::table('users')->where('id', $userId)->update(['avatar_frame' => 'Default']);
+            }
+            if (Schema::hasColumn('users', 'avatar_frame_id')) {
+                DB::table('users')->where('id', $userId)->update(['avatar_frame_id' => null]);
             }
         });
         return response()->json(['ok' => true]);
