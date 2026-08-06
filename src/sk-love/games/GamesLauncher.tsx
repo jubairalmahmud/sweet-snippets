@@ -140,7 +140,7 @@ const normalizeConfig = (raw: any): GameConfig => {
 };
 
 const safeBalance = (raw: any) =>
-  Number(raw?.coins ?? raw?.r_coins ?? raw?.balance ?? raw?.data?.coins ?? raw?.data?.r_coins ?? raw?.data?.balance ?? 0);
+  Number(raw?.coins ?? raw?.diamonds ?? raw?.balance ?? raw?.data?.coins ?? raw?.data?.diamonds ?? raw?.data?.balance ?? 0);
 
 class GameCrashBoundary extends Component<
   { gameKey: GameKey | null; onBack: () => void; children: ReactNode },

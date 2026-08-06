@@ -14086,7 +14086,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               Play Inside Homepage
                             </span>
                             <span className="text-[9px] bg-slate-950 text-amber-300 font-bold px-2 py-0.5 rounded-full border border-slate-800">
-                              {userWallet.rCoins} Coins
+                              {userWallet.diamonds.toLocaleString()} Coins
                             </span>
                           </div>
 

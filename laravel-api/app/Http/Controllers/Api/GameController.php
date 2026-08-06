@@ -99,7 +99,7 @@ class GameController extends Controller
         if (!$u) return response()->json(['ok' => false, 'message' => 'Unauthorized'], 401);
         return response()->json([
             'ok'    => true,
-            'coins' => (int) ($u->r_coins ?? 0),
+            'coins' => (int) ($u->diamonds ?? $u->coins ?? 0),
         ]);
     }
 
@@ -153,7 +153,7 @@ class GameController extends Controller
                 if (!$row) {
                     return response()->json(['ok' => false, 'message' => 'User not found'], 404);
                 }
-                $balanceBefore = (int) ($row->r_coins ?? 0);
+                $balanceBefore = (int) ($row->diamonds ?? $row->coins ?? 0);
                 if ($balanceBefore < $betTotal) {
                     return response()->json(['ok' => false, 'message' => 'Insufficient coins'], 402);
                 }
@@ -165,7 +165,7 @@ class GameController extends Controller
 
                 $newBalance = $balanceBefore - $betTotal + $payout;
                 DB::table('users')->where('id', $user->id)->update([
-                    'r_coins'    => $newBalance,
+                    'diamonds'   => $newBalance,
                     'updated_at' => now(),
                 ]);
 

@@ -34,11 +34,11 @@ const DEFAULT_SLOTS: Slot[] = [
 const parseBalance = (raw: any, fallback = 0) =>
   Number(
     raw?.coins ??
+      raw?.diamonds ??
       raw?.balance ??
-      raw?.r_coins ??
       raw?.data?.coins ??
+      raw?.data?.diamonds ??
       raw?.data?.balance ??
-      raw?.data?.r_coins ??
       fallback,
   );
 

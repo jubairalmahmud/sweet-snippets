@@ -32,11 +32,11 @@ const DEFAULT_CHIPS = [1000, 5000, 10000, 50000, 100000];
 const parseBalance = (raw: any, fallback = 0) =>
   Number(
     raw?.coins ??
+      raw?.diamonds ??
       raw?.balance ??
-      raw?.r_coins ??
       raw?.data?.coins ??
+      raw?.data?.diamonds ??
       raw?.data?.balance ??
-      raw?.data?.r_coins ??
       fallback,
   );
 
