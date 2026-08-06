@@ -8123,16 +8123,25 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // FIX (top-gifter): record a gift/seat-buy contribution from `giverName`,
   // recompute the leader, and — if the leader changed — flash the handshake
   // animation so it visibly promotes to the Top Gifter box.
-  const recordPartyGifter = (giverName: string, giverAvatar: string, coins: number) => {
+  const recordPartyGifter = (
+    giverName: string,
+    giverAvatar: string,
+    coins: number,
+    mode: "add" | "set" = "add"
+  ) => {
     if (!giverName || !coins || coins <= 0) return;
     const key = giverName.trim().toLowerCase();
     if (!key) return;
     const totals = partyGifterTotalsRef.current;
     const prev = totals.get(key);
+    const nextSpent = mode === "set"
+      ? Math.max(prev?.totalSpent || 0, coins)
+      : (prev?.totalSpent || 0) + coins;
+
     const nextEntry = {
       name: giverName,
       avatar: giverAvatar || prev?.avatar || "🎁",
-      totalSpent: (prev?.totalSpent || 0) + coins,
+      totalSpent: nextSpent,
     };
     totals.set(key, nextEntry);
     const rId = activePartyRoomIdRef.current || activePartyRoom?.id;
@@ -8217,7 +8226,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         recordPartyGifter(
           String(g.name),
           String(g.avatar || g.icon || "🎁"),
-          Number(g.totalSpent ?? g.coins ?? g.amount ?? 0)
+          Number(g.totalSpent ?? g.coins ?? g.amount ?? 0),
+          "set"
         );
       }
     });
@@ -8256,8 +8266,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       if (!isGift) return;
 
       // Unique message key to prevent re-processing identical messages across renders
-      const msgId = m?.id != null ? String(m.id) : null;
-      const msgKey = msgId ? `id_${msgId}` : `txt_${m?.name || m?.userName || ''}_${text.trim()}`;
+      const normalizedText = text.replace(/^[🎁\s]+/, "").trim().toLowerCase();
+      const giverKey = String(m?.name ?? m?.userName ?? m?.user_name ?? "Guest").trim().toLowerCase();
+      const msgKey = `gift_msg_${giverKey}_${normalizedText}`;
 
       if (processedGiftMsgsRef.current.has(msgKey)) {
         return; // Already processed this message, skip to avoid compounding coins
@@ -8346,7 +8357,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       // Step D: Record gifter total spent
       const totalCost = coinsPerTarget * targetsCount;
       if (totalCost > 0) {
-        recordPartyGifter(giverName, giverAvatar, totalCost);
+        recordPartyGifter(giverName, giverAvatar, totalCost, "set");
       }
     });
 
