@@ -3534,35 +3534,46 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       seatIndex: number;
     }>
   >([]);
+  const lastActivePartyRoomIdRef = useRef<number | string | null>(null);
+
   // Batch 2: Load room-specific seat coin totals when joining a room (or reset when leaving).
   // Also clear chat comments + emoji overlays so a previous session's messages
   // never linger into a new room / new session.
   useEffect(() => {
-    activePartyRoomIdRef.current = activePartyRoom?.id ?? null;
-    processedGiftMsgsRef.current.clear();
-    if (isPartyRoomOpen && activePartyRoom?.id) {
-      const storedCoins = getStoredPartyRoomCoins(activePartyRoom.id);
-      setPartySeatSessionCoins(storedCoins);
+    const currentRoomId = activePartyRoom?.id ?? null;
+    activePartyRoomIdRef.current = currentRoomId;
 
-      const storedGifters = getStoredPartyRoomGifters(activePartyRoom.id);
-      const gifterMap = new Map<string, { name: string; avatar: string; totalSpent: number }>();
-      storedGifters.forEach((g) => {
-        if (g && g.name) gifterMap.set(g.name.trim().toLowerCase(), g);
-      });
-      partyGifterTotalsRef.current = gifterMap;
+    // ONLY reset session state if room ID actually changed (joining a new room or leaving)
+    if (currentRoomId !== lastActivePartyRoomIdRef.current) {
+      lastActivePartyRoomIdRef.current = currentRoomId;
+      processedGiftMsgsRef.current.clear();
+      setPartyChatMessages([]);
+      setPartyChatReplyTo(null);
+      setSeatEmojiOverlay({});
 
-      let leader: { name: string; avatar: string; totalSpent: number } | null = null;
-      gifterMap.forEach((entry) => {
-        if (!leader || entry.totalSpent > leader.totalSpent) leader = entry;
-      });
-      setTopGifter(leader);
-      setPartyGifterTick((t) => t + 1);
-    } else {
-      setPartySeatSessionCoins({});
+      if (isPartyRoomOpen && currentRoomId) {
+        const storedCoins = getStoredPartyRoomCoins(currentRoomId);
+        setPartySeatSessionCoins(storedCoins);
+
+        const storedGifters = getStoredPartyRoomGifters(currentRoomId);
+        const gifterMap = new Map<string, { name: string; avatar: string; totalSpent: number }>();
+        storedGifters.forEach((g) => {
+          if (g && g.name) gifterMap.set(g.name.trim().toLowerCase(), g);
+        });
+        partyGifterTotalsRef.current = gifterMap;
+
+        let leader: { name: string; avatar: string; totalSpent: number } | null = null;
+        gifterMap.forEach((entry) => {
+          if (!leader || entry.totalSpent > leader.totalSpent) leader = entry;
+        });
+        setTopGifter(leader);
+        setPartyGifterTick((t) => t + 1);
+      } else {
+        setPartySeatSessionCoins({});
+        partyGifterTotalsRef.current = new Map();
+        setTopGifter(null);
+      }
     }
-    setPartyChatMessages([]);
-    setPartyChatReplyTo(null);
-    setSeatEmojiOverlay({});
   }, [activePartyRoom?.id, isPartyRoomOpen]);
   // Party room in-room chat (host + guests can comment & reply)
   type PartyChatMsg = {
@@ -12373,17 +12384,22 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   }, [partyAgoraReadyTick, isPartyCoinLeaderboardOpen, activePartyRoom?.totalCoins, partyGifterTick]);
 
   const partyEarnedCoins = React.useMemo(() => {
-    const localGiftersSum = partyGifterList.reduce((sum, g) => sum + (g.totalSpent || 0), 0);
-    let seatCoinsSum = 0;
-    for (let sNum = 1; sNum <= maxGuestSeats + 1; sNum++) {
-      seatCoinsSum += Number(partySeatSessionCoins[sNum] || 0);
-    }
-    let userCoinsSum = 0;
-    Object.entries(partySeatSessionCoins).forEach(([k, v]) => {
-      if (k.startsWith("u_")) {
-        userCoinsSum += Number(v || 0);
+    // 1. Sum of coins for active occupants currently on seats (Host + Guests)
+    let seatsOccupantsSum = 0;
+    partySeats.slice(0, maxGuestSeats + 1).forEach((seat, idx) => {
+      if (seat && seat.occupant) {
+        const seatUid = seat.userId ? Number(seat.userId) : null;
+        const seatNum = idx + 1;
+        const userCoins = seatUid ? Number(partySeatSessionCoins[`u_${seatUid}`] || 0) : 0;
+        const sCoins = userCoins > 0 ? userCoins : Number(partySeatSessionCoins[seatNum] || 0);
+        seatsOccupantsSum += sCoins;
       }
     });
+
+    // 2. Sum of total gifts sent by gifters in this session
+    const localGiftersSum = partyGifterList.reduce((sum, g) => sum + (g.totalSpent || 0), 0);
+
+    // 3. Backend total if available
     const backend = Number(
       (activePartyRoom as any)?.totalCoins ??
       (activePartyRoom as any)?.total_coins ??
@@ -12391,8 +12407,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       (activePartyRoom as any)?.room_coins ??
       0
     );
-    return Math.max(localGiftersSum, seatCoinsSum, userCoinsSum, backend);
-  }, [partyGifterList, partySeatSessionCoins, activePartyRoom, partyGifterTick, maxGuestSeats]);
+
+    return Math.max(seatsOccupantsSum, localGiftersSum, backend);
+  }, [partyGifterList, partySeatSessionCoins, activePartyRoom, partySeats, maxGuestSeats]);
   const defaultPartySeatAvatars: GiftItem[] = [
     { id: "seat-unicorn", name: "Unicorn", diamonds: 100, rCoins: 100, icon: "🦄", category: "seat_avatar" },
     { id: "seat-car", name: "Car", diamonds: 300, rCoins: 300, icon: "🏎️", category: "seat_avatar" },
