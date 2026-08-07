@@ -3100,10 +3100,8 @@ export default function App() {
           dbSyncKnownOwnedFramesRef.current[id] = true;
           if (r.is_equipped) equipped = id;
         });
-        if (rows.length) {
-          setOwnedAvatarFrames(owned);
-          if (equipped) setEquippedAvatarFrame(equipped);
-        }
+        setOwnedAvatarFrames(owned);
+        setEquippedAvatarFrame(equipped);
       } catch {
         /* offline — keep localStorage state */
       } finally {
