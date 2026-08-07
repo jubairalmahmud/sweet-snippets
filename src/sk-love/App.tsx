@@ -21684,17 +21684,55 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               </div>
                             )}
                             {liveCohostRequests.length > 0 && (
-                              <div className="absolute left-3 top-16 z-30 w-48 rounded-xl border border-rose-400/30 bg-slate-950/90 p-2 shadow-xl backdrop-blur">
-                                <p className="text-[8px] font-black uppercase text-rose-300">Co-host requests</p>
-                                {liveCohostRequests.slice(0, 3).map((request) => (
-                                  <div key={request.id} className="mt-2 flex items-center justify-between gap-1 text-[8px] text-white">
-                                    <span className="truncate">{request.name}</span>
-                                    <span className="flex gap-1">
-                                      <button onClick={() => void respondToLiveCohostRequest(request.id, "approve")} className="rounded bg-emerald-500 px-1.5 py-1 font-black text-slate-950" aria-label="Approve" title="Approve">✅</button>
-                                      <button onClick={() => void respondToLiveCohostRequest(request.id, "reject")} className="rounded bg-rose-500 px-1.5 py-1 font-black text-white" aria-label="Reject" title="Reject">❌</button>
+                              <div className="absolute left-3 top-16 z-30 w-64 max-w-[calc(100%-1.5rem)] rounded-2xl border border-pink-500/40 bg-slate-950/92 p-2.5 shadow-[0_0_20px_rgba(236,72,153,0.35)] backdrop-blur-md">
+                                <div className="mb-1.5 flex items-center justify-between border-b border-white/10 pb-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="relative flex h-2 w-2">
+                                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-pink-400 opacity-75"></span>
+                                      <span className="relative inline-flex h-2 w-2 rounded-full bg-pink-500"></span>
                                     </span>
+                                    <p className="text-[9px] font-black uppercase tracking-wider text-pink-300">
+                                      🎙️ Co-host Request ({liveCohostRequests.length})
+                                    </p>
                                   </div>
-                                ))}
+                                  <span className="rounded-full bg-pink-500/20 px-1.5 py-0.5 text-[8px] font-bold text-pink-200">Live</span>
+                                </div>
+                                <div className="space-y-2">
+                                  {liveCohostRequests.slice(0, 2).map((request) => (
+                                    <div key={request.id} className="flex items-center gap-2 rounded-xl bg-white/5 p-1.5 border border-white/10">
+                                      <img
+                                        src={getUserAvatarUrl({ name: request.name, avatar: request.avatar })}
+                                        alt={request.name || "User"}
+                                        className="h-8 w-8 rounded-full border border-pink-400/50 object-cover shadow"
+                                      />
+                                      <div className="min-w-0 flex-1">
+                                        <p className="truncate text-[10px] font-black text-white">{request.name || "SK Love User"}</p>
+                                        <p className="truncate text-[8px] font-medium text-pink-200">কো-হোস্ট হিসেবে যুক্ত হতে চান</p>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => void respondToLiveCohostRequest(request.id, "approve")}
+                                          className="flex h-7 px-2 items-center justify-center gap-1 rounded-lg bg-gradient-to-r from-emerald-500 to-green-600 text-[9px] font-bold text-slate-950 shadow active:scale-95 transition-transform"
+                                          aria-label="Approve"
+                                          title="Approve"
+                                        >
+                                          <Check className="h-3.5 w-3.5 stroke-[3]" />
+                                          <span>গ্রহণ</span>
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => void respondToLiveCohostRequest(request.id, "reject")}
+                                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-800 hover:bg-rose-600/80 text-white text-[9px] font-bold shadow active:scale-95 transition-transform"
+                                          aria-label="Reject"
+                                          title="Reject"
+                                        >
+                                          <X className="h-3.5 w-3.5 stroke-[3]" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             )}
                             {liveCohosts.length > 0 && (
@@ -22672,33 +22710,39 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                   </div>
                                   <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
                                     {liveCohostRequests.length === 0 ? (
-                                      <p className="py-4 text-center text-[9px] text-slate-400">No pending requests.</p>
+                                      <p className="py-6 text-center text-[10px] font-medium text-slate-400">কোনো রিকোয়েস্ট পেন্ডিং নেই</p>
                                     ) : (
                                       liveCohostRequests.map((request: any) => (
-                                        <div key={`host-req-${request.id}`} className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/70 p-2">
-                                          <img src={getUserAvatarUrl({ name: request.name, avatar: request.avatar })} alt={request.name || "User"} className="h-9 w-9 rounded-full object-cover" />
-                                          <div className="min-w-0 flex-1">
-                                            <p className="truncate text-[10px] font-black text-white">{request.name || "SK Love User"}</p>
-                                            <p className="text-[8px] font-bold text-cyan-300">Wants to join as co-host</p>
+                                        <div key={`host-req-${request.id}`} className="flex items-center gap-2.5 rounded-2xl border border-pink-500/20 bg-gradient-to-r from-slate-900/90 via-slate-900/80 to-pink-950/30 p-2.5 shadow-lg backdrop-blur">
+                                          <div className="relative">
+                                            <img src={getUserAvatarUrl({ name: request.name, avatar: request.avatar })} alt={request.name || "User"} className="h-10 w-10 rounded-full border-2 border-pink-500/40 object-cover shadow" />
+                                            <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-pink-500 text-[8px]">🎙️</span>
                                           </div>
-                                          <button
-                                            type="button"
-                                            onClick={() => void respondToLiveCohostRequest(request.id, "approve")}
-                                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-slate-950"
-                                            aria-label="Approve"
-                                            title="Approve"
-                                          >
-                                            <Check className="h-4 w-4" />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => void respondToLiveCohostRequest(request.id, "reject")}
-                                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500 text-white"
-                                            aria-label="Reject"
-                                            title="Reject"
-                                          >
-                                            <X className="h-4 w-4" />
-                                          </button>
+                                          <div className="min-w-0 flex-1">
+                                            <p className="truncate text-[11px] font-black text-white">{request.name || "SK Love User"}</p>
+                                            <p className="text-[9px] font-semibold text-pink-300">কো-হোস্ট হিসেবে যুক্ত হতে চান</p>
+                                          </div>
+                                          <div className="flex items-center gap-1.5">
+                                            <button
+                                              type="button"
+                                              onClick={() => void respondToLiveCohostRequest(request.id, "approve")}
+                                              className="flex h-8 items-center gap-1 px-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 text-[10px] font-bold text-slate-950 shadow-md active:scale-95 transition-transform"
+                                              aria-label="Approve"
+                                              title="Approve"
+                                            >
+                                              <Check className="h-4 w-4 stroke-[3]" />
+                                              <span>গ্রহণ</span>
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => void respondToLiveCohostRequest(request.id, "reject")}
+                                              className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-800 hover:bg-rose-600 text-white shadow-md active:scale-95 transition-transform"
+                                              aria-label="Reject"
+                                              title="Reject"
+                                            >
+                                              <X className="h-4 w-4 stroke-[2.5]" />
+                                            </button>
+                                          </div>
                                         </div>
                                       ))
                                     )}
