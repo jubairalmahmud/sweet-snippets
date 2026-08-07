@@ -225,8 +225,23 @@ class EntryEffectController extends Controller
         });
     }
 
+    private function ensureAdmin(Request $req): void
+    {
+        $u = $req->user();
+        if (!$u) return;
+        $isAdmin = false;
+        try {
+            $isAdmin = (bool) ($u->is_admin ?? 0)
+                || (bool) ($u->is_superadmin ?? 0)
+                || in_array(strtolower((string) ($u->role ?? '')), ['admin', 'superadmin', 'super_admin'], true)
+                || ($u->id == 1);
+        } catch (\Throwable $e) { $isAdmin = true; }
+        if (!$isAdmin) abort(403, 'Admin only');
+    }
+
     public function store(Request $r)
     {
+        $this->ensureAdmin($r);
         $this->ensureTables();
         $data = $r->validate([
             'code' => 'required|string|max:64|unique:entry_effect_catalog,code',
@@ -246,6 +261,7 @@ class EntryEffectController extends Controller
 
     public function update(Request $r, $id)
     {
+        $this->ensureAdmin($r);
         $this->ensureTables();
         $data = $r->validate([
             'name' => 'sometimes|string|max:120',
@@ -262,8 +278,9 @@ class EntryEffectController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    public function destroy($id)
+    public function destroy(Request $r, $id)
     {
+        $this->ensureAdmin($r);
         $this->ensureTables();
         DB::table('entry_effect_catalog')->where('id', $id)->delete();
         return response()->json(['ok' => true]);

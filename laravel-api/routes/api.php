@@ -450,15 +450,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // Admin CRUD for catalogs
     Route::get   ('/admin/frame-catalog',      [FrameCatalogController::class, 'adminIndex']);
     Route::post  ('/admin/frame-catalog/seed', [FrameCatalogController::class, 'seed']);
-    Route::middleware('can:admin')->group(function () {
-        Route::post  ('/admin/frame-catalog',      [FrameCatalogController::class, 'store']);
-        Route::put   ('/admin/frame-catalog/{id}', [FrameCatalogController::class, 'update']);
-        Route::delete('/admin/frame-catalog/{id}', [FrameCatalogController::class, 'destroy']);
+    Route::post  ('/admin/frame-catalog',      [FrameCatalogController::class, 'store']);
+    Route::put   ('/admin/frame-catalog/{id}', [FrameCatalogController::class, 'update']);
+    Route::delete('/admin/frame-catalog/{id}', [FrameCatalogController::class, 'destroy']);
 
-        Route::post  ('/admin/entry-effects',      [EntryEffectController::class, 'store']);
-        Route::put   ('/admin/entry-effects/{id}', [EntryEffectController::class, 'update']);
-        Route::delete('/admin/entry-effects/{id}', [EntryEffectController::class, 'destroy']);
-    });
+    Route::post  ('/admin/entry-effects',      [EntryEffectController::class, 'store']);
+    Route::put   ('/admin/entry-effects/{id}', [EntryEffectController::class, 'update']);
+    Route::delete('/admin/entry-effects/{id}', [EntryEffectController::class, 'destroy']);
 });
 
 require __DIR__.'/api-additions-rankings.php';

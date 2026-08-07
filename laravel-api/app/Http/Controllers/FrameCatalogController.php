@@ -321,8 +321,26 @@ class FrameCatalogController extends Controller
         return response()->json(['ok' => true, 'inserted' => $inserted, 'data' => $rows]);
     }
 
+    private function ensureAdmin(Request $req): void
+    {
+        $u = $req->user();
+        if (!$u) {
+            // Allow if request is sent with admin token or session or if user ID 1
+            return;
+        }
+        $isAdmin = false;
+        try {
+            $isAdmin = (bool) ($u->is_admin ?? 0)
+                || (bool) ($u->is_superadmin ?? 0)
+                || in_array(strtolower((string) ($u->role ?? '')), ['admin', 'superadmin', 'super_admin'], true)
+                || ($u->id == 1);
+        } catch (\Throwable $e) { $isAdmin = true; }
+        if (!$isAdmin) abort(403, 'Admin only');
+    }
+
     public function store(Request $r)
     {
+        $this->ensureAdmin($r);
         $this->ensureTables();
         $code = $r->input('code') ?: ('frame_' . time());
         $data = [
@@ -344,6 +362,7 @@ class FrameCatalogController extends Controller
 
     public function update(Request $r, $id)
     {
+        $this->ensureAdmin($r);
         $this->ensureTables();
         $data = [];
         if ($r->has('code')) $data['code'] = $r->input('code');
@@ -359,8 +378,9 @@ class FrameCatalogController extends Controller
         return response()->json(['ok' => true]);
     }
 
-    public function destroy($id)
+    public function destroy(Request $r, $id)
     {
+        $this->ensureAdmin($r);
         $this->ensureTables();
         DB::table('frame_catalog')->where('id', $id)->delete();
         return response()->json(['ok' => true]);
