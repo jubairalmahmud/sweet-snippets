@@ -27868,14 +27868,24 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               {/* BOTTOM PREMIUM GEM NAV BAR — image reference (exact match) */}
               {appSection !== "stream" && !isCommentInputPopupOpen && !isPartyCommentPopupOpen && (
                 <div
-                  className="relative w-screen max-w-full select-none shrink-0 overflow-visible"
+                  className="relative w-screen max-w-full select-none shrink-0 overflow-visible min-h-[56px] bg-[#0c091a]"
                 >
                   <img
                     src={navGemBarImg}
                     alt=""
                     aria-hidden="true"
                     draggable={false}
-                    className="block w-full h-auto pointer-events-none"
+                    className="block w-full h-auto min-h-[56px] object-contain pointer-events-none"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.dataset.retried) {
+                        target.dataset.retried = "1";
+                        target.src = "/nav-gem-bar.png";
+                      } else if (target.dataset.retried === "1") {
+                        target.dataset.retried = "2";
+                        target.src = "/assets/nav-gem-bar.png";
+                      }
+                    }}
                   />
                   {/* Click zones positioned at the actual icon centers in the image
                       (measured: 11%, 30%, 50%, 70%, 89%) */}
