@@ -14613,6 +14613,26 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     }
   >
 
+    {/* Full-screen backdrop overlays for Party Room popups (moved outside transformed bottom-bar wrapper) */}
+    {isPartyRoomOpen && isPartyCommentPopupOpen && (
+      <div
+        className="fixed inset-0 z-[85] bg-black/40 cursor-pointer"
+        onClick={() => setIsPartyCommentPopupOpen(false)}
+      />
+    )}
+    {isPartyRoomOpen && isPartyMenuOpen && (
+      <div
+        className="fixed inset-0 z-[85] bg-black/20 cursor-pointer"
+        onClick={() => setIsPartyMenuOpen(false)}
+      />
+    )}
+    {isPartyRoomOpen && isPartyExitMenuOpen && (
+      <div
+        className="fixed inset-0 z-[85] bg-transparent cursor-pointer"
+        onClick={() => setIsPartyExitMenuOpen(false)}
+      />
+    )}
+
 
     {!isPartyRoomOpen && (
       <div className="space-y-2.5 mb-3.5">
@@ -15755,12 +15775,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 the button visuals were swapped to match the stream footer. */}
             <div className="relative flex flex-1 items-center justify-between gap-1 px-1 pb-0">
               {isPartyCommentPopupOpen ? (
-                <>
-                  <div
-                    className="fixed inset-0 z-[75] bg-black/30"
-                    onClick={() => setIsPartyCommentPopupOpen(false)}
-                  />
-                  <div className="relative z-[80] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
+                <div className="relative z-[90] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
                     <div className="relative flex items-center">
                       <input
                         ref={partyCommentInputRef}
@@ -15794,7 +15809,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                       </button>
                     </div>
                   </div>
-                </>
               ) : (
                 <>
                   {/* FIX (UI parity): Comment pencil button — mirrors the video
@@ -15889,12 +15903,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 </button>
 
                 {isPartyMenuOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-[90]"
-                      onClick={() => setIsPartyMenuOpen(false)}
-                    />
-                    <div className="fixed bottom-20 right-3 z-[95] w-[min(220px,calc(100vw-24px))] max-h-[70vh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-950/95 backdrop-blur shadow-2xl p-2 flex flex-col gap-1">
+                  <div className="fixed bottom-20 right-3 z-[95] w-[min(220px,calc(100vw-24px))] max-h-[70vh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-950/95 backdrop-blur shadow-2xl p-2 flex flex-col gap-1">
                       {/* FIX: Exit + Share removed from hamburger. Exit is the top-right X button; Share is the Share2 icon in the top row. */}
                       <button
                         type="button"
@@ -15984,7 +15993,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                         </div>
                       )}
                     </div>
-                  </>
                 )}
               </div>
 
@@ -21580,6 +21588,22 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               {/* 4. STREAM VIEW (LIVE SPECIFIED VIEW CONCEPTS) */}
               {appSection === "stream" && (
                 <div className="flex-1 flex flex-col relative bg-gradient-to-b from-purple-950 via-slate-900 to-black overflow-hidden sk-preserve-dark">
+                  {/* Full-screen backdrop overlays for Stream popups (moved outside transformed bottom-bar wrapper) */}
+                  {isCommentInputPopupOpen && (
+                    <div
+                      className="fixed inset-0 z-[85] bg-black/40 cursor-pointer"
+                      onClick={() => {
+                        setIsCommentInputPopupOpen(false);
+                        setReplyingToComment(null);
+                      }}
+                    />
+                  )}
+                  {isViewerMenuOpen && (
+                    <div
+                      className="fixed inset-0 z-[85] bg-black/20 cursor-pointer"
+                      onClick={() => setIsViewerMenuOpen(false)}
+                    />
+                  )}
                   {/* Join notices — animated pill above the comment box, bottom-left for 2 seconds */}
                   {joinNotices.length > 0 && !isLiveStreamMinimized && (
                     <div className="pointer-events-none absolute left-3 bottom-20 z-[85] flex flex-col-reverse gap-1.5">
@@ -22083,15 +22107,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               {/* Always-visible input bar */}
                               <div className="relative flex min-w-0 flex-1 items-center gap-1">
                                 {isCommentInputPopupOpen ? (
-                                  <>
-                                    <div
-                                      className="fixed inset-0 z-[75] bg-black/30"
-                                      onClick={() => {
-                                        setIsCommentInputPopupOpen(false);
-                                        setReplyingToComment(null);
-                                      }}
-                                    />
-                                    <div className="relative z-[80] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
+                                  <div className="relative z-[90] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
                                       {/* Replying Context Bar */}
                                       {replyingToComment && (
                                         <div className="flex items-center justify-between bg-fuchsia-950/90 border border-fuchsia-500/40 rounded-xl px-2.5 py-1 mb-1.5 text-[10px] text-fuchsia-200">
@@ -22178,7 +22194,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                         </button>
                                       </div>
                                     </div>
-                                  </>
                                 ) : (
                                   <LiveActionBar
                                     onComment={() => setIsCommentInputPopupOpen(true)}
@@ -23578,15 +23593,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                           <div className="relative flex items-center justify-between gap-2 sm:gap-3 w-full max-w-lg mx-auto">
                             <div className="flex items-center gap-2 sm:gap-3 min-w-0 w-full">
                               {isCommentInputPopupOpen ? (
-                                <>
-                                  <div
-                                    className="fixed inset-0 z-[75] bg-black/30"
-                                    onClick={() => {
-                                      setIsCommentInputPopupOpen(false);
-                                      setReplyingToComment(null);
-                                    }}
-                                  />
-                                  <div className="relative z-[80] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
+                                <div className="relative z-[90] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
                                     {/* Replying Context Bar */}
                                     {replyingToComment && (
                                       <div className="flex items-center justify-between bg-fuchsia-950/90 border border-fuchsia-500/40 rounded-xl px-2.5 py-1 mb-1.5 text-[10px] text-fuchsia-200">
@@ -23673,8 +23680,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                       </button>
                                     </div>
                                   </div>
-                                </>
-                              ) : (
+                                ) : (
                                 <LiveActionBar
                                   onComment={() => setIsCommentInputPopupOpen(true)}
                                 onGift={() => setIsStreamGiftPanelOpen((current) => !current)}
