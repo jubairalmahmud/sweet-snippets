@@ -3459,6 +3459,45 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   };
   // FIX #5: Hamburger menu (Exit / Share / Minimize / Seat Setup / Voice)
   const [isPartyMenuOpen, setIsPartyMenuOpen] = useState<boolean>(false);
+
+  const handleSharePartyRoom = async () => {
+    setIsPartyMenuOpen(false);
+    const roomId = activePartyRoom?.id;
+    if (!roomId) {
+      triggerSystemAnnouncement("No active room to share.");
+      return;
+    }
+    const shareUrl = `${window.location.origin}${window.location.pathname}?partyRoomId=${roomId}`;
+    const roomTitle = activePartyRoom?.title || activePartyRoom?.name || "Party Room";
+    const shareData = {
+      title: roomTitle,
+      text: `Join ${roomTitle} on SK Love!`,
+      url: shareUrl,
+    };
+
+    if (navigator.share && typeof navigator.share === "function") {
+      try {
+        await navigator.share(shareData);
+        triggerSystemAnnouncement("Room link shared!");
+        return;
+      } catch {
+        // Fallback to clipboard if cancelled or unsupported
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      triggerSystemAnnouncement("🔗 Room link copied to clipboard!");
+    } catch {
+      const input = document.createElement("input");
+      input.value = shareUrl;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+      triggerSystemAnnouncement("🔗 Room link copied to clipboard!");
+    }
+  };
   const [isPKOpen, setIsPKOpen] = useState<boolean>(false);
   // Incoming PK invite that this user just accepted → jump straight into battle
   const [pkIncomingBattle, setPkIncomingBattle] = useState<{
@@ -4889,6 +4928,27 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       refreshBanners();
       refreshLiveRooms();
       refreshPartyRooms();
+      // Deep link support: auto join party room if partyRoomId parameter is present in URL
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const sharedPartyRoomId = urlParams.get("partyRoomId");
+        if (sharedPartyRoomId) {
+          api.get(`/api/party-rooms/${sharedPartyRoomId}`)
+            .then((res: any) => {
+              const roomData = res?.data || res;
+              if (roomData && (roomData.id || roomData.hostId || roomData.title)) {
+                joinBackendPartyRoom(roomData);
+              } else {
+                joinBackendPartyRoom({ id: Number(sharedPartyRoomId) });
+              }
+            })
+            .catch(() => {
+              joinBackendPartyRoom({ id: Number(sharedPartyRoomId) });
+            });
+        }
+      } catch {
+        /* ignore */
+      }
       refreshGiftCatalog();
       // Sync user's deposit history
       api
@@ -15844,15 +15904,26 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                         <Minimize2 className="h-3.5 w-3.5" />
                         <span>Minimize</span>
                       </button>
-                      {/* Batch 2: Theme Gallery — host applies to whole room, guest previews personally */}
+                      {/* Share Room Button */}
                       <button
                         type="button"
-                        onClick={() => { setIsPartyMenuOpen(false); setIsPartyThemeGalleryOpen(true); }}
-                        className="w-full flex items-center gap-2 rounded-lg border border-fuchsia-500/30 bg-fuchsia-500/10 px-2.5 py-2 text-[10px] font-black uppercase text-fuchsia-200"
+                        onClick={handleSharePartyRoom}
+                        className="w-full flex items-center gap-2 rounded-lg border border-pink-500/30 bg-gradient-to-r from-pink-500/20 to-purple-500/20 px-2.5 py-2 text-[10px] font-black uppercase text-pink-200 hover:from-pink-500/30 hover:to-purple-500/30 active:scale-95 transition cursor-pointer"
                       >
-                        <Palette className="h-3.5 w-3.5" />
-                        <span>{isActivePartyHost ? "Theme Gallery (Room)" : "Theme Gallery (Preview)"}</span>
+                        <Share2 className="h-3.5 w-3.5 text-pink-400" />
+                        <span>Share Room</span>
                       </button>
+                      {/* Theme Gallery — only visible to the Room Host */}
+                      {isActivePartyHost && (
+                        <button
+                          type="button"
+                          onClick={() => { setIsPartyMenuOpen(false); setIsPartyThemeGalleryOpen(true); }}
+                          className="w-full flex items-center gap-2 rounded-lg border border-fuchsia-500/30 bg-fuchsia-500/10 px-2.5 py-2 text-[10px] font-black uppercase text-fuchsia-200"
+                        >
+                          <Palette className="h-3.5 w-3.5" />
+                          <span>Theme Gallery</span>
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => { setIsPartyMenuOpen(false); enablePartyRoomAudio(); }}
