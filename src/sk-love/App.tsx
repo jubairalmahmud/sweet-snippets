@@ -4945,6 +4945,23 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     }
   }, []);
 
+  // ---- Real-time Periodic Database State Sync Effect ----
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const syncFromDb = () => {
+      void fetchUserWalletData();
+    };
+    const interval = setInterval(syncFromDb, 25000);
+    const handleFocus = () => {
+      syncFromDb();
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [isLoggedIn]);
+
 
   // ---- ইফেক্ট: useEffect — if (commentsEndRef.current) { ----
   useEffect(() => {
