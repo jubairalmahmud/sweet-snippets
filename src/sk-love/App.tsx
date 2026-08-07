@@ -15233,21 +15233,44 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                         )}
 
                         {/* #5/#10: mic status badge (bottom-right) — visible to EVERYONE.
-                            Pink mic = speaking/open, violet slashed = muted. */}
+                            Pink mic = speaking/open with animated sound wave bars, violet slashed = muted. */}
                         {effOccupant && (
-                          <span
-                            className={`absolute -bottom-1 -right-1 z-40 grid h-5 w-5 place-items-center rounded-full border-2 border-[#0a0618] shadow-lg ${
-                              effectiveSeatMuted
-                                ? "bg-gradient-to-br from-violet-500 to-purple-700"
-                                : "bg-gradient-to-br from-pink-500 to-fuchsia-600"
-                            }`}
-                          >
-                            {effectiveSeatMuted ? (
-                              <MicOff className="h-3 w-3 text-white" />
-                            ) : (
-                              <Mic className="h-3 w-3 text-white" />
+                          <div className="absolute -bottom-1 -right-1 z-40 flex items-center pointer-events-none">
+                            {!effectiveSeatMuted && (
+                              <>
+                                {/* Animated sound wave aura ring */}
+                                <span className="absolute inset-0 rounded-full bg-pink-500/80 animate-ping opacity-75" />
+                                {/* Animated Sound Wave Equalizer Bars */}
+                                <span className="absolute -top-3.5 -right-2 z-50 flex items-end gap-[2px] h-3.5 rounded-full bg-slate-950/95 border border-pink-400/80 px-1 py-0.5 shadow-[0_0_8px_rgba(236,72,153,0.8)]">
+                                  <span
+                                    className="w-[2.5px] rounded-full bg-pink-400"
+                                    style={{ animation: "soundWaveBar 0.5s ease-in-out infinite" }}
+                                  />
+                                  <span
+                                    className="w-[2.5px] rounded-full bg-emerald-400"
+                                    style={{ animation: "soundWaveBar 0.35s ease-in-out infinite 0.12s" }}
+                                  />
+                                  <span
+                                    className="w-[2.5px] rounded-full bg-cyan-400"
+                                    style={{ animation: "soundWaveBar 0.65s ease-in-out infinite 0.25s" }}
+                                  />
+                                </span>
+                              </>
                             )}
-                          </span>
+                            <span
+                              className={`grid h-5 w-5 place-items-center rounded-full border-2 border-[#0a0618] shadow-lg relative z-10 ${
+                                effectiveSeatMuted
+                                  ? "bg-gradient-to-br from-violet-500 to-purple-700"
+                                  : "bg-gradient-to-br from-pink-500 to-fuchsia-600"
+                              }`}
+                            >
+                              {effectiveSeatMuted ? (
+                                <MicOff className="h-3 w-3 text-white" />
+                              ) : (
+                                <Mic className="h-3 w-3 text-white" />
+                              )}
+                            </span>
+                          </div>
                         )}
                       </button>
 
