@@ -448,6 +448,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/party-themes/admin/{id}',    [PartyThemeController::class, 'adminDelete']);
 
     // Admin CRUD for catalogs
+    Route::get   ('/admin/frame-catalog',      [FrameCatalogController::class, 'adminIndex']);
     Route::post  ('/admin/frame-catalog/seed', [FrameCatalogController::class, 'seed']);
     Route::middleware('can:admin')->group(function () {
         Route::post  ('/admin/frame-catalog',      [FrameCatalogController::class, 'store']);

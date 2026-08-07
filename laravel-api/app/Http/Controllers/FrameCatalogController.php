@@ -281,6 +281,16 @@ class FrameCatalogController extends Controller
     }
 
     // ===== Admin =====
+    public function adminIndex(Request $r)
+    {
+        $this->ensureTables();
+        $rows = DB::table('frame_catalog')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+        return response()->json(['data' => $rows]);
+    }
+
     public function seed(Request $r)
     {
         $this->ensureTables();
@@ -314,34 +324,37 @@ class FrameCatalogController extends Controller
     public function store(Request $r)
     {
         $this->ensureTables();
-        $data = $r->validate([
-            'code' => 'required|string|max:64|unique:frame_catalog,code',
-            'name' => 'required|string|max:120',
-            'image_url' => 'required|string|max:500',
-            'price_coins' => 'integer|min:0',
-            'vip_level_required' => 'integer|min:0',
-            'rarity' => 'in:common,rare,epic,legendary',
-            'duration_days' => 'integer|min:0',
-            'is_active' => 'boolean',
-            'sort_order' => 'integer',
-        ]);
-        $id = DB::table('frame_catalog')->insertGetId($data + ['created_at' => now(), 'updated_at' => now()]);
-        return response()->json(['id' => $id], 201);
+        $code = $r->input('code') ?: ('frame_' . time());
+        $data = [
+            'code' => $code,
+            'name' => $r->input('name', 'New Frame'),
+            'image_url' => $r->input('image_url') ?: $r->input('image', ''),
+            'price_coins' => (int)($r->input('price_coins') ?? $r->input('price', 0)),
+            'vip_level_required' => (int)$r->input('vip_level_required', 0),
+            'rarity' => $r->input('rarity', 'common'),
+            'duration_days' => (int)($r->input('duration_days') ?? $r->input('durationDays', 30)),
+            'is_active' => $r->has('is_active') ? (bool)$r->input('is_active') : true,
+            'sort_order' => (int)$r->input('sort_order', 0),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+        $id = DB::table('frame_catalog')->insertGetId($data);
+        return response()->json(['id' => $id, 'ok' => true], 201);
     }
 
     public function update(Request $r, $id)
     {
         $this->ensureTables();
-        $data = $r->validate([
-            'name' => 'sometimes|string|max:120',
-            'image_url' => 'sometimes|string|max:500',
-            'price_coins' => 'sometimes|integer|min:0',
-            'vip_level_required' => 'sometimes|integer|min:0',
-            'rarity' => 'sometimes|in:common,rare,epic,legendary',
-            'duration_days' => 'sometimes|integer|min:0',
-            'is_active' => 'sometimes|boolean',
-            'sort_order' => 'sometimes|integer',
-        ]);
+        $data = [];
+        if ($r->has('code')) $data['code'] = $r->input('code');
+        if ($r->has('name')) $data['name'] = $r->input('name');
+        if ($r->has('image_url') || $r->has('image')) $data['image_url'] = $r->input('image_url') ?: $r->input('image');
+        if ($r->has('price_coins') || $r->has('price')) $data['price_coins'] = (int)($r->input('price_coins') ?? $r->input('price'));
+        if ($r->has('duration_days') || $r->has('durationDays')) $data['duration_days'] = (int)($r->input('duration_days') ?? $r->input('durationDays'));
+        if ($r->has('rarity')) $data['rarity'] = $r->input('rarity');
+        if ($r->has('is_active')) $data['is_active'] = (bool)$r->input('is_active');
+        if ($r->has('sort_order')) $data['sort_order'] = (int)$r->input('sort_order');
+
         DB::table('frame_catalog')->where('id', $id)->update($data + ['updated_at' => now()]);
         return response()->json(['ok' => true]);
     }

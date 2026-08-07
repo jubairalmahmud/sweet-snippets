@@ -55,7 +55,10 @@ export default function AgencyAndThemes(props: Props) {
         setPartyThemeCatalog={props.setPartyThemeCatalog}
       />
 
-      {/* 2️⃣  🏢 Agency Management (Pending · Approved · Performance · NOC) */}
+      {/* 2️⃣  Store → Avatar Frames Catalog */}
+      <AvatarFramesAdminSection />
+
+      {/* 3️⃣  🏢 Agency Management (Pending · Approved · Performance · NOC) */}
       <AgencyManagement
         agencyApplications={agencyApplications}
         approveAgencyApplication={props.approveAgencyApplication}
@@ -800,6 +803,348 @@ function MetricBar({
         <div className={`h-full ${bg}`} style={{ width: `${p ?? 0}%` }} />
       </div>
       {p !== null && <p className="mt-0.5 text-right text-[8px] font-bold text-slate-400">{p}%</p>}
+    </div>
+  );
+}
+
+/* ═════════════════════════════════════════════════════════════
+   Avatar Frames — Store admin panel
+   ═════════════════════════════════════════════════════════════ */
+type FrameDraft = {
+  code: string;
+  name: string;
+  image: string;
+  priceCoins: string;
+  durationDays: string;
+  rarity: string;
+  isActive: boolean;
+};
+
+function AvatarFramesAdminSection() {
+  const emptyDraft: FrameDraft = {
+    code: "",
+    name: "",
+    image: "",
+    priceCoins: "200000",
+    durationDays: "30",
+    rarity: "epic",
+    isActive: true,
+  };
+
+  const [frames, setFrames] = useState<any[]>([]);
+  const [draft, setDraft] = useState<FrameDraft>(emptyDraft);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const fetchFrames = async () => {
+    try {
+      const res = await api.get("/api/admin/frame-catalog");
+      if (res?.data && Array.isArray(res.data)) {
+        setFrames(res.data);
+      } else {
+        const resPublic = await api.get("/api/frame-catalog");
+        if (resPublic?.data && Array.isArray(resPublic.data)) {
+          setFrames(resPublic.data);
+        }
+      }
+    } catch (err) {
+      console.warn("Fetch frame catalog error:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchFrames();
+  }, []);
+
+  const handleSeed = async () => {
+    if (!window.confirm("Seed default 7 Avatar Frames in DB table `frame_catalog`?")) return;
+    setLoading(true);
+    try {
+      const res = await api.post("/api/admin/frame-catalog/seed", {});
+      if (res?.data && Array.isArray(res.data)) setFrames(res.data);
+      else fetchFrames();
+      window.alert(`✅ Default frames seeded successfully! (${res?.inserted ?? 0} new inserted)`);
+    } catch (e: any) {
+      window.alert("⚠️ Seed failed: " + (e?.message || "Error"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFile = (file: File | null) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setDraft((prev) => ({ ...prev, image: reader.result as string }));
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!draft.name.trim()) return window.alert("Frame name is required!");
+    if (!draft.image.trim()) return window.alert("Frame image / URL is required!");
+
+    setLoading(true);
+    try {
+      const payload = {
+        code: draft.code.trim() || `avatar-${draft.name.toLowerCase().replace(/\s+/g, '-')}`,
+        name: draft.name.trim(),
+        image_url: draft.image.trim(),
+        price_coins: parseInt(draft.priceCoins || "0", 10),
+        duration_days: parseInt(draft.durationDays || "30", 10),
+        rarity: draft.rarity || "common",
+        is_active: draft.isActive,
+      };
+
+      if (editingId) {
+        await api.put(`/api/admin/frame-catalog/${editingId}`, payload);
+        window.alert("✅ Avatar frame updated successfully!");
+      } else {
+        await api.post("/api/admin/frame-catalog", payload);
+        window.alert("✅ New Avatar frame added successfully!");
+      }
+
+      setDraft(emptyDraft);
+      setEditingId(null);
+      fetchFrames();
+    } catch (err: any) {
+      window.alert("❌ Failed to save avatar frame: " + (err?.message || "Error"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (item: any) => {
+    setEditingId(item.id);
+    setDraft({
+      code: item.code || "",
+      name: item.name || "",
+      image: item.image_url || item.image || "",
+      priceCoins: String(item.price_coins ?? item.price ?? 0),
+      durationDays: String(item.duration_days ?? item.durationDays ?? 30),
+      rarity: item.rarity || "common",
+      isActive: Boolean(item.is_active ?? true),
+    });
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm("Are you sure you want to delete this frame from database?")) return;
+    setLoading(true);
+    try {
+      await api.delete(`/api/admin/frame-catalog/${id}`);
+      setFrames((prev) => prev.filter((f) => f.id !== id));
+      window.alert("🗑️ Frame deleted.");
+    } catch (err: any) {
+      window.alert("❌ Failed to delete frame: " + (err?.message || "Error"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl text-white">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800">
+        <div>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-fuchsia-400">STORE</span>
+          <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
+            <span>🖼️ Avatar Frames Catalog</span>
+            <span className="text-xs bg-fuchsia-500/20 text-fuchsia-300 font-semibold px-2 py-0.5 rounded-full border border-fuchsia-500/30">
+              {frames.length} items in DB
+            </span>
+          </h2>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Manage avatar frames catalog (`frame_catalog` table). Changes reflect instantly in Store & User Profiles.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleSeed}
+          disabled={loading}
+          className="bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/40 text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer transition flex items-center gap-1.5"
+        >
+          <span>⚡ Seed Default 7 Frames</span>
+        </button>
+      </div>
+
+      {/* ADD / EDIT FORM */}
+      <form onSubmit={handleSave} className="bg-slate-950/70 border border-slate-800/80 rounded-xl p-4 mb-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-200">
+            {editingId ? "✏️ EDIT AVATAR FRAME" : "➕ ADD NEW AVATAR FRAME"}
+          </h3>
+          {editingId && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingId(null);
+                setDraft(emptyDraft);
+              }}
+              className="text-xs text-slate-400 hover:text-white underline cursor-pointer"
+            >
+              Cancel Edit
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          <div>
+            <label className="text-[11px] text-slate-400 block mb-1">Frame Name *</label>
+            <input
+              type="text"
+              placeholder="e.g. Royal Dragon"
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-fuchsia-500"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] text-slate-400 block mb-1">Code / Identifier</label>
+            <input
+              type="text"
+              placeholder="e.g. avatar-royal (auto if empty)"
+              value={draft.code}
+              onChange={(e) => setDraft({ ...draft, code: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-fuchsia-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] text-slate-400 block mb-1">Price (🪙 Coins)</label>
+            <input
+              type="number"
+              placeholder="e.g. 200000"
+              value={draft.priceCoins}
+              onChange={(e) => setDraft({ ...draft, priceCoins: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-fuchsia-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] text-slate-400 block mb-1">Duration (Days)</label>
+            <input
+              type="number"
+              value={draft.durationDays}
+              onChange={(e) => setDraft({ ...draft, durationDays: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-fuchsia-500"
+            />
+          </div>
+
+          <div>
+            <label className="text-[11px] text-slate-400 block mb-1">Rarity</label>
+            <select
+              value={draft.rarity}
+              onChange={(e) => setDraft({ ...draft, rarity: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-fuchsia-500"
+            >
+              <option value="common">Common</option>
+              <option value="rare">Rare</option>
+              <option value="epic">Epic</option>
+              <option value="legendary">Legendary</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[11px] text-slate-400 block mb-1">Image URL / File</label>
+            <input
+              type="text"
+              placeholder="/assets/frames/egol.png or https://..."
+              value={draft.image}
+              onChange={(e) => setDraft({ ...draft, image: e.target.value })}
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-fuchsia-500 mb-1"
+            />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => handleFile(e.target.files?.[0] || null)}
+              className="text-[10px] text-slate-400 file:bg-slate-800 file:text-slate-200 file:border-0 file:rounded file:px-2 file:py-0.5 file:cursor-pointer"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-2">
+          <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={draft.isActive}
+              onChange={(e) => setDraft({ ...draft, isActive: e.target.checked })}
+              className="rounded bg-slate-900 border-slate-800 text-fuchsia-500 focus:ring-0"
+            />
+            Active in Store
+          </label>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 text-white font-bold text-xs px-6 py-2 rounded-xl border-none cursor-pointer shadow-lg transition"
+          >
+            {editingId ? "Update Frame" : "Add Frame to DB"}
+          </button>
+        </div>
+      </form>
+
+      {/* CATALOG GRID */}
+      {frames.length === 0 ? (
+        <div className="text-center py-8 text-slate-500 text-xs bg-slate-950/40 rounded-xl border border-slate-800">
+          No frames in `frame_catalog` table. Click "Seed Default 7 Frames" above.
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {frames.map((f: any) => {
+            const price = Number(f.price_coins ?? f.price ?? 0);
+            const img = f.image_url || f.image || "";
+            return (
+              <div
+                key={f.id}
+                className="bg-slate-950/80 border border-slate-800 hover:border-fuchsia-500/50 rounded-xl p-3 flex flex-col items-center text-center relative group transition shadow-md"
+              >
+                <div className="w-16 h-16 relative flex items-center justify-center my-1">
+                  <div className="w-12 h-12 rounded-full bg-slate-800 overflow-hidden flex items-center justify-center">
+                    <span className="text-xl">👤</span>
+                  </div>
+                  {img && (
+                    <img
+                      src={img}
+                      alt={f.name}
+                      className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                    />
+                  )}
+                </div>
+
+                <div className="font-bold text-xs text-white truncate w-full mt-1">{f.name}</div>
+                <div className="text-[10px] text-slate-400 truncate w-full">{f.code}</div>
+
+                <div className="text-[11px] font-semibold text-amber-400 mt-1">
+                  {price === 0 ? "FREE / Official" : `🪙 ${price.toLocaleString()}`}
+                </div>
+                <div className="text-[10px] text-slate-500">{f.duration_days ?? 30} days</div>
+
+                <div className="mt-2 flex items-center gap-1 opacity-90 group-hover:opacity-100">
+                  <button
+                    type="button"
+                    onClick={() => handleEdit(f)}
+                    className="bg-slate-800 hover:bg-fuchsia-600 text-white text-[10px] px-2 py-1 rounded cursor-pointer transition border-none"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(f.id)}
+                    className="bg-slate-800 hover:bg-rose-600 text-white text-[10px] px-2 py-1 rounded cursor-pointer transition border-none"
+                  >
+                    Del
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

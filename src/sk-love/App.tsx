@@ -173,24 +173,31 @@ import partyTheme10Img from "./assets/party-themes/theme-10.jpg";
 import { GamesLauncher, type GameKey } from "./games/GamesLauncher";
 
 // ==========================================
-// STORE — Avatar Frame catalog (frontend only; wire to Laravel later)
+// STORE — Avatar Frame catalog
 // ==========================================
-const AVATAR_FRAME_CATALOG: Array<{
+export type AvatarFrameItem = {
+  dbId?: number;
   id: string;
+  code: string;
   name: string;
   image: string;
   price: number;
   durationDays: number;
+  vipLevelRequired?: number;
+  rarity?: string;
+  isActive?: boolean;
   adminOnly?: boolean;
   isOfficial?: boolean;
-}> = [
-  { id: "avatar-egol", name: "Egol", image: frameEgolImg, price: 500000, durationDays: 30 },
-  { id: "avatar-fair", name: "Fair", image: frameFairImg, price: 500000, durationDays: 30 },
-  { id: "avatar-king", name: "KING", image: frameKingImg, price: 500000, durationDays: 30 },
-  { id: "avatar-queen", name: "QUEEN", image: frameQueenImg, price: 500000, durationDays: 30 },
-  { id: "avatar-host-premium", name: "HOST VIP", image: frameHostPremiumImg, price: 0, durationDays: 3650, isOfficial: true, adminOnly: true },
-  { id: "avatar-reseller-premium", name: "RESELLER VIP", image: frameResellerPremiumImg, price: 0, durationDays: 3650, isOfficial: true, adminOnly: true },
-  { id: "avatar-agency-premium", name: "AGENCY VIP", image: frameAgencyPremiumImg, price: 0, durationDays: 3650, isOfficial: true, adminOnly: true },
+};
+
+const DEFAULT_AVATAR_FRAME_CATALOG: AvatarFrameItem[] = [
+  { dbId: 1, id: "avatar-egol", code: "avatar-egol", name: "Egol", image: frameEgolImg, price: 500000, durationDays: 30, rarity: "epic" },
+  { dbId: 2, id: "avatar-fair", code: "avatar-fair", name: "Fair", image: frameFairImg, price: 500000, durationDays: 30, rarity: "epic" },
+  { dbId: 3, id: "avatar-king", code: "avatar-king", name: "KING", image: frameKingImg, price: 500000, durationDays: 30, rarity: "legendary" },
+  { dbId: 4, id: "avatar-queen", code: "avatar-queen", name: "QUEEN", image: frameQueenImg, price: 500000, durationDays: 30, rarity: "legendary" },
+  { dbId: 5, id: "avatar-host-premium", code: "avatar-host-premium", name: "HOST VIP", image: frameHostPremiumImg, price: 0, durationDays: 3650, isOfficial: true, adminOnly: true, rarity: "rare" },
+  { dbId: 6, id: "avatar-reseller-premium", code: "avatar-reseller-premium", name: "RESELLER VIP", image: frameResellerPremiumImg, price: 0, durationDays: 3650, isOfficial: true, adminOnly: true, rarity: "rare" },
+  { dbId: 7, id: "avatar-agency-premium", code: "avatar-agency-premium", name: "AGENCY VIP", image: frameAgencyPremiumImg, price: 0, durationDays: 3650, isOfficial: true, adminOnly: true, rarity: "rare" },
 ];
 
 
@@ -2271,6 +2278,22 @@ export default function App() {
     refCode: "",
   });
 
+  // ---- Store: Avatar Frame catalog (admin-editable, persisted) ----
+  const [avatarFrameCatalog, setAvatarFrameCatalog] = useState<AvatarFrameItem[]>(() => {
+    try {
+      const raw = typeof window !== "undefined" ? window.localStorage.getItem("sk_avatar_frame_catalog") : null;
+      if (!raw) return DEFAULT_AVATAR_FRAME_CATALOG;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length) return parsed as AvatarFrameItem[];
+      return DEFAULT_AVATAR_FRAME_CATALOG;
+    } catch {
+      return DEFAULT_AVATAR_FRAME_CATALOG;
+    }
+  });
+  useEffect(() => {
+    try { window.localStorage.setItem("sk_avatar_frame_catalog", JSON.stringify(avatarFrameCatalog)); } catch {}
+  }, [avatarFrameCatalog]);
+
   // ---- Store: owned avatar frames { id -> expiryTimestamp(ms) } + currently equipped ----
   const [ownedAvatarFrames, setOwnedAvatarFrames] = useState<Record<string, number>>(() => {
     try {
@@ -2331,7 +2354,7 @@ export default function App() {
     }
   }, [equippedAvatarFrame, ownedAvatarFrames]);
   const activeAvatarFrameImg = equippedAvatarFrame
-    ? AVATAR_FRAME_CATALOG.find((f) => f.id === equippedAvatarFrame)?.image ?? null
+    ? avatarFrameCatalog.find((f) => f.id === equippedAvatarFrame || f.code === equippedAvatarFrame)?.image ?? null
     : null;
 
   // ---- Store: owned Rides / Entry Effects { id -> expiryTimestamp(ms) } + equipped ----
@@ -3061,6 +3084,48 @@ export default function App() {
       }
     })();
 
+    // ────── 1.5) Avatar Frame catalog (public) ──────
+    (async () => {
+      try {
+        const res: any = await api.get("/api/frame-catalog", { auth: false });
+        if (cancelled) return;
+        const items = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+        if (items.length) {
+          setAvatarFrameCatalog(
+            items.map((f: any): AvatarFrameItem => {
+              const code = String(f.code || `frame_${f.id}`);
+              let img = String(f.image_url || f.image || "");
+              if (!img || img.includes('/assets/frames/egol.png')) img = frameEgolImg;
+              else if (img.includes('/assets/frames/fair.png')) img = frameFairImg;
+              else if (img.includes('/assets/frames/king.png')) img = frameKingImg;
+              else if (img.includes('/assets/frames/queen.png')) img = frameQueenImg;
+              else if (img.includes('/assets/frames/host-vip.png')) img = frameHostPremiumImg;
+              else if (img.includes('/assets/frames/reseller-vip.png')) img = frameResellerPremiumImg;
+              else if (img.includes('/assets/frames/agency-vip.png')) img = frameAgencyPremiumImg;
+
+              const price = Number(f.price_coins ?? f.price ?? 0);
+              return {
+                dbId: Number(f.id),
+                id: code,
+                code: code,
+                name: String(f.name || "Frame"),
+                image: img,
+                price: price,
+                durationDays: Number(f.duration_days ?? f.durationDays ?? 30),
+                vipLevelRequired: Number(f.vip_level_required ?? 0),
+                rarity: String(f.rarity || "common"),
+                isActive: Boolean(f.is_active ?? true),
+                isOfficial: price === 0 && (code.includes("vip") || code.includes("premium")),
+                adminOnly: price === 0 && (code.includes("vip") || code.includes("premium")),
+              };
+            })
+          );
+        }
+      } catch {
+        /* fall back to localStorage default */
+      }
+    })();
+
     // ────── 2) My owned themes + equipped ──────
     (async () => {
       try {
@@ -3139,13 +3204,12 @@ export default function App() {
   // ────── Push equipped-frame change to server ──────
   useEffect(() => {
     if (!dbSyncHydratedFramesRef.current || !equippedAvatarFrame) return;
-    // Resolve numeric frame_id from catalog
-    const cat = AVATAR_FRAME_CATALOG.find((f) => f.id === equippedAvatarFrame);
-    const dbId = (cat as any)?.dbId;
+    const cat = avatarFrameCatalog.find((f) => f.id === equippedAvatarFrame || f.code === equippedAvatarFrame);
+    const dbId = cat?.dbId || cat?.id;
     if (dbId) {
-      api.post(`/api/me/frames/${dbId}/equip`, {}).catch(() => {});
+      api.post(`/api/me/frames/equip`, { frame_id: dbId, code: cat?.code || equippedAvatarFrame }).catch(() => {});
     }
-  }, [equippedAvatarFrame]);
+  }, [equippedAvatarFrame, avatarFrameCatalog]);
 
   // ────── Push NEW frame purchases to server ──────
   useEffect(() => {
@@ -3153,15 +3217,11 @@ export default function App() {
     Object.keys(ownedAvatarFrames).forEach((id) => {
       if (dbSyncKnownOwnedFramesRef.current[id]) return;
       dbSyncKnownOwnedFramesRef.current[id] = true;
-      const cat = AVATAR_FRAME_CATALOG.find((f) => f.id === id);
-      const dbId = (cat as any)?.dbId;
-      if (dbId) api.post(`/api/frame-catalog/${dbId}/buy`, {}).catch(() => {});
+      const cat = avatarFrameCatalog.find((f) => f.id === id || f.code === id);
+      const dbId = cat?.dbId || id;
+      if (dbId) api.post(`/api/frame-catalog/${dbId}/buy`, { code: cat?.code || id }).catch(() => {});
     });
-  }, [ownedAvatarFrames]);
-
-
-
-
+  }, [ownedAvatarFrames, avatarFrameCatalog]);
 
   /**
    * Resolve which avatar-frame image to render for ANY user (own or others).
@@ -3197,9 +3257,9 @@ export default function App() {
         const expMs = typeof expiry === "number" ? expiry : Date.parse(String(expiry));
         if (Number.isFinite(expMs) && expMs > 0 && expMs < Date.now()) return null;
       }
-      return AVATAR_FRAME_CATALOG.find((f) => f.id === frameId)?.image ?? null;
+      return avatarFrameCatalog.find((f) => f.id === frameId || f.code === frameId)?.image ?? null;
     },
-    [activeAvatarFrameImg],
+    [activeAvatarFrameImg, avatarFrameCatalog],
   );
 
 
@@ -27027,14 +27087,16 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   "avatar" | "party" | "rides",
                   { id: string; name: string; emoji: string; price: string; gradient: string; image?: string }[]
                 > = {
-                  avatar: AVATAR_FRAME_CATALOG.map((f) => ({
+                  avatar: avatarFrameCatalog.filter((f) => f.isActive !== false).map((f) => ({
                     id: f.id,
                     name: f.name,
                     emoji: f.isOfficial ? "🛡️" : "",
                     image: f.image,
-                    price: f.isOfficial
+                    price: f.isOfficial || f.price === 0
                       ? "Official Frame"
-                      : `${(f.price / 1000).toLocaleString()}K/${f.durationDays} d`,
+                      : f.price >= 1000
+                      ? `${(f.price / 1000).toLocaleString()}K/${f.durationDays} d`
+                      : `${f.price.toLocaleString()}/${f.durationDays} d`,
                     gradient: f.isOfficial ? "from-amber-100 to-yellow-50" : "from-purple-100 to-pink-50",
                   })),
 
@@ -27326,7 +27388,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                           );
                         }
 
-                        const catItem = AVATAR_FRAME_CATALOG.find((f) => f.id === selected.id);
+                        const catItem = avatarFrameCatalog.find((f) => f.id === selected.id || f.code === selected.id);
                         const isOwned = !!ownedAvatarFrames[selected.id];
                         const isEquipped = equippedAvatarFrame === selected.id;
                         if (isEquipped) {
