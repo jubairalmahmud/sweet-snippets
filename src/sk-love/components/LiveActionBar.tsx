@@ -39,6 +39,9 @@ export function SafeStreamIcon({
   className = "h-12 w-12 object-contain filter drop-shadow-[0_0_6px_rgba(0,0,0,0.35)]",
   glowColor = "rgba(236,72,153,0.6)",
 }: SafeStreamIconProps) {
+  /* ========================================================================
+   * FALLBACK SYSTEM (COMMENTED OUT)
+   * ------------------------------------------------------------------------
   const [retryStage, setRetryStage] = useState(0);
   const [currentSrc, setCurrentSrc] = useState(src || "");
 
@@ -81,12 +84,12 @@ export function SafeStreamIcon({
       </div>
     );
   }
+   * ======================================================================== */
 
   return (
     <img
-      src={currentSrc}
+      src={src}
       alt={alt}
-      onError={handleError}
       className={className}
     />
   );
