@@ -202,15 +202,19 @@ export function GamesLauncher({ open, onClose, initialGame = null, compact = fal
   const [error, setError] = useState<string | null>(null);
 
   const normalizedConfig = useMemo(() => normalizeConfig(config), [config]);
+  const updateBalance = useCallback((next: number) => {
+    setBalance(next);
+    window.dispatchEvent(new CustomEvent("sklove:topup-balance", { detail: next }));
+  }, []);
 
   const loadBalance = useCallback(async () => {
     try {
       const res = await api.get<{ coins: number }>("/api/games/balance");
-      setBalance(safeBalance(res));
+      updateBalance(safeBalance(res));
     } catch (e: any) {
       setError(e?.message || "Balance load failed");
     }
-  }, []);
+  }, [updateBalance]);
 
   useEffect(() => {
     if (!open) return;
@@ -319,7 +323,7 @@ export function GamesLauncher({ open, onClose, initialGame = null, compact = fal
                   chips={normalizedConfig.casino.chips}
                   timerSeconds={normalizedConfig.casino.timer_seconds}
                   balance={balance ?? 0}
-                  onBalance={setBalance}
+                  onBalance={updateBalance}
                 />
               </FitToViewport>
             </GameCrashBoundary>
@@ -338,7 +342,7 @@ export function GamesLauncher({ open, onClose, initialGame = null, compact = fal
                     icon: s.icon,
                   }))}
                   balance={balance ?? 0}
-                  onBalance={setBalance}
+                  onBalance={updateBalance}
                 />
               </FitToViewport>
             </GameCrashBoundary>
@@ -350,7 +354,7 @@ export function GamesLauncher({ open, onClose, initialGame = null, compact = fal
                   chips={normalizedConfig.teenpatti.chips}
                   timerSeconds={normalizedConfig.teenpatti.timer_seconds}
                   balance={balance ?? 0}
-                  onBalance={setBalance}
+                  onBalance={updateBalance}
                 />
               </FitToViewport>
             </GameCrashBoundary>

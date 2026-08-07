@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 
 /**
  * SK Love — Games Controller
- * Solo rounds. Coin balance lives on users.r_coins (NO wallets table).
+ * Solo rounds. Coin balance lives on users.diamonds (recharge/top-up balance).
  * Games: casino (roulette 0-36), ferry_wheel (8 slots), teen_patti (3 hands).
  *
  * Routes (add to routes/api.php inside auth:sanctum group):
@@ -99,7 +99,8 @@ class GameController extends Controller
         if (!$u) return response()->json(['ok' => false, 'message' => 'Unauthorized'], 401);
         return response()->json([
             'ok'    => true,
-            'coins' => (int) ($u->r_coins ?? 0),
+            'coins' => (int) ($u->diamonds ?? 0),
+            'diamonds' => (int) ($u->diamonds ?? 0),
         ]);
     }
 
@@ -113,6 +114,12 @@ class GameController extends Controller
         $user = Auth::user();
         if (!$user) return response()->json(['ok' => false, 'message' => 'Unauthorized'], 401);
 
+        $game = match ($game) {
+            'ferry'     => 'ferry_wheel',
+            'teenpatti' => 'teen_patti',
+            default     => $game,
+        };
+
         if (!in_array($game, ['casino', 'ferry_wheel', 'teen_patti'], true)) {
             return response()->json(['ok' => false, 'message' => 'Unknown game'], 404);
         }
@@ -120,6 +127,12 @@ class GameController extends Controller
         $bets = $request->input('bets', []);
         if (!is_array($bets) || count($bets) === 0) {
             return response()->json(['ok' => false, 'message' => 'No bets provided'], 422);
+        }
+        // Mobile clients send either [{target, amount}] or {target: amount}.
+        if (!array_is_list($bets)) {
+            $bets = collect($bets)->map(
+                fn ($amount, $target) => ['target' => (string) $target, 'amount' => $amount]
+            )->values()->all();
         }
 
         // Normalize & validate bets
@@ -129,6 +142,10 @@ class GameController extends Controller
             $target = isset($b['target']) ? (string) $b['target'] : '';
             $amount = (int) ($b['amount'] ?? 0);
             if ($target === '' || $amount <= 0) continue;
+            if ($game === 'ferry_wheel' && preg_match('/^slot_(\d+)$/', $target, $match)) {
+                $slotIndex = (int) $match[1];
+                $target = self::FERRY_SLOTS[$slotIndex]['key'] ?? $target;
+            }
             if (!$this->isValidTarget($game, $target)) {
                 return response()->json(['ok' => false, 'message' => "Invalid target: $target"], 422);
             }
@@ -153,7 +170,7 @@ class GameController extends Controller
                 if (!$row) {
                     return response()->json(['ok' => false, 'message' => 'User not found'], 404);
                 }
-                $balanceBefore = (int) ($row->r_coins ?? 0);
+                $balanceBefore = (int) ($row->diamonds ?? 0);
                 if ($balanceBefore < $betTotal) {
                     return response()->json(['ok' => false, 'message' => 'Insufficient coins'], 402);
                 }
@@ -165,7 +182,7 @@ class GameController extends Controller
 
                 $newBalance = $balanceBefore - $betTotal + $payout;
                 DB::table('users')->where('id', $user->id)->update([
-                    'r_coins'    => $newBalance,
+                    'diamonds'   => $newBalance,
                     'updated_at' => now(),
                 ]);
 
@@ -204,6 +221,7 @@ class GameController extends Controller
                         'nonce'          => $nonce,
                     ],
                     'coins'   => $newBalance,
+                    'diamonds'=> $newBalance,
                 ]);
             });
         } catch (\Throwable $e) {
@@ -218,6 +236,11 @@ class GameController extends Controller
     {
         $user = Auth::user();
         if (!$user) return response()->json(['ok' => false, 'message' => 'Unauthorized'], 401);
+        $game = match ($game) {
+            'ferry'     => 'ferry_wheel',
+            'teenpatti' => 'teen_patti',
+            default     => $game,
+        };
         if (!in_array($game, ['casino', 'ferry_wheel', 'teen_patti'], true)) {
             return response()->json(['ok' => false, 'message' => 'Unknown game'], 404);
         }
@@ -254,7 +277,7 @@ class GameController extends Controller
     private function isValidTarget(string $game, string $target): bool
     {
         if ($game === 'casino') {
-            if (in_array($target, ['red','black','odd','even','low','high'], true)) return true;
+            if (in_array($target, ['red','black','odd','even','low','high','d1','d2','d3'], true)) return true;
             if (ctype_digit($target)) {
                 $n = (int) $target;
                 return $n >= 0 && $n <= 36;
@@ -318,7 +341,7 @@ class GameController extends Controller
                 if ($pick <= $acc) { $idx = $i; break; }
             }
             $slot = self::FERRY_SLOTS[$idx];
-            return ['slot' => $slot['key'], 'label' => $slot['label'], 'mult' => $slot['mult']];
+            return ['slot' => $slot['key'], 'index' => $idx, 'label' => $slot['label'], 'mult' => $slot['mult']];
         }
 
         // teen_patti — simulate three 3-card hands, highest wins
@@ -392,9 +415,12 @@ class GameController extends Controller
                     'even'  => $parity === 'even',
                     'low'   => $half === 'low',
                     'high'  => $half === 'high',
+                    'd1'    => $n >= 1 && $n <= 12,
+                    'd2'    => $n >= 13 && $n <= 24,
+                    'd3'    => $n >= 25 && $n <= 36,
                     default => false,
                 };
-                if ($win) $payout += $a * 2;
+                if ($win) $payout += $a * (str_starts_with($t, 'd') ? 3 : 2);
             }
             return $payout;
         }

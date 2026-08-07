@@ -133,16 +133,15 @@ export default function FerryWheelGame({ chips, slots, balance: balanceProp, onB
       const betsArray = Object.entries(bets)
         .filter(([, v]) => Number(v) > 0)
         .map(([target, amount]) => ({ target, amount }));
-      const res: any = await api.post("/api/games/ferry/play", { bets, bets_array: betsArray, total: totalBet });
+      const res: any = await api.post("/api/games/ferry/play", { bets: betsArray, total: totalBet });
       const idx = Number(res?.result_index ?? res?.slot_index ?? res?.round?.result?.index ?? res?.result?.index ?? 0);
       const winAmount = Number(res?.win ?? res?.payout ?? res?.round?.payout_total ?? 0);
       const newBal = parseBalance(res, balance + winAmount);
       runResult(idx, winAmount, newBal);
-    } catch {
-      const idx = Math.floor(Math.random() * wheelSlots.length);
-      const bet = bets[`slot_${idx}`] || 0;
-      const winAmount = bet * (wheelSlots[idx]?.multiplier || 0);
-      runResult(idx, winAmount, balance + winAmount);
+    } catch (error: any) {
+      pushBalance(balance + totalBet);
+      setSpinning(false);
+      toast.error(error?.message || "Game server unavailable. Bet refunded.");
     }
   };
 

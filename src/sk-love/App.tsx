@@ -8,14 +8,14 @@ import LiveActionBar, { SafeStreamIcon } from "./components/LiveActionBar";
 import TopGameWinnerBanner from "./components/TopGameWinnerBanner";
 import RoyalGiftBanner from "./components/RoyalGiftBanner";
 
-import commentImg from "./assets/stream-icons/comment.png";
-import menuImg from "./assets/stream-icons/menu.png";
-import phoneImg from "./assets/stream-icons/phone.png";
-import giftImg from "./assets/stream-icons/gift.png";
-import gameImg from "./assets/stream-icons/game.png";
-import reactImg from "./assets/stream-icons/react.png";
-import seatImg from "./assets/stream-icons/seat.png";
-import navGemBarImg from "./assets/nav-gem-bar.png";
+import commentImg from "./assets/stream-icons/comment.webp";
+import menuImg from "./assets/stream-icons/menu.webp";
+import phoneImg from "./assets/stream-icons/phone.webp";
+import giftImg from "./assets/stream-icons/gift.webp";
+import gameImg from "./assets/stream-icons/game.webp";
+import reactImg from "./assets/stream-icons/react.webp";
+import seatImg from "./assets/stream-icons/seat.webp";
+import navGemBarImg from "./assets/nav-gem-bar.webp";
 
 import { createPortal } from "react-dom";
 import type {
@@ -23,15 +23,19 @@ import type {
   ICameraVideoTrack,
   IMicrophoneAudioTrack,
 } from "agora-rtc-sdk-ng";
-// FIX: agora-rtc-sdk-ng reads `window` at module load and crashes during SSR
-// ("window is not defined"). Load it only on the client via top-level await.
-import AgoraRTC from "agora-rtc-sdk-ng";
-
-if (typeof window !== "undefined" && AgoraRTC && typeof (AgoraRTC as any).setLogLevel === "function") {
-  try {
-    (AgoraRTC as any).setLogLevel(3);
-  } catch {}
-}
+// Agora is large and only needed after a user opens live/party/call media.
+// Lazy-loading it keeps the normal home/profile/store experience fast.
+let agoraRtcPromise: Promise<any> | null = null;
+const loadAgoraRTC = async () => {
+  if (!agoraRtcPromise) {
+    agoraRtcPromise = import("agora-rtc-sdk-ng").then((module) => {
+      const rtc = module.default;
+      try { rtc?.setLogLevel?.(3); } catch {}
+      return rtc;
+    });
+  }
+  return agoraRtcPromise;
+};
 import { api } from "./lib/api";
 import { formatCoinCompact } from "./lib/hooks";
 import { toast } from "sonner";
@@ -153,11 +157,11 @@ const formatCompact = (n: number): string => {
   if (abs >= 1e3) return (n / 1e3).toFixed(abs >= 1e4 ? 0 : 1).replace(/\.0$/, "") + "K";
   return String(Math.round(n));
 };
-import frameEgolImg from "./assets/frames/egol.png";
-import frameFairImg from "./assets/frames/fair.png";
-import frameKingImg from "./assets/frames/king.png";
-import frameQueenImg from "./assets/frames/queen.png";
-import frameAgencyPremiumImg from "./assets/frames/agency-premium.png";
+import frameEgolImg from "./assets/frames/egol.webp";
+import frameFairImg from "./assets/frames/fair.webp";
+import frameKingImg from "./assets/frames/king.webp";
+import frameQueenImg from "./assets/frames/queen.webp";
+import frameAgencyPremiumImg from "./assets/frames/agency-premium.webp";
 import frameHostPremiumImg from "./assets/frames/host-premium.png";
 import frameResellerPremiumImg from "./assets/frames/reseller-premium.png";
 import partyTheme1Img from "./assets/party-themes/theme-1.jpg";
@@ -170,7 +174,10 @@ import partyTheme7Img from "./assets/party-themes/theme-7.jpg";
 import partyTheme8Img from "./assets/party-themes/theme-8.jpg";
 import partyTheme9Img from "./assets/party-themes/theme-9.jpg";
 import partyTheme10Img from "./assets/party-themes/theme-10.jpg";
-import { GamesLauncher, type GameKey } from "./games/GamesLauncher";
+import type { GameKey } from "./games/GamesLauncher";
+const GamesLauncher = React.lazy(() =>
+  import("./games/GamesLauncher").then((module) => ({ default: module.GamesLauncher })),
+);
 
 // ==========================================
 // STORE — Avatar Frame catalog
@@ -2277,6 +2284,15 @@ export default function App() {
     referredCount: 0,
     refCode: "",
   });
+  useEffect(() => {
+    const syncGameTopUpBalance = (event: Event) => {
+      const next = Number((event as CustomEvent<number>).detail);
+      if (!Number.isFinite(next) || next < 0) return;
+      setUserWallet((previous) => ({ ...previous, diamonds: next }));
+    };
+    window.addEventListener("sklove:topup-balance", syncGameTopUpBalance);
+    return () => window.removeEventListener("sklove:topup-balance", syncGameTopUpBalance);
+  }, []);
 
   // ---- Store: Avatar Frame catalog (admin-editable, persisted) ----
   const [avatarFrameCatalog, setAvatarFrameCatalog] = useState<AvatarFrameItem[]>(() => {
@@ -5404,6 +5420,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         return;
       }
 
+      const AgoraRTC = await loadAgoraRTC();
+
       await cleanupAgoraSession();
       setAgoraStatus(streamRole === "streamer" ? "Starting camera..." : "Joining stream...");
 
@@ -5720,6 +5738,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           setCallAgoraStatus("Private call token missing.");
           return;
         }
+
+        const AgoraRTC = await loadAgoraRTC();
 
         const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
         callAgoraClientRef.current = client;
@@ -6074,6 +6094,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       return null;
     }
     if (!partyPreparingMicRef.current) {
+      const AgoraRTC = await loadAgoraRTC();
       partyPreparingMicRef.current = AgoraRTC.createMicrophoneAudioTrack()
         .then(async (track) => {
           partyAgoraAudioTrackRef.current = track;
@@ -6182,6 +6203,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           setPartyAgoraStatus("Party voice token missing.");
           return;
         }
+
+        const AgoraRTC = await loadAgoraRTC();
 
         // Party rooms are multiparty conversations: every participant can
         // publish and subscribe to audio, so RTC mode is required here.
@@ -27556,7 +27579,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                         }
                         return (
                           <button
-                            onClick={() => {
+                            onClick={async () => {
                               if (!catItem) {
                                 window.alert("❌ এই ফ্রেমের ইনফো পাওয়া যায়নি।");
                                 return;
@@ -27571,17 +27594,28 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 `"${catItem.name}" ফ্রেমটি কিনতে চান?\n\nমূল্য: 🪙 ${catItem.price.toLocaleString()}\nমেয়াদ: ${catItem.durationDays} দিন`,
                               );
                               if (!ok) return;
-                              const expiry = Date.now() + catItem.durationDays * 24 * 60 * 60 * 1000;
-                              setUserWallet((prev) => ({
-                                ...prev,
-                                diamonds: Math.max(0, prev.diamonds - catItem.price),
-                                avatarFrame: catItem.name,
-                              }));
-                              setOwnedAvatarFrames((prev) => ({ ...prev, [catItem.id]: expiry }));
-                              setEquippedAvatarFrame(catItem.id);
-                              window.alert(
-                                `🎉 "${catItem.name}" ফ্রেম কেনা হলো এবং সক্রিয় করা হয়েছে!\nমেয়াদ: ${catItem.durationDays} দিন`,
-                              );
+                              try {
+                                const result: any = await api.post(
+                                  `/api/frame-catalog/${catItem.dbId || catItem.id}/buy`,
+                                  { code: catItem.code },
+                                );
+                                const expiry = result?.expires_at
+                                  ? new Date(result.expires_at).getTime()
+                                  : Date.now() + catItem.durationDays * 24 * 60 * 60 * 1000;
+                                dbSyncKnownOwnedFramesRef.current[catItem.id] = true;
+                                setUserWallet((prev) => ({
+                                  ...prev,
+                                  diamonds: Number(result?.diamonds ?? Math.max(0, prev.diamonds - catItem.price)),
+                                  avatarFrame: catItem.name,
+                                }));
+                                setOwnedAvatarFrames((prev) => ({ ...prev, [catItem.id]: expiry }));
+                                setEquippedAvatarFrame(catItem.id);
+                                window.alert(
+                                  `🎉 "${catItem.name}" ফ্রেম কেনা হলো এবং সক্রিয় করা হয়েছে!\nমেয়াদ: ${catItem.durationDays} দিন`,
+                                );
+                              } catch (error: any) {
+                                window.alert(error?.message || "Frame purchase failed. Please try again.");
+                              }
                             }}
                             className="bg-gradient-to-r from-purple-400 to-fuchsia-400 text-white font-bold text-[13px] px-8 py-2.5 rounded-full border-none cursor-pointer shadow-md hover:opacity-90"
                           >
@@ -29165,12 +29199,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       )}
 
       {/* SK Games Arena — full-screen modal (Home Game tab + Party hamburger Games) */}
-      <GamesLauncher
-        open={isFullGamesOpen}
-        onClose={() => setIsFullGamesOpen(false)}
-        initialGame={fullGamesInitial}
-        compact={gamesLauncherCompact}
-      />
+      <React.Suspense fallback={null}>
+        <GamesLauncher
+          open={isFullGamesOpen}
+          onClose={() => setIsFullGamesOpen(false)}
+          initialGame={fullGamesInitial}
+          compact={gamesLauncherCompact}
+        />
+      </React.Suspense>
     </div>
 
   );

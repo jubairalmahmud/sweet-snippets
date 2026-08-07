@@ -14,13 +14,13 @@
 
 import React, { useState } from "react";
 import { MessageSquare, Gift, Smile, Gamepad2, Menu, Sofa, Phone } from "lucide-react";
-import commentImg from "../assets/stream-icons/comment.png";
-import giftImg from "../assets/stream-icons/gift.png";
-import reactImg from "../assets/stream-icons/react.png";
-import gameImg from "../assets/stream-icons/game.png";
-import menuImg from "../assets/stream-icons/menu.png";
-import seatImg from "../assets/stream-icons/seat.png";
-import phoneImg from "../assets/stream-icons/phone.png";
+import commentImg from "../assets/stream-icons/comment.webp";
+import giftImg from "../assets/stream-icons/gift.webp";
+import reactImg from "../assets/stream-icons/react.webp";
+import gameImg from "../assets/stream-icons/game.webp";
+import menuImg from "../assets/stream-icons/menu.webp";
+import seatImg from "../assets/stream-icons/seat.webp";
+import phoneImg from "../assets/stream-icons/phone.webp";
 
 type SafeStreamIconProps = {
   src: string;

@@ -321,12 +321,11 @@ export default function TeenPattiGame({
     const localNewBal = Math.max(0, balance + localWinAmount);
 
     try {
-      const betsObj: Record<string, number> = {};
-      (Object.keys(bets) as HandKey[]).forEach((k) => {
-        if (bets[k] > 0) betsObj[k] = bets[k];
-      });
+      const betsArray = (Object.keys(bets) as HandKey[])
+        .filter((key) => bets[key] > 0)
+        .map((target) => ({ target, amount: bets[target] }));
       const res: any = await api.post("/api/games/teenpatti/play", {
-        bets: betsObj,
+        bets: betsArray,
         total: totalUserBet,
       });
 
@@ -335,16 +334,35 @@ export default function TeenPattiGame({
       const winAmount = Number(res?.win ?? res?.payout ?? res?.round?.payout_total ?? res?.payout_total ?? localWinAmount);
       const newBal = parseBalance(res, localNewBal);
 
+      const readHand = (raw: any, fallback: Hand): Hand => {
+        const rawCards = Array.isArray(raw) ? raw : raw?.cards;
+        if (Array.isArray(rawCards)) {
+          const suits = ["♠", "♥", "♦", "♣"] as const;
+          const cards = rawCards.map((card: any): Card => {
+            const numericRank = Number(card?.r ?? card?.rank);
+            const rank = Number.isFinite(numericRank)
+              ? ({ 11: "J", 12: "Q", 13: "K", 14: "A" } as Record<number, string>)[numericRank] || String(numericRank)
+              : String(card?.rank || "?");
+            const suit = typeof card?.suit === "string"
+              ? card.suit
+              : suits[Math.max(0, Math.min(3, Number(card?.s ?? 0)))];
+            return { rank, suit } as Card;
+          });
+          return { cards, label: raw?.label || "result" };
+        }
+        return fallback;
+      };
       const dealt: Record<HandKey, Hand> = {
-        A: handsSrc?.A ? { cards: handsSrc.A.cards, label: handsSrc.A.label || "flush" } : localDealt.A,
-        B: handsSrc?.B ? { cards: handsSrc.B.cards, label: handsSrc.B.label || "high card" } : localDealt.B,
-        C: handsSrc?.C ? { cards: handsSrc.C.cards, label: handsSrc.C.label || "straight" } : localDealt.C,
+        A: readHand(handsSrc?.A, localDealt.A),
+        B: readHand(handsSrc?.B, localDealt.B),
+        C: readHand(handsSrc?.C, localDealt.C),
       };
 
       runResult(dealt, winKey, winAmount, newBal);
-    } catch {
-      // Offline / Local calculation with 20% win rate
-      runResult(localDealt, localWinKey, localWinAmount, localNewBal);
+    } catch (error: any) {
+      pushBalance(balance + totalUserBet);
+      setPhase("betting");
+      toast.error(error?.message || "Game server unavailable. Bet refunded.");
     }
   };
 

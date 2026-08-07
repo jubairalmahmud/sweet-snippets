@@ -14,13 +14,9 @@ export default defineConfig(() => {
     },
     build: {
       target: 'esnext',
-      rollupOptions: {
-        output: {
-          entryFileNames: 'assets/[name].js',
-          chunkFileNames: 'assets/[name].js',
-          assetFileNames: 'assets/[name].[ext]',
-        },
-      },
+      // Vite's content hashes prevent phones from reusing an older JS/CSS
+      // bundle after a cPanel deployment.
+      sourcemap: false,
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.

@@ -139,21 +139,10 @@ export default function CasinoGame({ chips, balance: balanceProp, onBalance, onB
       );
       const newBal = parseBalance(res, balance + winAmount);
       runResult(num, winAmount, newBal);
-    } catch {
-      // Local fallback so the wheel still spins in preview / offline
-      const num = Math.floor(Math.random() * 37);
-      const c = colorOf(num);
-      let winAmount = 0;
-      for (const [k, amt] of Object.entries(bets)) {
-        if (k === c) winAmount += amt * (c === "green" ? 14 : 2);
-        else if (k === "even" && num !== 0 && num % 2 === 0) winAmount += amt * 2;
-        else if (k === "odd" && num % 2 === 1) winAmount += amt * 2;
-        else if (k === "low" && num >= 1 && num <= 18) winAmount += amt * 2;
-        else if (k === "high" && num >= 19 && num <= 36) winAmount += amt * 2;
-        else if (k === "d1" && num >= 1 && num <= 12) winAmount += amt * 3;
-        else if (k === "d2" && num >= 13 && num <= 24) winAmount += amt * 3;
-      }
-      runResult(num, winAmount, balance + winAmount);
+    } catch (error: any) {
+      pushBalance(balance + totalBet);
+      setSpinning(false);
+      toast.error(error?.message || "Game server unavailable. Bet refunded.");
     }
   };
 
