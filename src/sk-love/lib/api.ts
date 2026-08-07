@@ -1,11 +1,8 @@
 // @ts-nocheck
-// Centralized Laravel API client for SK Love with Dual / Failover Server Support.
-// Primary: https://api.sklove.nit.bd
-// Failover Backup: commented out for testing primary API
-// export const DEFAULT_BACKUP_API = "https://api.keno70.com";
+// Centralized Laravel API client for SK Love.
+// Primary API: https://api.sklove.nit.bd
 
 export const DEFAULT_PRIMARY_API = "https://api.sklove.nit.bd";
-export const DEFAULT_BACKUP_API = "";
 
 export function cleanBaseUrl(url: string | null | undefined): string {
   if (!url) return "";
@@ -20,18 +17,26 @@ export function getBackendCandidates(): string[] {
   let custom: string | null = null;
   try {
     custom = localStorage.getItem("sk_love_api_url");
+    // Purge legacy keno70 URL if previously stored in browser
+    if (custom && custom.toLowerCase().includes("keno70.com")) {
+      localStorage.removeItem("sk_love_api_url");
+      custom = null;
+    }
     if (custom && custom.toLowerCase().endsWith("/api")) {
       const fixedCustom = cleanBaseUrl(custom);
       if (fixedCustom) localStorage.setItem("sk_love_api_url", fixedCustom);
     }
   } catch {}
 
-  const envUrl = (import.meta as any).env?.VITE_API_BASE_URL || (import.meta as any).env?.VITE_LARAVEL_API_URL;
-  const primaryCandidate = cleanBaseUrl(custom) || cleanBaseUrl(envUrl) || cleanBaseUrl(DEFAULT_PRIMARY_API);
+  const rawEnv = (import.meta as any).env?.VITE_API_BASE_URL || (import.meta as any).env?.VITE_LARAVEL_API_URL;
+  let cleanEnv = cleanBaseUrl(rawEnv);
+  if (cleanEnv.toLowerCase().includes("keno70.com")) {
+    cleanEnv = "";
+  }
 
-  const backupCandidate = primaryCandidate.includes("sklove.nit.bd") ? cleanBaseUrl(DEFAULT_PRIMARY_API) : cleanBaseUrl(DEFAULT_BACKUP_API);
+  const primaryCandidate = cleanBaseUrl(custom) || cleanEnv || cleanBaseUrl(DEFAULT_PRIMARY_API);
 
-  const list = [primaryCandidate, backupCandidate, cleanBaseUrl(DEFAULT_PRIMARY_API), cleanBaseUrl(DEFAULT_BACKUP_API)]
+  const list = [primaryCandidate, cleanBaseUrl(DEFAULT_PRIMARY_API)]
     .map((url) => cleanBaseUrl(url))
     .filter(Boolean);
 
