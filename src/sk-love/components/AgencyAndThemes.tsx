@@ -78,6 +78,24 @@ function PartyThemesAdminSection({
   const emptyDraft: PartyThemeDraft = { name: "", image: "", price: "", offerPrice: "", durationDays: "30" };
   const [draft, setDraft] = useState<PartyThemeDraft>(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch catalog from DB on mount
+  useEffect(() => {
+    let active = true;
+    const fetchThemes = async () => {
+      try {
+        const res = await api.get('/party-themes/admin/catalog');
+        if (active && res?.themes && Array.isArray(res.themes) && res.themes.length > 0) {
+          if (setPartyThemeCatalog) setPartyThemeCatalog(res.themes);
+        }
+      } catch (err) {
+        console.warn("Party theme DB catalog fetch notice:", err);
+      }
+    };
+    fetchThemes();
+    return () => { active = false; };
+  }, []);
 
   const handleFile = (file: File | null) => {
     if (!file) return;
@@ -88,7 +106,25 @@ function PartyThemesAdminSection({
 
   const resetDraft = () => { setDraft(emptyDraft); setEditingId(null); };
 
-  const saveDraft = () => {
+  const seedDefaultThemes = async () => {
+    try {
+      setLoading(true);
+      const res = await api.post('/party-themes/admin/seed');
+      if (res?.themes && Array.isArray(res.themes)) {
+        if (setPartyThemeCatalog) setPartyThemeCatalog(res.themes);
+        window.alert(`ডাটাবেজে ${res.inserted ?? 0} টি পার্টি থিম সফলভাবে ইনসার্ট করা হয়েছে!`);
+      } else {
+        window.alert("পার্টি থিম সিডিং সফল হয়েছে।");
+      }
+    } catch (err: any) {
+      console.error("Seed party themes error:", err);
+      window.alert("ডাটাবেজে থিম সিড করতে সমস্যা হয়েছে: " + (err?.message || String(err)));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveDraft = async () => {
     if (!setPartyThemeCatalog) return;
     const name = draft.name.trim();
     const image = draft.image.trim();
@@ -103,34 +139,80 @@ function PartyThemesAdminSection({
       window.alert("Offer price valid হতে হবে।");
       return;
     }
-    setPartyThemeCatalog((prev: any[]) => {
-      const list = Array.isArray(prev) ? [...prev] : [];
-      if (editingId) {
-        return list.map((t) =>
-          t.id === editingId ? { ...t, name, image, price, offerPrice: offer, durationDays: days } : t,
-        );
-      }
-      const id = `party-theme-${Date.now()}`;
-      return [...list, { id, name, image, price, offerPrice: offer, durationDays: days }];
-    });
-    resetDraft();
+
+    try {
+      setLoading(true);
+      const numericId = editingId && !isNaN(Number(editingId)) ? Number(editingId) : undefined;
+      const res = await api.post('/party-themes/admin/upsert', {
+        id: numericId,
+        name,
+        imageUrl: image,
+        price,
+        offerPrice: offer,
+        durationDays: days,
+      });
+
+      const savedTheme = res?.theme || {
+        id: editingId || `party-theme-${Date.now()}`,
+        name,
+        image,
+        price,
+        offerPrice: offer,
+        durationDays: days,
+      };
+
+      setPartyThemeCatalog((prev: any[]) => {
+        const list = Array.isArray(prev) ? [...prev] : [];
+        if (editingId) {
+          return list.map((t) => (t.id === editingId ? { ...t, ...savedTheme } : t));
+        }
+        return [...list, savedTheme];
+      });
+
+      window.alert("পার্টি থিমটি সফলভাবে ডাটাবেজে ইনসার্ট / আপডেট হয়েছে!");
+      resetDraft();
+    } catch (err: any) {
+      console.error("Failed to save theme to DB:", err);
+      setPartyThemeCatalog((prev: any[]) => {
+        const list = Array.isArray(prev) ? [...prev] : [];
+        if (editingId) {
+          return list.map((t) =>
+            t.id === editingId ? { ...t, name, image, price, offerPrice: offer, durationDays: days } : t,
+          );
+        }
+        const id = `party-theme-${Date.now()}`;
+        return [...list, { id, name, image, price, offerPrice: offer, durationDays: days }];
+      });
+      resetDraft();
+    } finally {
+      setLoading(false);
+    }
   };
 
   const editItem = (t: any) => {
     setEditingId(t.id);
     setDraft({
       name: t.name || "",
-      image: t.image || "",
+      image: t.image || t.imageUrl || "",
       price: String(t.price ?? ""),
       offerPrice: t.offerPrice != null ? String(t.offerPrice) : "",
       durationDays: String(t.durationDays ?? 30),
     });
   };
 
-  const removeItem = (id: string) => {
+  const removeItem = async (id: string) => {
     if (!setPartyThemeCatalog) return;
-    if (!window.confirm("এই থিমটি delete করবেন?")) return;
-    setPartyThemeCatalog((prev: any[]) => (Array.isArray(prev) ? prev.filter((t) => t.id !== id) : []));
+    if (!window.confirm("এই থিমটি ডাটাবেজ থেকে delete করবেন?")) return;
+
+    try {
+      if (!isNaN(Number(id))) {
+        await api.delete(`/party-themes/admin/${id}`);
+      }
+    } catch (err) {
+      console.error("Failed to delete theme from DB:", err);
+    }
+
+    setPartyThemeCatalog((prev: any[]) => (Array.isArray(prev) ? prev.filter((t) => String(t.id) !== String(id)) : []));
     if (editingId === id) resetDraft();
   };
 
@@ -141,9 +223,19 @@ function PartyThemesAdminSection({
           <p className="text-[10px] font-black uppercase tracking-widest text-fuchsia-300">Store</p>
           <h4 className="mt-0.5 text-sm font-black text-white">Party Room Themes</h4>
         </div>
-        <span className="rounded-lg bg-fuchsia-500/15 px-2 py-1 text-[9px] font-black text-fuchsia-300">
-          {partyThemeCatalog.length} items
-        </span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={seedDefaultThemes}
+            disabled={loading}
+            className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-[9px] font-black text-amber-300 transition hover:bg-amber-500/20 disabled:opacity-50"
+          >
+            ⚡ Seed Default 10 Themes
+          </button>
+          <span className="rounded-lg bg-fuchsia-500/15 px-2 py-1 text-[9px] font-black text-fuchsia-300">
+            {partyThemeCatalog.length} items
+          </span>
+        </div>
       </div>
 
       <div className="mt-3 rounded-xl border border-slate-800 bg-slate-900/70 p-3">
