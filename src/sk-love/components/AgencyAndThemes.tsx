@@ -88,9 +88,15 @@ function PartyThemesAdminSection({
     let active = true;
     const fetchThemes = async () => {
       try {
-        const res = await api.get('/api/party-themes/admin/catalog');
-        if (active && res?.themes && Array.isArray(res.themes) && res.themes.length > 0) {
-          if (setPartyThemeCatalog) setPartyThemeCatalog(res.themes);
+        let res: any;
+        try {
+          res = await api.get('/api/party-themes/admin/catalog');
+        } catch {
+          res = await api.get('/api/party-themes/catalog', { auth: false });
+        }
+        const list = res?.themes ?? (Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []);
+        if (active && Array.isArray(list) && list.length > 0) {
+          if (setPartyThemeCatalog) setPartyThemeCatalog(list);
         }
       } catch (err) {
         console.warn("Party theme DB catalog fetch notice:", err);
@@ -98,7 +104,7 @@ function PartyThemesAdminSection({
     };
     fetchThemes();
     return () => { active = false; };
-  }, []);
+  }, [setPartyThemeCatalog]);
 
   const handleFile = (file: File | null) => {
     if (!file) return;
@@ -838,14 +844,15 @@ function AvatarFramesAdminSection() {
 
   const fetchFrames = async () => {
     try {
-      const res = await api.get("/api/admin/frame-catalog");
-      if (res?.data && Array.isArray(res.data)) {
-        setFrames(res.data);
-      } else {
-        const resPublic = await api.get("/api/frame-catalog");
-        if (resPublic?.data && Array.isArray(resPublic.data)) {
-          setFrames(resPublic.data);
-        }
+      let res: any;
+      try {
+        res = await api.get("/api/admin/frame-catalog");
+      } catch {
+        res = await api.get("/api/frame-catalog", { auth: false });
+      }
+      const list = res?.data ?? res?.frames ?? (Array.isArray(res) ? res : []);
+      if (Array.isArray(list) && list.length > 0) {
+        setFrames(list);
       }
     } catch (err) {
       console.warn("Fetch frame catalog error:", err);

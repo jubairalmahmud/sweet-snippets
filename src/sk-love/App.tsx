@@ -28653,6 +28653,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               agencyApplications={agencyApplications}
               approveAgencyApplication={approveAgencyApplication}
               rejectAgencyApplication={rejectAgencyApplication}
+              partyThemeCatalog={partyThemeCatalog}
+              setPartyThemeCatalog={setPartyThemeCatalog}
             />
           ) : (
             <DbSchemaPanel copiedText={copiedText} handleCopyText={handleCopyText} />
