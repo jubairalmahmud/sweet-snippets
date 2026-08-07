@@ -85,7 +85,7 @@ function PartyThemesAdminSection({
     let active = true;
     const fetchThemes = async () => {
       try {
-        const res = await api.get('/party-themes/admin/catalog');
+        const res = await api.get('/api/party-themes/admin/catalog');
         if (active && res?.themes && Array.isArray(res.themes) && res.themes.length > 0) {
           if (setPartyThemeCatalog) setPartyThemeCatalog(res.themes);
         }
@@ -109,7 +109,7 @@ function PartyThemesAdminSection({
   const seedDefaultThemes = async () => {
     try {
       setLoading(true);
-      const res = await api.post('/party-themes/admin/seed');
+      const res = await api.post('/api/party-themes/admin/seed');
       if (res?.themes && Array.isArray(res.themes)) {
         if (setPartyThemeCatalog) setPartyThemeCatalog(res.themes);
         window.alert(`ডাটাবেজে ${res.inserted ?? 0} টি পার্টি থিম সফলভাবে ইনসার্ট করা হয়েছে!`);
@@ -143,7 +143,7 @@ function PartyThemesAdminSection({
     try {
       setLoading(true);
       const numericId = editingId && !isNaN(Number(editingId)) ? Number(editingId) : undefined;
-      const res = await api.post('/party-themes/admin/upsert', {
+      const res = await api.post('/api/party-themes/admin/upsert', {
         id: numericId,
         name,
         imageUrl: image,
@@ -206,7 +206,7 @@ function PartyThemesAdminSection({
 
     try {
       if (!isNaN(Number(id))) {
-        await api.delete(`/party-themes/admin/${id}`);
+        await api.delete(`/api/party-themes/admin/${id}`);
       }
     } catch (err) {
       console.error("Failed to delete theme from DB:", err);

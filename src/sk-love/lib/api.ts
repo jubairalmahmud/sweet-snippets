@@ -100,6 +100,10 @@ export async function apiFetch<T = any>(
     let baseUrl = cleanBaseUrl(candidates[i]);
     let cleanPath = path.startsWith("/") ? path : `/${path}`;
 
+    if (!cleanPath.toLowerCase().startsWith("/api/")) {
+      cleanPath = `/api${cleanPath}`;
+    }
+
     if (baseUrl.toLowerCase().endsWith("/api") && cleanPath.toLowerCase().startsWith("/api/")) {
       baseUrl = baseUrl.slice(0, -4).replace(/\/+$/, "");
     }
