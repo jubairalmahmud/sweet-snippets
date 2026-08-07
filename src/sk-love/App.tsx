@@ -4112,8 +4112,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         rCoins: walletInfo.rCoins !== undefined ? Number(walletInfo.rCoins) : prev.rCoins,
         earnings: walletInfo.earnings !== undefined ? Number(walletInfo.earnings) : (walletInfo.host_earnings !== undefined ? Number(walletInfo.host_earnings) : prev.earnings),
         vipLevel: walletInfo.vipLevel !== undefined ? Number(walletInfo.vipLevel) : prev.vipLevel,
-        avatarFrame: walletInfo.avatarFrame || prev.avatarFrame,
-        entryEffect: walletInfo.entryEffect || prev.entryEffect,
+        avatarFrame: walletInfo.avatarFrame !== undefined ? (walletInfo.avatarFrame || "Default") : prev.avatarFrame,
+        entryEffect: walletInfo.entryEffect !== undefined ? (walletInfo.entryEffect || "None") : prev.entryEffect,
       }));
 
       if (walletInfo.name) setRegisterName(walletInfo.name);
@@ -4121,9 +4121,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       setUserBio(typeof walletInfo.bio === "string" ? walletInfo.bio : "");
       if (walletInfo.gender === "Male" || walletInfo.gender === "Female")
         setUserGender(walletInfo.gender);
-      if (walletInfo.avatar) setProfileAvatarImg(walletInfo.avatar);
+      if (walletInfo.avatar !== undefined && walletInfo.avatar !== null) {
+        setProfileAvatarImg(walletInfo.avatar);
+      }
       const syncedCover = getCoverFromUser(walletInfo);
-      if (syncedCover) setProfileCoverImg(syncedCover);
+      if (syncedCover !== undefined && syncedCover !== null) {
+        setProfileCoverImg(syncedCover);
+      }
       if (typeof walletInfo.location === "string") setProfileLocation(walletInfo.location);
       if (typeof walletInfo.hometown === "string") setProfileHometown(walletInfo.hometown);
       if (typeof walletInfo.birthday === "string") setProfileBirthday(walletInfo.birthday);
