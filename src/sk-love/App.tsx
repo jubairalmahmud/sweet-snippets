@@ -27912,14 +27912,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               {/* BOTTOM PREMIUM GEM NAV BAR — image reference (exact match) */}
               {appSection !== "stream" && !isCommentInputPopupOpen && !isPartyCommentPopupOpen && (
                 <div
-                  className="relative w-screen max-w-full select-none shrink-0 overflow-visible min-h-[56px] bg-[#0c091a]"
+                  className="sticky bottom-0 left-0 right-0 z-40 w-full select-none shrink-0 overflow-visible min-h-[56px] bg-[#0c091a] border-t border-purple-900/30 shadow-2xl"
                 >
                   <img
                     src={navGemBarImg}
-                    alt=""
+                    alt="Navigation"
                     aria-hidden="true"
                     draggable={false}
-                    className="block w-full h-auto min-h-[56px] object-contain pointer-events-none"
+                    className="block w-full h-auto min-h-[56px] max-h-[68px] object-contain pointer-events-none mx-auto"
                     onError={(e) => {
                       const target = e.currentTarget;
                       if (!target.dataset.retried) {
