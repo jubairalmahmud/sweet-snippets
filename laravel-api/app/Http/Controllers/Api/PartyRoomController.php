@@ -381,6 +381,19 @@ class PartyRoomController extends Controller
         }
     }
 
+    private function roomThemeCode(object $room): ?string
+    {
+        $code = $this->prop($room, 'active_theme_code', $this->prop($room, 'room_theme'));
+        if ($code) return (string) $code;
+
+        $themeId = (int) $this->prop($room, 'active_theme_id', 0);
+        if ($themeId > 0 && $this->tableExists('party_themes')) {
+            $value = DB::table('party_themes')->where('id', $themeId)->value('code');
+            return $value ? (string) $value : null;
+        }
+        return null;
+    }
+
     private function shape(object $room): array
     {
         // Read requests must not remove anyone from a seat. Duplicates are
@@ -644,6 +657,8 @@ class PartyRoomController extends Controller
             'startedAt'        => $this->prop($room, 'started_at'),
             'endedAt'          => $this->prop($room, 'ended_at'),
             'updatedAt'        => $this->prop($room, 'updated_at'),
+            'roomTheme'        => $this->roomThemeCode($room),
+            'roomThemeImg'     => $this->prop($room, 'active_theme_img'),
             'seats'            => $seatsArr,
             'lockedSeats'      => $lockedSeats,
             'locked_seats'     => $lockedSeats,
@@ -893,6 +908,47 @@ class PartyRoomController extends Controller
             'seatActive' => $seatActive,
             'updatedAt' => $this->prop($freshRoom, 'updated_at'),
         ];
+    }
+
+    public function setTheme(Request $request, int $id)
+    {
+        $user = $request->user();
+        if (!$user) abort(401);
+
+        $room = DB::table('party_rooms')->where('id', $id)->first();
+        if (!$room) abort(404, 'Party room not found');
+        if ((int) $this->prop($room, 'host_id', 0) !== (int) $user->id && !($user->is_admin ?? false)) {
+            abort(403, 'Only the room host can change the theme');
+        }
+
+        $data = $request->validate(['theme' => 'nullable|string|max:64']);
+        $code = isset($data['theme']) && $data['theme'] !== '' ? $data['theme'] : null;
+        $theme = null;
+        if ($code && $this->tableExists('party_themes')) {
+            $theme = DB::table('party_themes')->where('code', $code)->where('active', true)->first();
+            if (!$theme) abort(404, 'Theme not found');
+        }
+
+        $values = [];
+        if ($this->columnExists('party_rooms', 'active_theme_id')) {
+            $values['active_theme_id'] = $theme->id ?? null;
+        }
+        if ($this->columnExists('party_rooms', 'active_theme_img')) {
+            $values['active_theme_img'] = $theme->image_url ?? null;
+        }
+        if ($this->columnExists('party_rooms', 'active_theme_code')) {
+            $values['active_theme_code'] = $theme->code ?? null;
+        }
+        if ($this->columnExists('party_rooms', 'room_theme')) {
+            $values['room_theme'] = $theme->code ?? null;
+        }
+        $payload = $this->roomUpdatePayload($values);
+        if (!empty($payload)) {
+            DB::table('party_rooms')->where('id', $id)->update($payload);
+        }
+
+        $fresh = DB::table('party_rooms')->where('id', $id)->first();
+        return ['ok' => true, 'theme' => $theme->code ?? null, 'data' => $this->shape($fresh)];
     }
 
     public function joinSeat(Request $request, int $id, int $seatNum)

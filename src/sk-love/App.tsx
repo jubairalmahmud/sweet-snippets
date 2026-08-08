@@ -1768,6 +1768,14 @@ export default function App() {
     userId: number | null;
     until: number;
   } | null>(null);
+  const partySeatRepairInFlightRef = useRef<boolean>(false);
+  const partyDesiredSeatRef = useRef<{
+    roomId: number | null;
+    seatIndex: number;
+    occupant: string;
+    icon: string | null;
+    userId: number | null;
+  } | null>(null);
   const partySeatMuteOverrideRef = useRef<Record<number, { muted: boolean }>>({});
   const hostMutedPartyUserIdsRef = useRef<Set<number>>(new Set());
   const hostMutedPartyUserNamesRef = useRef<Set<string>>(new Set());
@@ -3068,15 +3076,18 @@ export default function App() {
         const themes = Array.isArray(cat?.themes) ? cat.themes : [];
         if (themes.length) {
           setPartyThemeCatalog(
-            themes.map((t: any): PartyThemeItem => ({
-              id: String(t.code || `theme_${t.id}`),
-              name: String(t.name || "Theme"),
-              image: String(t.imageUrl || t.image || ""),
-              price: Number(t.price || 0),
-              offerPrice:
-                t.offerPrice != null && t.offerPrice !== "" ? Number(t.offerPrice) : undefined,
-              durationDays: Number(t.durationDays || 30),
-            })),
+            themes.map((t: any): PartyThemeItem => {
+              const id = String(t.code || `theme_${t.id}`);
+              const builtIn = DEFAULT_PARTY_THEME_CATALOG.find((theme) => theme.id === id);
+              return {
+                id,
+                name: String(t.name || builtIn?.name || "Theme"),
+                image: builtIn?.image || String(t.imageUrl || t.image || ""),
+                price: 0,
+                offerPrice: undefined,
+                durationDays: 3650,
+              };
+            }),
           );
         }
       } catch {
@@ -6429,6 +6440,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           partyLiveFalseStreakRef.current = 0;
           setIsPartyRoomOpen(false);
           setActivePartyRoom(null);
+          optimisticPartySeatRef.current = null;
+          partyDesiredSeatRef.current = null;
           partyHadSeatRef.current = false;
           void cleanupPartyAgoraSession();
           void refreshPartyRooms();
@@ -6885,6 +6898,33 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         (Boolean(activePartyRoom?.hostId) && Number(activePartyRoom.hostId) === Number(currentUserId));
       api
         .post(`/api/party-rooms/${activePartyRoom.id}/heartbeat`, { revive: isHost })
+        .then((heartbeat: any) => {
+          const desired = partyDesiredSeatRef.current;
+          if (
+            heartbeat?.seatActive !== false ||
+            !desired?.roomId ||
+            Number(desired.roomId) !== Number(activePartyRoom.id) ||
+            partySeatRepairInFlightRef.current
+          ) return;
+
+          partySeatRepairInFlightRef.current = true;
+          const safeAvatar =
+            desired.icon && /^https?:\/\//i.test(desired.icon) && desired.icon.length <= 480
+              ? desired.icon
+              : null;
+          api
+            .post(`/api/party-rooms/${activePartyRoom.id}/seats/${desired.seatIndex + 1}/join`, {
+              avatarIcon: safeAvatar,
+              frame: equippedAvatarFrame || null,
+            })
+            .then((result: any) => applyPartyRoomState(result?.data))
+            .catch((error: any) => {
+              if (Number(error?.status) === 409) rollbackOptimisticPartySeat(desired.seatIndex);
+            })
+            .finally(() => {
+              partySeatRepairInFlightRef.current = false;
+            });
+        })
         .catch(() => undefined);
     };
     pingPartySession();
@@ -7651,6 +7691,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     if (optimisticPartySeatRef.current?.seatIndex === seatIndex) {
       optimisticPartySeatRef.current = null;
     }
+    if (partyDesiredSeatRef.current?.seatIndex === seatIndex) {
+      partyDesiredSeatRef.current = null;
+    }
     const currentUserId = getCurrentUserId();
     setPartySeats((prev) =>
       prev.map((seat, index) => {
@@ -7834,6 +7877,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     // FIX: Keep our locally-known seat visible until backend confirms it.
     const opt = optimisticPartySeatRef.current;
     const activeRoomId = room?.id ? Number(room.id) : null;
+    if (opt && activeRoomId && opt.roomId && Number(opt.roomId) === activeRoomId) {
+      partyDesiredSeatRef.current = {
+        roomId: opt.roomId,
+        seatIndex: opt.seatIndex,
+        occupant: opt.occupant,
+        icon: opt.icon,
+        userId: opt.userId,
+      };
+    }
     if (opt && activeRoomId && opt.roomId && Number(opt.roomId) !== Number(activeRoomId)) {
       optimisticPartySeatRef.current = null;
     } else if (opt && Date.now() < opt.until) {
@@ -7866,6 +7918,41 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       }
     } else if (opt) {
       optimisticPartySeatRef.current = null;
+    }
+
+    const desiredSeat = partyDesiredSeatRef.current;
+    if (desiredSeat && activeRoomId && Number(desiredSeat.roomId) !== activeRoomId) {
+      partyDesiredSeatRef.current = null;
+    } else if (desiredSeat) {
+      const ownId = getCurrentUserId();
+      const ownName = (registerName || "").trim().toLowerCase();
+      const confirmedOwnIndex = nextSeats.findIndex((seat) =>
+        (seat.userId && ownId && Number(seat.userId) === Number(ownId)) ||
+        (ownName && seat.occupant && String(seat.occupant).trim().toLowerCase() === ownName)
+      );
+      if (confirmedOwnIndex >= 0) {
+        const confirmed = nextSeats[confirmedOwnIndex];
+        partyDesiredSeatRef.current = {
+          roomId: activeRoomId,
+          seatIndex: confirmedOwnIndex,
+          occupant: confirmed.occupant || desiredSeat.occupant,
+          icon: confirmed.icon || desiredSeat.icon,
+          userId: confirmed.userId || desiredSeat.userId,
+        };
+      } else if (desiredSeat.seatIndex >= 0 && desiredSeat.seatIndex < nextSeats.length) {
+        const target = nextSeats[desiredSeat.seatIndex];
+        if (target.occupant || target.userId) {
+          partyDesiredSeatRef.current = null;
+        } else {
+          nextSeats[desiredSeat.seatIndex] = {
+            ...target,
+            userId: desiredSeat.userId,
+            occupant: desiredSeat.occupant,
+            icon: desiredSeat.icon || target.icon,
+            muted: false,
+          };
+        }
+      }
     }
     const currentUserIdForPartyState = getCurrentUserId();
     const selfNameForPartyState = (registerName || "").trim();
@@ -8688,6 +8775,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         locallyHostedPartyRoomIdsRef.current.delete(Number(room.id));
       }
       setActivePartyRoom(null);
+      optimisticPartySeatRef.current = null;
+      partyDesiredSeatRef.current = null;
+      partySeatRepairInFlightRef.current = false;
       setSelectedPartyGiftRecipient(null);
       partyHadSeatRef.current = false;
       partyHostSessionRef.current = null;
@@ -9062,6 +9152,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     setIsPartyMicMuted(false);
     if (optimisticPartySeatRef.current?.seatIndex === idx) {
       optimisticPartySeatRef.current = null;
+    }
+    if (partyDesiredSeatRef.current?.seatIndex === idx) {
+      partyDesiredSeatRef.current = null;
     }
     await syncPartySeat(idx, true);
   };
