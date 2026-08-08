@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 /**
@@ -102,6 +103,39 @@ class GameController extends Controller
             'coins' => (int) ($u->diamonds ?? 0),
             'diamonds' => (int) ($u->diamonds ?? 0),
         ]);
+    }
+
+    public function topWinner(): JsonResponse
+    {
+        return response()->json([
+            'ok' => true,
+            'winner' => Cache::get('sklove.games.top_winner'),
+        ]);
+    }
+
+    public function reportWin(Request $request): JsonResponse
+    {
+        $user = Auth::user();
+        if (!$user) return response()->json(['ok' => false, 'message' => 'Unauthorized'], 401);
+
+        $data = $request->validate([
+            'amount' => 'required|integer|min:1',
+            'game' => 'required|string|max:40',
+        ]);
+        $winner = [
+            'user_id' => (string) $user->id,
+            'name' => (string) ($user->name ?: 'Player'),
+            'avatar' => $user->avatar ?? null,
+            'amount' => (int) $data['amount'],
+            'game' => (string) $data['game'],
+            'ts' => now()->timestamp,
+        ];
+        $current = Cache::get('sklove.games.top_winner');
+        if (!$current || (int) ($current['amount'] ?? 0) <= $winner['amount']) {
+            Cache::put('sklove.games.top_winner', $winner, now()->addMinute());
+        }
+
+        return response()->json(['ok' => true, 'winner' => $winner]);
     }
 
     /**

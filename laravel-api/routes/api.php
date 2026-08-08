@@ -62,6 +62,7 @@ Route::get('/posts/{postId}/comments',  [PostCommentController::class, 'index'])
 
 // Game Controller
 Route::get('/games/config', [GameController::class, 'config']);
+Route::get('/games/top-winner', [GameController::class, 'topWinner']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -93,6 +94,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Game Controller
 
     Route::get('/games/balance',          [GameController::class, 'balance']);
+    Route::post('/games/report-win',       [GameController::class, 'reportWin']);
     Route::post('/games/{game}/play',     [GameController::class, 'play'])
         ->where('game', 'casino|ferry|teenpatti');
     Route::get('/games/{game}/history',   [GameController::class, 'history'])

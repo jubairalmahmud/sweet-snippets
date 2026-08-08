@@ -1103,17 +1103,6 @@ export default function App() {
   const fetchFullProfileUser = async (profileId: number, seed: any = {}) => {
     const endpoints = [
       `/api/users/${profileId}`,
-      `/api/users/${profileId}/profile`,
-      `/api/users/${profileId}/role`,
-      `/api/users/${profileId}/roles`,
-      `/api/users/${profileId}/role-request`,
-      `/api/users/${profileId}/role-requests`,
-      `/api/profile/${profileId}`,
-      `/api/profiles/${profileId}`,
-      `/api/user/${profileId}`,
-      `/api/user/${profileId}/profile`,
-      `/api/role-requests?user_id=${profileId}`,
-      `/api/admin/users`,
     ];
 
     let merged = { ...seed };
@@ -4342,18 +4331,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     } catch {
       /* keep default offline recharge config */
     }
-    // Fetch exchange rates (both directions)
-    try {
-      const rates: any = await api.get("/api/exchange/rates", { auth: false } as any);
-      const cd = rates?.rates?.coin_to_diamond;
-      if (cd && Number(cd.rate) > 0) setCoinToDiamondRate(Number(cd.rate));
-      const dc = rates?.rates?.diamond_to_coin;
-      if (dc && Number(dc.rate) > 0) setDiamondToCoinRate(Number(dc.rate));
-      const rd = rates?.rates?.rcoin_to_diamond;
-      if (rd && Number(rd.rate) > 0) setRcoinToDiamondRate(Number(rd.rate));
-    } catch {
-      /* keep default rate */
-    }
   };
 
 
@@ -4786,6 +4763,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   useEffect(() => {
     const savedToken = localStorage.getItem("sk_love_token");
     const savedUser = localStorage.getItem("sk_love_user");
+    let cachedIsAdmin = false;
 
     if (savedToken) {
       // Decode cached user details first for immediate zero-latency load
@@ -4805,11 +4783,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
             }));
 
             // Rehydrate custom role-based configs fully
-            if (parsed.role) {
-              setUserRole(parsed.role);
-            } else {
-              setUserRole(determineUserRole(parsed.email));
-            }
+            const cachedRole = parsed.role || determineUserRole(parsed.email);
+            setUserRole(cachedRole);
+            cachedIsAdmin = cachedRole === "admin" || Boolean(parsed.is_admin || parsed.isAdmin);
             if (parsed.avatarImg) {
               setProfileAvatarImg(parsed.avatarImg);
             }
@@ -4859,7 +4835,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         .catch(() => {
           /* ignore */
         });
-      // Admin: load all users + all deposits
+      // Admin-only data must not be requested for normal users; those 403s
+      // were also adding avoidable work during initial Explore loading.
+      if (cachedIsAdmin) {
       api
         .get("/api/admin/users")
         .then((res: any) => {
@@ -4949,6 +4927,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         .catch(() => {
           /* not admin or endpoint missing */
         });
+      }
       setIsLoggedIn(true);
     }
   }, []);

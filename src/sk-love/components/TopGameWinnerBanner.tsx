@@ -94,6 +94,7 @@ export default function TopGameWinnerBanner() {
   useEffect(() => {
     let stopped = false;
     const poll = async () => {
+      if (document.visibilityState !== "visible") return;
       try {
         const res: any = await api.get("/api/games/top-winner");
         const w = res?.winner ?? res?.data?.winner ?? res;
@@ -111,7 +112,7 @@ export default function TopGameWinnerBanner() {
       } catch {}
     };
     poll();
-    const id = window.setInterval(poll, 8000);
+    const id = window.setInterval(poll, 15000);
     return () => {
       stopped = true;
       window.clearInterval(id);
