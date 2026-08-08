@@ -724,7 +724,44 @@ class PartyRoomController extends Controller
             $query->orderByDesc('id');
         }
 
-        $rows = $query->limit(100)->get();
+        $rows = $query->limit($request->boolean('summary') ? 50 : 100)->get();
+
+        if ($request->boolean('summary')) {
+            $hostIds = $rows->pluck('host_id')->map(fn ($id) => (int) $id)->filter()->unique()->values();
+            $hosts = $hostIds->isEmpty() || !$this->tableExists('users')
+                ? collect()
+                : DB::table('users')->whereIn('id', $hostIds->all())->get()->keyBy('id');
+            $frames = $this->userFramesFor($hostIds->all());
+
+            return ['data' => $rows->map(function ($room) use ($hosts, $frames) {
+                $hostId = (int) $this->prop($room, 'host_id', 0);
+                $host = $hosts->get($hostId);
+                $frame = $frames[$hostId] ?? null;
+                $privacy = (string) ($this->prop($room, 'privacy', 'public') ?: 'public');
+                return array_merge([
+                    'id' => (int) $this->prop($room, 'id', 0),
+                    'hostId' => $hostId,
+                    'host_id' => $hostId,
+                    'hostName' => $host->name ?? null,
+                    'hostAvatar' => $this->pickAvatar($host),
+                    'hostFrame' => $frame['code'] ?? ($frame['frameId'] ?? ($host->avatar_frame ?? null)),
+                    'hostFrameImg' => $frame['imageUrl'] ?? null,
+                    'title' => $this->prop($room, 'title', 'Party Room'),
+                    'privacy' => $privacy,
+                    'isPrivate' => $privacy === 'private',
+                    'maxGuestSeats' => (int) $this->prop($room, 'max_guest_seats', 10),
+                    'live' => (bool) $this->prop($room, 'live', true),
+                    'viewerCount' => (int) $this->prop($room, 'viewer_count', 0),
+                    'totalDiamonds' => (int) $this->prop($room, 'total_diamonds', 0),
+                    'startedAt' => $this->prop($room, 'started_at'),
+                    'endedAt' => $this->prop($room, 'ended_at'),
+                    'updatedAt' => $this->prop($room, 'updated_at'),
+                    'roomTheme' => $this->prop($room, 'room_theme', $this->prop($room, 'active_theme_code')),
+                    'seats' => [],
+                    'lockedSeats' => $this->normalizeLockedSeats($this->prop($room, 'locked_seats', [])),
+                ], $this->frameShape($frame, $host));
+            })->values()];
+        }
 
         return ['data' => $rows->map(fn ($room) => $this->safeShape($room))->filter()->values()];
     }

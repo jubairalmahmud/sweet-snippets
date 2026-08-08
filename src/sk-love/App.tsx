@@ -1,8 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import PK from "./components/PK";
 import PKInviteListener from "./components/PKInviteListener";
-import PKWatchView from "./components/PKWatchView";
 import PKActiveBattlesPoller from "./components/PKActiveBattlesPoller";
 import LiveActionBar, { SafeStreamIcon } from "./components/LiveActionBar";
 import TopGameWinnerBanner from "./components/TopGameWinnerBanner";
@@ -18,6 +16,19 @@ import seatImg from "./assets/stream-icons/seat.webp";
 import navGemBarImg from "./assets/nav-gem-bar.webp";
 
 import { createPortal } from "react-dom";
+const deferredComponent = (loader: () => Promise<{ default: React.ComponentType<any> }>) => {
+  const Component = React.lazy(loader);
+  return (props: any) => {
+    if (Object.prototype.hasOwnProperty.call(props, "open") && !props.open) return null;
+    return (
+      <React.Suspense fallback={null}>
+        <Component {...props} />
+      </React.Suspense>
+    );
+  };
+};
+const PK = deferredComponent(() => import("./components/PK"));
+const PKWatchView = deferredComponent(() => import("./components/PKWatchView"));
 import type {
   IAgoraRTCClient,
   ICameraVideoTrack,
@@ -33,6 +44,20 @@ const loadAgoraRTC = async () => {
     });
   }
   return agoraRtcPromise;
+};
+const agoraTokenCache = new Map<string, { expiresAt: number; promise: Promise<any> }>();
+const getAgoraToken = (channelName: string, role: "publisher" | "subscriber") => {
+  const key = `${channelName}:${role}`;
+  const cached = agoraTokenCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.promise;
+  const promise = api
+    .post("/api/agora/token", { channelName, role })
+    .catch((error) => {
+      agoraTokenCache.delete(key);
+      throw error;
+    });
+  agoraTokenCache.set(key, { expiresAt: Date.now() + 30_000, promise });
+  return promise;
 };
 import { api } from "./lib/api";
 import { formatCoinCompact } from "./lib/hooks";
@@ -139,13 +164,12 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
-// Imported modular sub-panels and data schemas
-import { SK_LOVE_SQL_SCHEMA, laravelControllerCode } from "./data/laravelData";
-import AdminPanel from "./components/AdminPanel";
-import AgencyDashboardPanel from "./components/AgencyDashboardPanel";
-import DbSchemaPanel from "./components/DbSchemaPanel";
+// Heavy admin/editor surfaces load only when opened.
+const AdminPanel = deferredComponent(() => import("./components/AdminPanel"));
+const AgencyDashboardPanel = deferredComponent(() => import("./components/AgencyDashboardPanel"));
+const DbSchemaPanel = deferredComponent(() => import("./components/DbSchemaPanel"));
 import CommentInputWithMentions from "./components/CommentInputWithMentions";
-import ReelsEditor from "./components/ReelsEditor";
+const ReelsEditor = deferredComponent(() => import("./components/ReelsEditor"));
 import PostActionsMenu from "./components/PostActionsMenu";
 const formatCompact = (n: number): string => {
   if (!Number.isFinite(n)) return "0";
@@ -4215,15 +4239,17 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
   // ═══════════════════════════════════════════════════════════════
   // PARTY ROOM — Real-time earned-coin refresh
-  // While inside a party room, poll /api/wallet every 3s so the on-board
+  // While inside a party room, poll /api/wallet every 8s so the on-board
   // earned coin counter updates live (no manual refresh / coin-icon tap).
   // Purely additive: does not touch the 20s global poll above.
   // ═══════════════════════════════════════════════════════════════
   useEffect(() => {
     if (!isLoggedIn || !isPartyRoomOpen) return;
     let cancelled = false;
+    let inFlight = false;
     const tick = async () => {
-      if (cancelled || document.hidden) return;
+      if (cancelled || document.hidden || inFlight) return;
+      inFlight = true;
       try {
         const wallet: any = await api.get("/api/wallet");
         if (cancelled || !wallet) return;
@@ -4240,10 +4266,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         }));
       } catch {
         /* silent */
+      } finally {
+        inFlight = false;
       }
     };
     void tick();
-    const id = window.setInterval(tick, 3000);
+    const id = window.setInterval(tick, 8000);
     const onVis = () => { if (!document.hidden) void tick(); };
     document.addEventListener("visibilitychange", onVis);
     return () => {
@@ -5563,10 +5591,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       setCallAgoraStatus("Connecting private video call...");
 
       try {
-        const tokenData: any = await api.post("/api/agora/token", {
-          channelName: activeCallChannel,
-          role: "publisher",
-        });
+        const tokenData: any = await getAgoraToken(activeCallChannel, "publisher");
 
         if (!tokenData?.appId || !tokenData?.channelName || !tokenData?.token) {
           setCallAgoraStatus("Private call token missing.");
@@ -5698,6 +5723,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       ]);
     }
   }, [appSection, homeSubTab]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    if (homeSubTab === "live" || homeSubTab === "party" || isBoardPickerOpen) {
+      void loadAgoraRTC();
+    }
+  }, [isLoggedIn, homeSubTab, isBoardPickerOpen]);
 
 
   // ---- হ্যান্ডলার: Agora RTC (normalizeAgoraUidForJoin) ----
@@ -6030,10 +6062,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       setPartyAgoraStatus("Connecting party voice...");
 
       try {
-        const agora: any = await api.post("/api/agora/token", {
-          channelName: `party_${activePartyRoom.id}`,
-          role: "publisher",
-        });
+        const agora: any = await getAgoraToken(`party_${activePartyRoom.id}`, "publisher");
 
         if (!agora?.appId || !agora?.channelName || agora?.uid === undefined || agora?.uid === null) {
           setPartyAgoraStatus("Party voice token missing.");
@@ -6363,9 +6392,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // ---- ইফেক্ট: useEffect — if (!isPartyRoomOpen || !activePartyRoom?.id) return; ----
   useEffect(() => {
     if (!isPartyRoomOpen || !activePartyRoom?.id) return;
-    const timer = setInterval(async () => {
+    let cancelled = false;
+    let inFlight = false;
+    const syncRoom = async () => {
+      if (cancelled || document.hidden || inFlight) return;
+      inFlight = true;
       try {
         const data: any = await api.get(`/api/party-rooms/${activePartyRoom.id}`);
+        if (cancelled) return;
         const currentUserId = getCurrentUserId();
         // Host detection — prefer the LOCAL activePartyRoom.hostId (set at
         // create/join time) over the server response, because a shared-hosting
@@ -6428,9 +6462,21 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         applyPartyRoomState(data?.data);
       } catch {
         // Keep the current room state if a single poll fails.
+      } finally {
+        inFlight = false;
       }
-    }, 2000);
-    return () => clearInterval(timer);
+    };
+    void syncRoom();
+    const timer = window.setInterval(syncRoom, 4000);
+    const onVisibilityChange = () => {
+      if (!document.hidden) void syncRoom();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [isPartyRoomOpen, activePartyRoom?.id]);
 
 
@@ -8398,7 +8444,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   const refreshPartyRooms = async () => {
     setPartyRoomStatus("Refreshing party rooms...");
     try {
-      const data: any = await api.get("/api/party-rooms");
+      const data: any = await api.get("/api/party-rooms?summary=1");
       setActivePartyRooms(Array.isArray(data?.data) ? data.data : []);
       setPartyRoomStatus("");
     } catch (err: any) {
@@ -8443,6 +8489,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
   // ---- হ্যান্ডলার: রুম ম্যানেজমেন্ট (createBackendPartyRoom) ----
   const createBackendPartyRoom = async (privacy?: "public" | "private") => {
+    void loadAgoraRTC();
     isClosingPartyRoomRef.current = false;
     setPartyRoomStatus("Creating party room...");
     try {
@@ -8456,6 +8503,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         maxGuestSeats,
         privacy: nextPrivacy,
       });
+      if (data?.data?.id) {
+        void getAgoraToken(`party_${data.data.id}`, "publisher").catch(() => undefined);
+      }
       partyMicMuteHoldRef.current = null;
       isPartyMicMutedRef.current = false;
       setIsPartyMicMuted(false);
@@ -8510,6 +8560,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
   // ---- হ্যান্ডলার: রুম ম্যানেজমেন্ট (joinBackendPartyRoom) ----
   const joinBackendPartyRoom = async (room: any) => {
+    void loadAgoraRTC();
     isClosingPartyRoomRef.current = false;
     partyMicMuteHoldRef.current = null;
     isPartyMicMutedRef.current = false;
@@ -8523,6 +8574,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       const data: any = await api.post(`/api/party-rooms/${room.id}/join`);
       const joinedRoom = data?.data || room;
       const joinedRoomId = Number(joinedRoom?.id ?? room?.id ?? 0);
+      if (joinedRoomId) {
+        void getAgoraToken(`party_${joinedRoomId}`, "publisher").catch(() => undefined);
+      }
       const joinedHostId = Number(joinedRoom?.hostId ?? joinedRoom?.host_id ?? room?.hostId ?? room?.host_id ?? 0);
       const currentUserId = getCurrentUserId();
       if (joinedRoomId && joinedHostId && currentUserId && joinedHostId === Number(currentUserId)) {
@@ -10190,10 +10244,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     if (!room?.id) return room;
     const channelName = `live_${room.id}`;
     try {
-      const agora = await api.post("/api/agora/token", {
-        channelName,
-        role,
-      });
+      const agora = await getAgoraToken(channelName, role);
       return { ...room, agora };
     } catch (err: any) {
       setLiveRoomStatus(err?.message || "Agora token request failed.");
@@ -10219,6 +10270,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
   // ---- হ্যান্ডলার: লাইভ রুম (startBackendLiveRoom) ----
   const startBackendLiveRoom = async (mode: "video" | "multi" = "video") => {
+    const mediaEngineReady = loadAgoraRTC();
     // Approved agency owners (userRole === "agent") get automatic host access —
     // they do NOT need to submit a separate host request. Admins bypass too.
     const isApprovedHostRequest = ["approved", "active", "enabled"].includes(
@@ -10254,7 +10306,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       });
       const room = data?.data;
       if (room?.id) {
-        const roomWithToken = await attachAgoraToken(room, "publisher");
+        const [roomWithToken] = await Promise.all([
+          attachAgoraToken(room, "publisher"),
+          mediaEngineReady,
+        ]);
         setStreamRole("streamer");
         setIsLiveStreamMinimized(false);
         setAppSection("stream");
@@ -10452,6 +10507,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
   // ---- হ্যান্ডলার: লাইভ রুম (joinBackendLiveRoom) ----
   const joinBackendLiveRoom = async (room: any) => {
+    const mediaEngineReady = loadAgoraRTC();
     // === END-LIVE-BLOCK: হোস্ট রি-জয়েন ফিক্স ===
     // হোস্ট যদি নিজের লাইভে ফেরত ক্লিক করে, তাকে viewer হিসাবে জয়েন না
     // করিয়ে সরাসরি streamer role-এ স্ট্রিমিং বোর্ডে পাঠাও।
@@ -10464,7 +10520,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         setAppSection("stream");
         setIsStreamCameraOff(false);
         if (!activeLiveRoom || Number(activeLiveRoom.id) !== Number(room.id)) {
-          const roomWithToken = await attachAgoraToken(room, "publisher");
+          const [roomWithToken] = await Promise.all([
+            attachAgoraToken(room, "publisher"),
+            mediaEngineReady,
+          ]);
           setActiveLiveRoom(roomWithToken);
           if (!liveSessionStartedAt) setLiveSessionStartedAt(Date.now());
           return roomWithToken;
@@ -10477,9 +10536,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     // === END-LIVE-BLOCK end ===
     setLiveRoomStatus("Joining live room...");
     try {
-      const data: any = await api.post(`/api/live-rooms/${room.id}/join`);
+      const [data, tokenRoom]: any[] = await Promise.all([
+        api.post(`/api/live-rooms/${room.id}/join`),
+        attachAgoraToken(room, "subscriber"),
+        mediaEngineReady,
+      ]);
       const joined = data?.data || room;
-      const roomWithToken = await attachAgoraToken(joined, "subscriber");
+      const roomWithToken = { ...joined, agora: tokenRoom?.agora };
       setActiveLiveRoom(roomWithToken);
       setStreamRole("viewer");
       setIsLiveStreamMinimized(false);

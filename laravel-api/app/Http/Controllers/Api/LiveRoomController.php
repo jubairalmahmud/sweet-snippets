@@ -13,12 +13,13 @@ class LiveRoomController extends Controller
 {
     private function shape(object $r): array
     {
-        $host = DB::table('users')->where('id', $r->host_id)->first();
+        $hasJoinedHost = property_exists($r, 'host_name') || property_exists($r, 'host_avatar');
+        $host = $hasJoinedHost ? null : DB::table('users')->where('id', $r->host_id)->first();
         return [
             'id'            => (int) $r->id,
             'hostId'        => (int) $r->host_id,
-            'hostName'      => $host->name ?? null,
-            'hostAvatar'    => $host->avatar ?? $host->avatar_url ?? null,
+            'hostName'      => $r->host_name ?? $host->name ?? null,
+            'hostAvatar'    => $r->host_avatar ?? $host->avatar ?? $host->avatar_url ?? null,
             'title'         => $r->title,
             'cover'         => $r->cover,
             'streamFilter'  => property_exists($r, 'stream_filter') ? $r->stream_filter : null,
@@ -69,7 +70,16 @@ class LiveRoomController extends Controller
             $q->where('category', '!=', 'multi');
         }
         if ($co = $request->query('country'))  $q->where('country', $co);
-        $rows = $q->orderByDesc('viewer_count')->orderByDesc('id')->limit(200)->get();
+        $rows = $q->orderByDesc('viewer_count')->orderByDesc('id')->limit(50)->get();
+        $hostIds = $rows->pluck('host_id')->map(fn ($id) => (int) $id)->filter()->unique()->values();
+        $hosts = $hostIds->isEmpty()
+            ? collect()
+            : DB::table('users')->whereIn('id', $hostIds->all())->get()->keyBy('id');
+        foreach ($rows as $row) {
+            $host = $hosts->get((int) $row->host_id);
+            $row->host_name = $host->name ?? null;
+            $row->host_avatar = $host->avatar ?? $host->avatar_url ?? null;
+        }
         return ['data' => $rows->map(fn ($r) => $this->shape($r))->values()];
     }
 
