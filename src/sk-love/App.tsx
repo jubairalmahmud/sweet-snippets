@@ -8,14 +8,14 @@ import LiveActionBar, { SafeStreamIcon } from "./components/LiveActionBar";
 import TopGameWinnerBanner from "./components/TopGameWinnerBanner";
 import RoyalGiftBanner from "./components/RoyalGiftBanner";
 
-import commentImg from "./assets/stream-icons/comment.webp";
-import menuImg from "./assets/stream-icons/menu.webp";
-import phoneImg from "./assets/stream-icons/phone.webp";
-import giftImg from "./assets/stream-icons/gift.webp";
-import gameImg from "./assets/stream-icons/game.webp";
-import reactImg from "./assets/stream-icons/react.webp";
-import seatImg from "./assets/stream-icons/seat.webp";
-import navGemBarImg from "./assets/nav-gem-bar.webp";
+import commentImg from "./assets/stream-icons/comment.png";
+import menuImg from "./assets/stream-icons/menu.png";
+import phoneImg from "./assets/stream-icons/phone.png";
+import giftImg from "./assets/stream-icons/gift.png";
+import gameImg from "./assets/stream-icons/game.png";
+import reactImg from "./assets/stream-icons/react.png";
+import seatImg from "./assets/stream-icons/seat.png";
+import navGemBarImg from "./assets/nav-gem-bar.png";
 
 import { createPortal } from "react-dom";
 import type {
@@ -23,19 +23,15 @@ import type {
   ICameraVideoTrack,
   IMicrophoneAudioTrack,
 } from "agora-rtc-sdk-ng";
-// Agora is large and only needed after a user opens live/party/call media.
-// Lazy-loading it keeps the normal home/profile/store experience fast.
-let agoraRtcPromise: Promise<any> | null = null;
-const loadAgoraRTC = async () => {
-  if (!agoraRtcPromise) {
-    agoraRtcPromise = import("agora-rtc-sdk-ng").then((module) => {
-      const rtc = module.default;
-      try { rtc?.setLogLevel?.(3); } catch {}
-      return rtc;
-    });
-  }
-  return agoraRtcPromise;
-};
+// FIX: agora-rtc-sdk-ng reads `window` at module load and crashes during SSR
+// ("window is not defined"). Load it only on the client via top-level await.
+import AgoraRTC from "agora-rtc-sdk-ng";
+
+if (typeof window !== "undefined" && AgoraRTC && typeof (AgoraRTC as any).setLogLevel === "function") {
+  try {
+    (AgoraRTC as any).setLogLevel(3);
+  } catch {}
+}
 import { api } from "./lib/api";
 import { formatCoinCompact } from "./lib/hooks";
 import { toast } from "sonner";
@@ -157,13 +153,11 @@ const formatCompact = (n: number): string => {
   if (abs >= 1e3) return (n / 1e3).toFixed(abs >= 1e4 ? 0 : 1).replace(/\.0$/, "") + "K";
   return String(Math.round(n));
 };
-import frameEgolImg from "./assets/frames/egol.webp";
-import frameFairImg from "./assets/frames/fair.webp";
-import frameKingImg from "./assets/frames/king.webp";
-import frameQueenImg from "./assets/frames/queen.webp";
-import frameAgencyPremiumImg from "./assets/frames/agency-premium.webp";
-import frameHostPremiumImg from "./assets/frames/host-premium.png";
-import frameResellerPremiumImg from "./assets/frames/reseller-premium.png";
+const frameEgolImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='none' stroke='%23FFD700' stroke-width='6'/><circle cx='50' cy='50' r='42' fill='none' stroke='%23FF8C00' stroke-width='2' stroke-dasharray='4 2'/></svg>";
+const frameFairImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='none' stroke='%2300FFFF' stroke-width='6'/><circle cx='50' cy='50' r='42' fill='none' stroke='%23FF007F' stroke-width='2'/></svg>";
+const frameKingImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='none' stroke='%23E6C200' stroke-width='7'/><path d='M35 25 L42 35 L50 20 L58 35 L65 25 L65 40 L35 40 Z' fill='%23FFD700'/></svg>";
+const frameQueenImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='none' stroke='%23FF1493' stroke-width='7'/><path d='M35 25 L42 35 L50 20 L58 35 L65 25 L65 40 L35 40 Z' fill='%23FF69B4'/></svg>";
+const frameAgencyPremiumImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='none' stroke='%239370DB' stroke-width='7'/><circle cx='50' cy='50' r='41' fill='none' stroke='%234B0082' stroke-width='3'/></svg>";
 import partyTheme1Img from "./assets/party-themes/theme-1.jpg";
 import partyTheme2Img from "./assets/party-themes/theme-2.jpg";
 import partyTheme3Img from "./assets/party-themes/theme-3.jpg";
@@ -174,37 +168,25 @@ import partyTheme7Img from "./assets/party-themes/theme-7.jpg";
 import partyTheme8Img from "./assets/party-themes/theme-8.jpg";
 import partyTheme9Img from "./assets/party-themes/theme-9.jpg";
 import partyTheme10Img from "./assets/party-themes/theme-10.jpg";
-import type { GameKey } from "./games/GamesLauncher";
-const GamesLauncher = React.lazy(() =>
-  import("./games/GamesLauncher").then((module) => ({ default: module.GamesLauncher })),
-);
+import { GamesLauncher, type GameKey } from "./games/GamesLauncher";
 
 // ==========================================
-// STORE — Avatar Frame catalog
+// STORE — Avatar Frame catalog (frontend only; wire to Laravel later)
 // ==========================================
-export type AvatarFrameItem = {
-  dbId?: number;
+const AVATAR_FRAME_CATALOG: Array<{
   id: string;
-  code: string;
   name: string;
   image: string;
   price: number;
   durationDays: number;
-  vipLevelRequired?: number;
-  rarity?: string;
-  isActive?: boolean;
   adminOnly?: boolean;
-  isOfficial?: boolean;
-};
-
-const DEFAULT_AVATAR_FRAME_CATALOG: AvatarFrameItem[] = [
-  { dbId: 1, id: "avatar-egol", code: "avatar-egol", name: "Egol", image: frameEgolImg, price: 500000, durationDays: 30, rarity: "epic" },
-  { dbId: 2, id: "avatar-fair", code: "avatar-fair", name: "Fair", image: frameFairImg, price: 500000, durationDays: 30, rarity: "epic" },
-  { dbId: 3, id: "avatar-king", code: "avatar-king", name: "KING", image: frameKingImg, price: 500000, durationDays: 30, rarity: "legendary" },
-  { dbId: 4, id: "avatar-queen", code: "avatar-queen", name: "QUEEN", image: frameQueenImg, price: 500000, durationDays: 30, rarity: "legendary" },
-  { dbId: 5, id: "avatar-host-premium", code: "avatar-host-premium", name: "HOST VIP", image: frameHostPremiumImg, price: 0, durationDays: 3650, isOfficial: true, adminOnly: true, rarity: "rare" },
-  { dbId: 6, id: "avatar-reseller-premium", code: "avatar-reseller-premium", name: "RESELLER VIP", image: frameResellerPremiumImg, price: 0, durationDays: 3650, isOfficial: true, adminOnly: true, rarity: "rare" },
-  { dbId: 7, id: "avatar-agency-premium", code: "avatar-agency-premium", name: "AGENCY VIP", image: frameAgencyPremiumImg, price: 0, durationDays: 3650, isOfficial: true, adminOnly: true, rarity: "rare" },
+}> = [
+  { id: "avatar-egol", name: "Egol", image: frameEgolImg, price: 500000, durationDays: 30 },
+  { id: "avatar-fair", name: "Fair", image: frameFairImg, price: 500000, durationDays: 30 },
+  { id: "avatar-king", name: "KING", image: frameKingImg, price: 500000, durationDays: 30 },
+  { id: "avatar-queen", name: "QUEEN", image: frameQueenImg, price: 500000, durationDays: 30 },
+  // Admin-granted only — awarded to approved agency owners via Admin Dashboard.
+  { id: "avatar-agency-premium", name: "AGENCY", image: frameAgencyPremiumImg, price: 0, durationDays: 3650, adminOnly: true },
 ];
 
 
@@ -2294,22 +2276,6 @@ export default function App() {
     return () => window.removeEventListener("sklove:topup-balance", syncGameTopUpBalance);
   }, []);
 
-  // ---- Store: Avatar Frame catalog (admin-editable, persisted) ----
-  const [avatarFrameCatalog, setAvatarFrameCatalog] = useState<AvatarFrameItem[]>(() => {
-    try {
-      const raw = typeof window !== "undefined" ? window.localStorage.getItem("sk_avatar_frame_catalog") : null;
-      if (!raw) return DEFAULT_AVATAR_FRAME_CATALOG;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length) return parsed as AvatarFrameItem[];
-      return DEFAULT_AVATAR_FRAME_CATALOG;
-    } catch {
-      return DEFAULT_AVATAR_FRAME_CATALOG;
-    }
-  });
-  useEffect(() => {
-    try { window.localStorage.setItem("sk_avatar_frame_catalog", JSON.stringify(avatarFrameCatalog)); } catch {}
-  }, [avatarFrameCatalog]);
-
   // ---- Store: owned avatar frames { id -> expiryTimestamp(ms) } + currently equipped ----
   const [ownedAvatarFrames, setOwnedAvatarFrames] = useState<Record<string, number>>(() => {
     try {
@@ -2370,7 +2336,7 @@ export default function App() {
     }
   }, [equippedAvatarFrame, ownedAvatarFrames]);
   const activeAvatarFrameImg = equippedAvatarFrame
-    ? avatarFrameCatalog.find((f) => f.id === equippedAvatarFrame || f.code === equippedAvatarFrame)?.image ?? null
+    ? AVATAR_FRAME_CATALOG.find((f) => f.id === equippedAvatarFrame)?.image ?? null
     : null;
 
   // ---- Store: owned Rides / Entry Effects { id -> expiryTimestamp(ms) } + equipped ----
@@ -3100,48 +3066,6 @@ export default function App() {
       }
     })();
 
-    // ────── 1.5) Avatar Frame catalog (public) ──────
-    (async () => {
-      try {
-        const res: any = await api.get("/api/frame-catalog", { auth: false });
-        if (cancelled) return;
-        const items = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
-        if (items.length) {
-          setAvatarFrameCatalog(
-            items.map((f: any): AvatarFrameItem => {
-              const code = String(f.code || `frame_${f.id}`);
-              let img = String(f.image_url || f.image || "");
-              if (!img || img.includes('/assets/frames/egol.png')) img = frameEgolImg;
-              else if (img.includes('/assets/frames/fair.png')) img = frameFairImg;
-              else if (img.includes('/assets/frames/king.png')) img = frameKingImg;
-              else if (img.includes('/assets/frames/queen.png')) img = frameQueenImg;
-              else if (img.includes('/assets/frames/host-vip.png')) img = frameHostPremiumImg;
-              else if (img.includes('/assets/frames/reseller-vip.png')) img = frameResellerPremiumImg;
-              else if (img.includes('/assets/frames/agency-vip.png')) img = frameAgencyPremiumImg;
-
-              const price = Number(f.price_coins ?? f.price ?? 0);
-              return {
-                dbId: Number(f.id),
-                id: code,
-                code: code,
-                name: String(f.name || "Frame"),
-                image: img,
-                price: price,
-                durationDays: Number(f.duration_days ?? f.durationDays ?? 30),
-                vipLevelRequired: Number(f.vip_level_required ?? 0),
-                rarity: String(f.rarity || "common"),
-                isActive: Boolean(f.is_active ?? true),
-                isOfficial: price === 0 && (code.includes("vip") || code.includes("premium")),
-                adminOnly: price === 0 && (code.includes("vip") || code.includes("premium")),
-              };
-            })
-          );
-        }
-      } catch {
-        /* fall back to localStorage default */
-      }
-    })();
-
     // ────── 2) My owned themes + equipped ──────
     (async () => {
       try {
@@ -3181,8 +3105,10 @@ export default function App() {
           dbSyncKnownOwnedFramesRef.current[id] = true;
           if (r.is_equipped) equipped = id;
         });
-        setOwnedAvatarFrames(owned);
-        setEquippedAvatarFrame(equipped);
+        if (rows.length) {
+          setOwnedAvatarFrames(owned);
+          if (equipped) setEquippedAvatarFrame(equipped);
+        }
       } catch {
         /* offline — keep localStorage state */
       } finally {
@@ -3220,12 +3146,13 @@ export default function App() {
   // ────── Push equipped-frame change to server ──────
   useEffect(() => {
     if (!dbSyncHydratedFramesRef.current || !equippedAvatarFrame) return;
-    const cat = avatarFrameCatalog.find((f) => f.id === equippedAvatarFrame || f.code === equippedAvatarFrame);
-    const dbId = cat?.dbId || cat?.id;
+    // Resolve numeric frame_id from catalog
+    const cat = AVATAR_FRAME_CATALOG.find((f) => f.id === equippedAvatarFrame);
+    const dbId = (cat as any)?.dbId;
     if (dbId) {
-      api.post(`/api/me/frames/equip`, { frame_id: dbId, code: cat?.code || equippedAvatarFrame }).catch(() => {});
+      api.post(`/api/me/frames/${dbId}/equip`, {}).catch(() => {});
     }
-  }, [equippedAvatarFrame, avatarFrameCatalog]);
+  }, [equippedAvatarFrame]);
 
   // ────── Push NEW frame purchases to server ──────
   useEffect(() => {
@@ -3233,11 +3160,15 @@ export default function App() {
     Object.keys(ownedAvatarFrames).forEach((id) => {
       if (dbSyncKnownOwnedFramesRef.current[id]) return;
       dbSyncKnownOwnedFramesRef.current[id] = true;
-      const cat = avatarFrameCatalog.find((f) => f.id === id || f.code === id);
-      const dbId = cat?.dbId || id;
-      if (dbId) api.post(`/api/frame-catalog/${dbId}/buy`, { code: cat?.code || id }).catch(() => {});
+      const cat = AVATAR_FRAME_CATALOG.find((f) => f.id === id);
+      const dbId = (cat as any)?.dbId;
+      if (dbId) api.post(`/api/frame-catalog/${dbId}/buy`, {}).catch(() => {});
     });
-  }, [ownedAvatarFrames, avatarFrameCatalog]);
+  }, [ownedAvatarFrames]);
+
+
+
+
 
   /**
    * Resolve which avatar-frame image to render for ANY user (own or others).
@@ -3273,9 +3204,9 @@ export default function App() {
         const expMs = typeof expiry === "number" ? expiry : Date.parse(String(expiry));
         if (Number.isFinite(expMs) && expMs > 0 && expMs < Date.now()) return null;
       }
-      return avatarFrameCatalog.find((f) => f.id === frameId || f.code === frameId)?.image ?? null;
+      return AVATAR_FRAME_CATALOG.find((f) => f.id === frameId)?.image ?? null;
     },
-    [activeAvatarFrameImg, avatarFrameCatalog],
+    [activeAvatarFrameImg],
   );
 
 
@@ -3475,45 +3406,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   };
   // FIX #5: Hamburger menu (Exit / Share / Minimize / Seat Setup / Voice)
   const [isPartyMenuOpen, setIsPartyMenuOpen] = useState<boolean>(false);
-
-  const handleSharePartyRoom = async () => {
-    setIsPartyMenuOpen(false);
-    const roomId = activePartyRoom?.id;
-    if (!roomId) {
-      triggerSystemAnnouncement("No active room to share.");
-      return;
-    }
-    const shareUrl = `${window.location.origin}${window.location.pathname}?partyRoomId=${roomId}`;
-    const roomTitle = activePartyRoom?.title || activePartyRoom?.name || "Party Room";
-    const shareData = {
-      title: roomTitle,
-      text: `Join ${roomTitle} on SK Love!`,
-      url: shareUrl,
-    };
-
-    if (navigator.share && typeof navigator.share === "function") {
-      try {
-        await navigator.share(shareData);
-        triggerSystemAnnouncement("Room link shared!");
-        return;
-      } catch {
-        // Fallback to clipboard if cancelled or unsupported
-      }
-    }
-
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      triggerSystemAnnouncement("🔗 Room link copied to clipboard!");
-    } catch {
-      const input = document.createElement("input");
-      input.value = shareUrl;
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand("copy");
-      document.body.removeChild(input);
-      triggerSystemAnnouncement("🔗 Room link copied to clipboard!");
-    }
-  };
   const [isPKOpen, setIsPKOpen] = useState<boolean>(false);
   // Incoming PK invite that this user just accepted → jump straight into battle
   const [pkIncomingBattle, setPkIncomingBattle] = useState<{
@@ -4227,8 +4119,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         rCoins: walletInfo.rCoins !== undefined ? Number(walletInfo.rCoins) : prev.rCoins,
         earnings: walletInfo.earnings !== undefined ? Number(walletInfo.earnings) : (walletInfo.host_earnings !== undefined ? Number(walletInfo.host_earnings) : prev.earnings),
         vipLevel: walletInfo.vipLevel !== undefined ? Number(walletInfo.vipLevel) : prev.vipLevel,
-        avatarFrame: walletInfo.avatarFrame !== undefined ? (walletInfo.avatarFrame || "Default") : prev.avatarFrame,
-        entryEffect: walletInfo.entryEffect !== undefined ? (walletInfo.entryEffect || "None") : prev.entryEffect,
+        avatarFrame: walletInfo.avatarFrame || prev.avatarFrame,
+        entryEffect: walletInfo.entryEffect || prev.entryEffect,
       }));
 
       if (walletInfo.name) setRegisterName(walletInfo.name);
@@ -4236,13 +4128,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       setUserBio(typeof walletInfo.bio === "string" ? walletInfo.bio : "");
       if (walletInfo.gender === "Male" || walletInfo.gender === "Female")
         setUserGender(walletInfo.gender);
-      if (walletInfo.avatar !== undefined && walletInfo.avatar !== null) {
-        setProfileAvatarImg(walletInfo.avatar);
-      }
+      if (walletInfo.avatar) setProfileAvatarImg(walletInfo.avatar);
       const syncedCover = getCoverFromUser(walletInfo);
-      if (syncedCover !== undefined && syncedCover !== null) {
-        setProfileCoverImg(syncedCover);
-      }
+      if (syncedCover) setProfileCoverImg(syncedCover);
       if (typeof walletInfo.location === "string") setProfileLocation(walletInfo.location);
       if (typeof walletInfo.hometown === "string") setProfileHometown(walletInfo.hometown);
       if (typeof walletInfo.birthday === "string") setProfileBirthday(walletInfo.birthday);
@@ -4380,7 +4268,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     const cleanup = () => {
       try {
         const token = window.localStorage.getItem("sk_love_token") || "";
-        const base = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_LARAVEL_API_URL || "https://api.sklove.nit.bd").replace(/\/+$/, "").replace(/\/api$/i, "");
+        const base = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_LARAVEL_API_URL || "https://api.sklove.nit.bd").replace(/\/+$/, "");
         const send = (path: string) => {
           const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
           const blob = new Blob([JSON.stringify({ token })], { type: "application/json" });
@@ -4944,27 +4832,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       refreshBanners();
       refreshLiveRooms();
       refreshPartyRooms();
-      // Deep link support: auto join party room if partyRoomId parameter is present in URL
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const sharedPartyRoomId = urlParams.get("partyRoomId");
-        if (sharedPartyRoomId) {
-          api.get(`/api/party-rooms/${sharedPartyRoomId}`)
-            .then((res: any) => {
-              const roomData = res?.data || res;
-              if (roomData && (roomData.id || roomData.hostId || roomData.title)) {
-                joinBackendPartyRoom(roomData);
-              } else {
-                joinBackendPartyRoom({ id: Number(sharedPartyRoomId) });
-              }
-            })
-            .catch(() => {
-              joinBackendPartyRoom({ id: Number(sharedPartyRoomId) });
-            });
-        }
-      } catch {
-        /* ignore */
-      }
       refreshGiftCatalog();
       // Sync user's deposit history
       api
@@ -5080,23 +4947,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       setIsLoggedIn(true);
     }
   }, []);
-
-  // ---- Real-time Periodic Database State Sync Effect ----
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    const syncFromDb = () => {
-      void fetchUserWalletData();
-    };
-    const interval = setInterval(syncFromDb, 25000);
-    const handleFocus = () => {
-      syncFromDb();
-    };
-    window.addEventListener("focus", handleFocus);
-    return () => {
-      clearInterval(interval);
-      window.removeEventListener("focus", handleFocus);
-    };
-  }, [isLoggedIn]);
 
 
   // ---- ইফেক্ট: useEffect — if (commentsEndRef.current) { ----
@@ -5420,8 +5270,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         return;
       }
 
-      const AgoraRTC = await loadAgoraRTC();
-
       await cleanupAgoraSession();
       setAgoraStatus(streamRole === "streamer" ? "Starting camera..." : "Joining stream...");
 
@@ -5738,8 +5586,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           setCallAgoraStatus("Private call token missing.");
           return;
         }
-
-        const AgoraRTC = await loadAgoraRTC();
 
         const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
         callAgoraClientRef.current = client;
@@ -6094,7 +5940,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       return null;
     }
     if (!partyPreparingMicRef.current) {
-      const AgoraRTC = await loadAgoraRTC();
       partyPreparingMicRef.current = AgoraRTC.createMicrophoneAudioTrack()
         .then(async (track) => {
           partyAgoraAudioTrackRef.current = track;
@@ -6203,8 +6048,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
           setPartyAgoraStatus("Party voice token missing.");
           return;
         }
-
-        const AgoraRTC = await loadAgoraRTC();
 
         // Party rooms are multiparty conversations: every participant can
         // publish and subscribe to audio, so RTC mode is required here.
@@ -14636,26 +14479,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     }
   >
 
-    {/* Full-screen backdrop overlays for Party Room popups (moved outside transformed bottom-bar wrapper) */}
-    {isPartyRoomOpen && isPartyCommentPopupOpen && (
-      <div
-        className="fixed inset-0 z-[85] bg-black/40 cursor-pointer"
-        onClick={() => setIsPartyCommentPopupOpen(false)}
-      />
-    )}
-    {isPartyRoomOpen && isPartyMenuOpen && (
-      <div
-        className="fixed inset-0 z-[85] bg-black/20 cursor-pointer"
-        onClick={() => setIsPartyMenuOpen(false)}
-      />
-    )}
-    {isPartyRoomOpen && isPartyExitMenuOpen && (
-      <div
-        className="fixed inset-0 z-[85] bg-transparent cursor-pointer"
-        onClick={() => setIsPartyExitMenuOpen(false)}
-      />
-    )}
-
 
     {!isPartyRoomOpen && (
       <div className="space-y-2.5 mb-3.5">
@@ -15396,44 +15219,21 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                         )}
 
                         {/* #5/#10: mic status badge (bottom-right) — visible to EVERYONE.
-                            Pink mic = speaking/open with animated sound wave bars, violet slashed = muted. */}
+                            Pink mic = speaking/open, violet slashed = muted. */}
                         {effOccupant && (
-                          <div className="absolute -bottom-1 -right-1 z-40 flex items-center pointer-events-none">
-                            {!effectiveSeatMuted && (
-                              <>
-                                {/* Animated sound wave aura ring */}
-                                <span className="absolute inset-0 rounded-full bg-pink-500/80 animate-ping opacity-75" />
-                                {/* Animated Sound Wave Equalizer Bars */}
-                                <span className="absolute -top-3.5 -right-2 z-50 flex items-end gap-[2px] h-3.5 rounded-full bg-slate-950/95 border border-pink-400/80 px-1 py-0.5 shadow-[0_0_8px_rgba(236,72,153,0.8)]">
-                                  <span
-                                    className="w-[2.5px] rounded-full bg-pink-400"
-                                    style={{ animation: "soundWaveBar 0.5s ease-in-out infinite" }}
-                                  />
-                                  <span
-                                    className="w-[2.5px] rounded-full bg-emerald-400"
-                                    style={{ animation: "soundWaveBar 0.35s ease-in-out infinite 0.12s" }}
-                                  />
-                                  <span
-                                    className="w-[2.5px] rounded-full bg-cyan-400"
-                                    style={{ animation: "soundWaveBar 0.65s ease-in-out infinite 0.25s" }}
-                                  />
-                                </span>
-                              </>
+                          <span
+                            className={`absolute -bottom-1 -right-1 z-40 grid h-5 w-5 place-items-center rounded-full border-2 border-[#0a0618] shadow-lg ${
+                              effectiveSeatMuted
+                                ? "bg-gradient-to-br from-violet-500 to-purple-700"
+                                : "bg-gradient-to-br from-pink-500 to-fuchsia-600"
+                            }`}
+                          >
+                            {effectiveSeatMuted ? (
+                              <MicOff className="h-3 w-3 text-white" />
+                            ) : (
+                              <Mic className="h-3 w-3 text-white" />
                             )}
-                            <span
-                              className={`grid h-5 w-5 place-items-center rounded-full border-2 border-[#0a0618] shadow-lg relative z-10 ${
-                                effectiveSeatMuted
-                                  ? "bg-gradient-to-br from-violet-500 to-purple-700"
-                                  : "bg-gradient-to-br from-pink-500 to-fuchsia-600"
-                              }`}
-                            >
-                              {effectiveSeatMuted ? (
-                                <MicOff className="h-3 w-3 text-white" />
-                              ) : (
-                                <Mic className="h-3 w-3 text-white" />
-                              )}
-                            </span>
-                          </div>
+                          </span>
                         )}
                       </button>
 
@@ -15798,7 +15598,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 the button visuals were swapped to match the stream footer. */}
             <div className="relative flex flex-1 items-center justify-between gap-1 px-1 pb-0">
               {isPartyCommentPopupOpen ? (
-                <div className="relative z-[90] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
+                <>
+                  <div
+                    className="fixed inset-0 z-[75] bg-black/30"
+                    onClick={() => setIsPartyCommentPopupOpen(false)}
+                  />
+                  <div className="relative z-[80] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
                     <div className="relative flex items-center">
                       <input
                         ref={partyCommentInputRef}
@@ -15832,6 +15637,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                       </button>
                     </div>
                   </div>
+                </>
               ) : (
                 <>
                   {/* FIX (UI parity): Comment pencil button — mirrors the video
@@ -15926,7 +15732,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 </button>
 
                 {isPartyMenuOpen && (
-                  <div className="fixed bottom-20 right-3 z-[95] w-[min(220px,calc(100vw-24px))] max-h-[70vh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-950/95 backdrop-blur shadow-2xl p-2 flex flex-col gap-1">
+                  <>
+                    <div
+                      className="fixed inset-0 z-[90]"
+                      onClick={() => setIsPartyMenuOpen(false)}
+                    />
+                    <div className="fixed bottom-20 right-3 z-[95] w-[min(220px,calc(100vw-24px))] max-h-[70vh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-950/95 backdrop-blur shadow-2xl p-2 flex flex-col gap-1">
                       {/* FIX: Exit + Share removed from hamburger. Exit is the top-right X button; Share is the Share2 icon in the top row. */}
                       <button
                         type="button"
@@ -15936,26 +15747,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                         <Minimize2 className="h-3.5 w-3.5" />
                         <span>Minimize</span>
                       </button>
-                      {/* Share Room Button */}
+                      {/* Batch 2: Theme Gallery — host applies to whole room, guest previews personally */}
                       <button
                         type="button"
-                        onClick={handleSharePartyRoom}
-                        className="w-full flex items-center gap-2 rounded-lg border border-pink-500/30 bg-gradient-to-r from-pink-500/20 to-purple-500/20 px-2.5 py-2 text-[10px] font-black uppercase text-pink-200 hover:from-pink-500/30 hover:to-purple-500/30 active:scale-95 transition cursor-pointer"
+                        onClick={() => { setIsPartyMenuOpen(false); setIsPartyThemeGalleryOpen(true); }}
+                        className="w-full flex items-center gap-2 rounded-lg border border-fuchsia-500/30 bg-fuchsia-500/10 px-2.5 py-2 text-[10px] font-black uppercase text-fuchsia-200"
                       >
-                        <Share2 className="h-3.5 w-3.5 text-pink-400" />
-                        <span>Share Room</span>
+                        <Palette className="h-3.5 w-3.5" />
+                        <span>{isActivePartyHost ? "Theme Gallery (Room)" : "Theme Gallery (Preview)"}</span>
                       </button>
-                      {/* Theme Gallery — only visible to the Room Host */}
-                      {isActivePartyHost && (
-                        <button
-                          type="button"
-                          onClick={() => { setIsPartyMenuOpen(false); setIsPartyThemeGalleryOpen(true); }}
-                          className="w-full flex items-center gap-2 rounded-lg border border-fuchsia-500/30 bg-fuchsia-500/10 px-2.5 py-2 text-[10px] font-black uppercase text-fuchsia-200"
-                        >
-                          <Palette className="h-3.5 w-3.5" />
-                          <span>Theme Gallery</span>
-                        </button>
-                      )}
                       <button
                         type="button"
                         onClick={() => { setIsPartyMenuOpen(false); enablePartyRoomAudio(); }}
@@ -16016,6 +15816,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                         </div>
                       )}
                     </div>
+                  </>
                 )}
               </div>
 
@@ -21611,22 +21412,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               {/* 4. STREAM VIEW (LIVE SPECIFIED VIEW CONCEPTS) */}
               {appSection === "stream" && (
                 <div className="flex-1 flex flex-col relative bg-gradient-to-b from-purple-950 via-slate-900 to-black overflow-hidden sk-preserve-dark">
-                  {/* Full-screen backdrop overlays for Stream popups (moved outside transformed bottom-bar wrapper) */}
-                  {isCommentInputPopupOpen && (
-                    <div
-                      className="fixed inset-0 z-[85] bg-black/40 cursor-pointer"
-                      onClick={() => {
-                        setIsCommentInputPopupOpen(false);
-                        setReplyingToComment(null);
-                      }}
-                    />
-                  )}
-                  {isViewerMenuOpen && (
-                    <div
-                      className="fixed inset-0 z-[85] bg-black/20 cursor-pointer"
-                      onClick={() => setIsViewerMenuOpen(false)}
-                    />
-                  )}
                   {/* Join notices — animated pill above the comment box, bottom-left for 2 seconds */}
                   {joinNotices.length > 0 && !isLiveStreamMinimized && (
                     <div className="pointer-events-none absolute left-3 bottom-20 z-[85] flex flex-col-reverse gap-1.5">
@@ -21802,55 +21587,17 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               </div>
                             )}
                             {liveCohostRequests.length > 0 && (
-                              <div className="absolute left-3 top-16 z-30 w-64 max-w-[calc(100%-1.5rem)] rounded-2xl border border-pink-500/40 bg-slate-950/92 p-2.5 shadow-[0_0_20px_rgba(236,72,153,0.35)] backdrop-blur-md">
-                                <div className="mb-1.5 flex items-center justify-between border-b border-white/10 pb-1">
-                                  <div className="flex items-center gap-1.5">
-                                    <span className="relative flex h-2 w-2">
-                                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-pink-400 opacity-75"></span>
-                                      <span className="relative inline-flex h-2 w-2 rounded-full bg-pink-500"></span>
+                              <div className="absolute left-3 top-16 z-30 w-48 rounded-xl border border-rose-400/30 bg-slate-950/90 p-2 shadow-xl backdrop-blur">
+                                <p className="text-[8px] font-black uppercase text-rose-300">Co-host requests</p>
+                                {liveCohostRequests.slice(0, 3).map((request) => (
+                                  <div key={request.id} className="mt-2 flex items-center justify-between gap-1 text-[8px] text-white">
+                                    <span className="truncate">{request.name}</span>
+                                    <span className="flex gap-1">
+                                      <button onClick={() => void respondToLiveCohostRequest(request.id, "approve")} className="rounded bg-emerald-500 px-1.5 py-1 font-black text-slate-950" aria-label="Approve" title="Approve">✅</button>
+                                      <button onClick={() => void respondToLiveCohostRequest(request.id, "reject")} className="rounded bg-rose-500 px-1.5 py-1 font-black text-white" aria-label="Reject" title="Reject">❌</button>
                                     </span>
-                                    <p className="text-[9px] font-black uppercase tracking-wider text-pink-300">
-                                      🎙️ Co-host Request ({liveCohostRequests.length})
-                                    </p>
                                   </div>
-                                  <span className="rounded-full bg-pink-500/20 px-1.5 py-0.5 text-[8px] font-bold text-pink-200">Live</span>
-                                </div>
-                                <div className="space-y-2">
-                                  {liveCohostRequests.slice(0, 2).map((request) => (
-                                    <div key={request.id} className="flex items-center gap-2 rounded-xl bg-white/5 p-1.5 border border-white/10">
-                                      <img
-                                        src={getUserAvatarUrl({ name: request.name, avatar: request.avatar })}
-                                        alt={request.name || "User"}
-                                        className="h-8 w-8 rounded-full border border-pink-400/50 object-cover shadow"
-                                      />
-                                      <div className="min-w-0 flex-1">
-                                        <p className="truncate text-[10px] font-black text-white">{request.name || "SK Love User"}</p>
-                                        <p className="truncate text-[8px] font-medium text-pink-200">কো-হোস্ট হিসেবে যুক্ত হতে চান</p>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        <button
-                                          type="button"
-                                          onClick={() => void respondToLiveCohostRequest(request.id, "approve")}
-                                          className="flex h-7 px-2 items-center justify-center gap-1 rounded-lg bg-gradient-to-r from-emerald-500 to-green-600 text-[9px] font-bold text-slate-950 shadow active:scale-95 transition-transform"
-                                          aria-label="Approve"
-                                          title="Approve"
-                                        >
-                                          <Check className="h-3.5 w-3.5 stroke-[3]" />
-                                          <span>গ্রহণ</span>
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => void respondToLiveCohostRequest(request.id, "reject")}
-                                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-800 hover:bg-rose-600/80 text-white text-[9px] font-bold shadow active:scale-95 transition-transform"
-                                          aria-label="Reject"
-                                          title="Reject"
-                                        >
-                                          <X className="h-3.5 w-3.5 stroke-[3]" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
+                                ))}
                               </div>
                             )}
                             {liveCohosts.length > 0 && (
@@ -22130,7 +21877,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                               {/* Always-visible input bar */}
                               <div className="relative flex min-w-0 flex-1 items-center gap-1">
                                 {isCommentInputPopupOpen ? (
-                                  <div className="relative z-[90] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
+                                  <>
+                                    <div
+                                      className="fixed inset-0 z-[75] bg-black/30"
+                                      onClick={() => {
+                                        setIsCommentInputPopupOpen(false);
+                                        setReplyingToComment(null);
+                                      }}
+                                    />
+                                    <div className="relative z-[80] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
                                       {/* Replying Context Bar */}
                                       {replyingToComment && (
                                         <div className="flex items-center justify-between bg-fuchsia-950/90 border border-fuchsia-500/40 rounded-xl px-2.5 py-1 mb-1.5 text-[10px] text-fuchsia-200">
@@ -22217,6 +21972,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                         </button>
                                       </div>
                                     </div>
+                                  </>
                                 ) : (
                                   <LiveActionBar
                                     onComment={() => setIsCommentInputPopupOpen(true)}
@@ -22819,39 +22575,33 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                   </div>
                                   <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
                                     {liveCohostRequests.length === 0 ? (
-                                      <p className="py-6 text-center text-[10px] font-medium text-slate-400">কোনো রিকোয়েস্ট পেন্ডিং নেই</p>
+                                      <p className="py-4 text-center text-[9px] text-slate-400">No pending requests.</p>
                                     ) : (
                                       liveCohostRequests.map((request: any) => (
-                                        <div key={`host-req-${request.id}`} className="flex items-center gap-2.5 rounded-2xl border border-pink-500/20 bg-gradient-to-r from-slate-900/90 via-slate-900/80 to-pink-950/30 p-2.5 shadow-lg backdrop-blur">
-                                          <div className="relative">
-                                            <img src={getUserAvatarUrl({ name: request.name, avatar: request.avatar })} alt={request.name || "User"} className="h-10 w-10 rounded-full border-2 border-pink-500/40 object-cover shadow" />
-                                            <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-pink-500 text-[8px]">🎙️</span>
-                                          </div>
+                                        <div key={`host-req-${request.id}`} className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/70 p-2">
+                                          <img src={getUserAvatarUrl({ name: request.name, avatar: request.avatar })} alt={request.name || "User"} className="h-9 w-9 rounded-full object-cover" />
                                           <div className="min-w-0 flex-1">
-                                            <p className="truncate text-[11px] font-black text-white">{request.name || "SK Love User"}</p>
-                                            <p className="text-[9px] font-semibold text-pink-300">কো-হোস্ট হিসেবে যুক্ত হতে চান</p>
+                                            <p className="truncate text-[10px] font-black text-white">{request.name || "SK Love User"}</p>
+                                            <p className="text-[8px] font-bold text-cyan-300">Wants to join as co-host</p>
                                           </div>
-                                          <div className="flex items-center gap-1.5">
-                                            <button
-                                              type="button"
-                                              onClick={() => void respondToLiveCohostRequest(request.id, "approve")}
-                                              className="flex h-8 items-center gap-1 px-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 text-[10px] font-bold text-slate-950 shadow-md active:scale-95 transition-transform"
-                                              aria-label="Approve"
-                                              title="Approve"
-                                            >
-                                              <Check className="h-4 w-4 stroke-[3]" />
-                                              <span>গ্রহণ</span>
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => void respondToLiveCohostRequest(request.id, "reject")}
-                                              className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-800 hover:bg-rose-600 text-white shadow-md active:scale-95 transition-transform"
-                                              aria-label="Reject"
-                                              title="Reject"
-                                            >
-                                              <X className="h-4 w-4 stroke-[2.5]" />
-                                            </button>
-                                          </div>
+                                          <button
+                                            type="button"
+                                            onClick={() => void respondToLiveCohostRequest(request.id, "approve")}
+                                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500 text-slate-950"
+                                            aria-label="Approve"
+                                            title="Approve"
+                                          >
+                                            <Check className="h-4 w-4" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => void respondToLiveCohostRequest(request.id, "reject")}
+                                            className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500 text-white"
+                                            aria-label="Reject"
+                                            title="Reject"
+                                          >
+                                            <X className="h-4 w-4" />
+                                          </button>
                                         </div>
                                       ))
                                     )}
@@ -23616,7 +23366,15 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                           <div className="relative flex items-center justify-between gap-2 sm:gap-3 w-full max-w-lg mx-auto">
                             <div className="flex items-center gap-2 sm:gap-3 min-w-0 w-full">
                               {isCommentInputPopupOpen ? (
-                                <div className="relative z-[90] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
+                                <>
+                                  <div
+                                    className="fixed inset-0 z-[75] bg-black/30"
+                                    onClick={() => {
+                                      setIsCommentInputPopupOpen(false);
+                                      setReplyingToComment(null);
+                                    }}
+                                  />
+                                  <div className="relative z-[80] w-full rounded-2xl border border-fuchsia-500/40 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-md">
                                     {/* Replying Context Bar */}
                                     {replyingToComment && (
                                       <div className="flex items-center justify-between bg-fuchsia-950/90 border border-fuchsia-500/40 rounded-xl px-2.5 py-1 mb-1.5 text-[10px] text-fuchsia-200">
@@ -23703,7 +23461,8 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                       </button>
                                     </div>
                                   </div>
-                                ) : (
+                                </>
+                              ) : (
                                 <LiveActionBar
                                   onComment={() => setIsCommentInputPopupOpen(true)}
                                 onGift={() => setIsStreamGiftPanelOpen((current) => !current)}
@@ -27231,17 +26990,13 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                   "avatar" | "party" | "rides",
                   { id: string; name: string; emoji: string; price: string; gradient: string; image?: string }[]
                 > = {
-                  avatar: avatarFrameCatalog.filter((f) => f.isActive !== false).map((f) => ({
+                  avatar: AVATAR_FRAME_CATALOG.filter((f) => !f.adminOnly).map((f) => ({
                     id: f.id,
                     name: f.name,
-                    emoji: f.isOfficial ? "🛡️" : "",
+                    emoji: "",
                     image: f.image,
-                    price: f.isOfficial || f.price === 0
-                      ? "Official Frame"
-                      : f.price >= 1000
-                      ? `${(f.price / 1000).toLocaleString()}K/${f.durationDays} d`
-                      : `${f.price.toLocaleString()}/${f.durationDays} d`,
-                    gradient: f.isOfficial ? "from-amber-100 to-yellow-50" : "from-purple-100 to-pink-50",
+                    price: `${(f.price / 1000).toLocaleString()}K/${f.durationDays} d`,
+                    gradient: "from-purple-100 to-pink-50",
                   })),
 
 
@@ -27532,7 +27287,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                           );
                         }
 
-                        const catItem = avatarFrameCatalog.find((f) => f.id === selected.id || f.code === selected.id);
+                        const catItem = AVATAR_FRAME_CATALOG.find((f) => f.id === selected.id);
                         const isOwned = !!ownedAvatarFrames[selected.id];
                         const isEquipped = equippedAvatarFrame === selected.id;
                         if (isEquipped) {
@@ -27563,23 +27318,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                             </button>
                           );
                         }
-                        if (catItem?.isOfficial || catItem?.adminOnly) {
-                          return (
-                            <button
-                              onClick={() => {
-                                window.alert(
-                                  "🔒 এই ফ্রেমটি অফিসিয়াল (Host, Reseller, Agency)।\n\nএটি শুধুমাত্র অ্যাডমিন বা সিস্টেম দ্বারা প্রদান করা হয়, স্টোর থেকে কেনা যাবে না।"
-                                );
-                              }}
-                              className="bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[12px] px-6 py-2.5 rounded-full cursor-pointer shadow-sm hover:bg-amber-200 transition"
-                            >
-                              🔒 Official (Not for sale)
-                            </button>
-                          );
-                        }
                         return (
                           <button
-                            onClick={async () => {
+                            onClick={() => {
                               if (!catItem) {
                                 window.alert("❌ এই ফ্রেমের ইনফো পাওয়া যায়নি।");
                                 return;
@@ -27594,28 +27335,17 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                                 `"${catItem.name}" ফ্রেমটি কিনতে চান?\n\nমূল্য: 🪙 ${catItem.price.toLocaleString()}\nমেয়াদ: ${catItem.durationDays} দিন`,
                               );
                               if (!ok) return;
-                              try {
-                                const result: any = await api.post(
-                                  `/api/frame-catalog/${catItem.dbId || catItem.id}/buy`,
-                                  { code: catItem.code },
-                                );
-                                const expiry = result?.expires_at
-                                  ? new Date(result.expires_at).getTime()
-                                  : Date.now() + catItem.durationDays * 24 * 60 * 60 * 1000;
-                                dbSyncKnownOwnedFramesRef.current[catItem.id] = true;
-                                setUserWallet((prev) => ({
-                                  ...prev,
-                                  diamonds: Number(result?.diamonds ?? Math.max(0, prev.diamonds - catItem.price)),
-                                  avatarFrame: catItem.name,
-                                }));
-                                setOwnedAvatarFrames((prev) => ({ ...prev, [catItem.id]: expiry }));
-                                setEquippedAvatarFrame(catItem.id);
-                                window.alert(
-                                  `🎉 "${catItem.name}" ফ্রেম কেনা হলো এবং সক্রিয় করা হয়েছে!\nমেয়াদ: ${catItem.durationDays} দিন`,
-                                );
-                              } catch (error: any) {
-                                window.alert(error?.message || "Frame purchase failed. Please try again.");
-                              }
+                              const expiry = Date.now() + catItem.durationDays * 24 * 60 * 60 * 1000;
+                              setUserWallet((prev) => ({
+                                ...prev,
+                                diamonds: Math.max(0, prev.diamonds - catItem.price),
+                                avatarFrame: catItem.name,
+                              }));
+                              setOwnedAvatarFrames((prev) => ({ ...prev, [catItem.id]: expiry }));
+                              setEquippedAvatarFrame(catItem.id);
+                              window.alert(
+                                `🎉 "${catItem.name}" ফ্রেম কেনা হলো এবং সক্রিয় করা হয়েছে!\nমেয়াদ: ${catItem.durationDays} দিন`,
+                              );
                             }}
                             className="bg-gradient-to-r from-purple-400 to-fuchsia-400 text-white font-bold text-[13px] px-8 py-2.5 rounded-full border-none cursor-pointer shadow-md hover:opacity-90"
                           >
@@ -28023,24 +27753,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               {/* BOTTOM PREMIUM GEM NAV BAR — image reference (exact match) */}
               {appSection !== "stream" && !isCommentInputPopupOpen && !isPartyCommentPopupOpen && (
                 <div
-                  className="sticky bottom-0 left-0 right-0 z-40 w-full select-none shrink-0 overflow-visible min-h-[56px] bg-[#0c091a] border-t border-purple-900/30 shadow-2xl"
+                  className="relative w-screen max-w-full select-none shrink-0 overflow-visible"
                 >
                   <img
                     src={navGemBarImg}
-                    alt="Navigation"
+                    alt=""
                     aria-hidden="true"
                     draggable={false}
-                    className="block w-full h-auto min-h-[56px] max-h-[68px] object-contain pointer-events-none mx-auto"
-                    onError={(e) => {
-                      const target = e.currentTarget;
-                      if (!target.dataset.retried) {
-                        target.dataset.retried = "1";
-                        target.src = "/nav-gem-bar.png";
-                      } else if (target.dataset.retried === "1") {
-                        target.dataset.retried = "2";
-                        target.src = "/assets/nav-gem-bar.png";
-                      }
-                    }}
+                    className="block w-full h-auto pointer-events-none"
                   />
                   {/* Click zones positioned at the actual icon centers in the image
                       (measured: 11%, 30%, 50%, 70%, 89%) */}
@@ -28818,8 +28538,6 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               agencyApplications={agencyApplications}
               approveAgencyApplication={approveAgencyApplication}
               rejectAgencyApplication={rejectAgencyApplication}
-              partyThemeCatalog={partyThemeCatalog}
-              setPartyThemeCatalog={setPartyThemeCatalog}
             />
           ) : (
             <DbSchemaPanel copiedText={copiedText} handleCopyText={handleCopyText} />
@@ -29199,14 +28917,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       )}
 
       {/* SK Games Arena — full-screen modal (Home Game tab + Party hamburger Games) */}
-      <React.Suspense fallback={null}>
-        <GamesLauncher
-          open={isFullGamesOpen}
-          onClose={() => setIsFullGamesOpen(false)}
-          initialGame={fullGamesInitial}
-          compact={gamesLauncherCompact}
-        />
-      </React.Suspense>
+      <GamesLauncher
+        open={isFullGamesOpen}
+        onClose={() => setIsFullGamesOpen(false)}
+        initialGame={fullGamesInitial}
+        compact={gamesLauncherCompact}
+      />
     </div>
 
   );

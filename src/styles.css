@@ -229,13 +229,4 @@
   animation: float-up 2.5s ease-out forwards;
 }
 
-@keyframes soundWaveBar {
-  0%, 100% {
-    height: 30%;
-  }
-  50% {
-    height: 100%;
-  }
-}
-
 

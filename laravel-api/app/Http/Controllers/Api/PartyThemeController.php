@@ -19,7 +19,7 @@ use Throwable;
  *   POST   /api/party-themes/admin/upsert     -> admin, create/update theme
  *   DELETE /api/party-themes/admin/{id}       -> admin, delete theme
  *   GET    /api/party-themes/my               -> auth, owned themes + equipped id
- *   POST   /api/party-themes/purchase         -> auth, claim a free theme
+ *   POST   /api/party-themes/purchase         -> auth, buy a theme with diamonds
  *   POST   /api/party-themes/equip            -> auth, equip (also writes to any
  *                                                room this user hosts so all
  *                                                viewers pick it up)
@@ -186,13 +186,19 @@ class PartyThemeController extends Controller
         }
         if (!$theme) return ['ok' => false, 'error' => 'theme_not_found'];
 
-        return DB::transaction(function () use ($user, $theme) {
+        $price = (int) ($theme->offer_price ?? $theme->price);
+
+        return DB::transaction(function () use ($user, $theme, $price) {
             $fresh = DB::table('users')->where('id', $user->id)->lockForUpdate()->first();
             if (!$fresh) return ['ok' => false, 'error' => 'user_missing'];
+            if ((int) $fresh->diamonds < $price) {
+                return ['ok' => false, 'error' => 'insufficient_diamonds'];
+            }
 
-            // Party themes are free and permanent. Keep the ownership row in
-            // the database so the same selection follows the user on every device.
-            $expiresAt = null;
+            DB::table('users')->where('id', $user->id)
+                ->update(['diamonds' => (int) $fresh->diamonds - $price, 'updated_at' => now()]);
+
+            $expiresAt = now()->addDays((int) ($theme->duration_days ?: 30));
             $existing = DB::table('user_party_themes')
                 ->where('user_id', $user->id)->where('theme_id', $theme->id)->first();
 
@@ -214,10 +220,10 @@ class PartyThemeController extends Controller
 
             return [
                 'ok'         => true,
-                'diamonds'   => (int) ($fresh->diamonds ?? 0),
+                'diamonds'   => (int) $fresh->diamonds - $price,
                 'themeId'    => (int) $theme->id,
                 'code'       => $theme->code,
-                'expiresAt'  => null,
+                'expiresAt'  => strtotime($expiresAt) * 1000,
             ];
         });
     }
@@ -238,19 +244,7 @@ class PartyThemeController extends Controller
 
         $owned = DB::table('user_party_themes')
             ->where('user_id', $user->id)->where('theme_id', $theme->id)->first();
-        // Themes are free: equipping one also claims it. This makes the action
-        // atomic and avoids a purchase/equip race on slower mobile connections.
-        if (!$owned) {
-            $ownedId = DB::table('user_party_themes')->insertGetId([
-                'user_id'     => $user->id,
-                'theme_id'    => $theme->id,
-                'expires_at'  => null,
-                'is_equipped' => 0,
-                'created_at'  => now(),
-                'updated_at'  => now(),
-            ]);
-            $owned = DB::table('user_party_themes')->where('id', $ownedId)->first();
-        }
+        if (!$owned) return ['ok' => false, 'error' => 'not_owned'];
         if ($owned->expires_at && strtotime($owned->expires_at) < time()) {
             return ['ok' => false, 'error' => 'expired'];
         }

@@ -71,9 +71,7 @@ class UserFrames
         if (!$row) {
             // Fallback: check users table directly if avatar_frame is set on user record
             if (Schema::hasTable('users') && Schema::hasColumn('users', 'avatar_frame')) {
-                $columns = ['avatar_frame'];
-                if (Schema::hasColumn('users', 'avatar_frame_id')) $columns[] = 'avatar_frame_id';
-                $userCol = DB::table('users')->where('id', $key)->select($columns)->first();
+                $userCol = DB::table('users')->where('id', $key)->select(['avatar_frame', 'avatar_frame_id'])->first();
                 $val = $userCol->avatar_frame ?? ($userCol->avatar_frame_id ?? null);
                 if ($val && (string)$val !== '' && $val !== 'None' && $val !== 'Default') {
                     return self::$cache[$key] = [
@@ -154,9 +152,7 @@ class UserFrames
         // Fallback for users missing from user_frames table
         $missingIds = array_filter($ids, fn($uid) => empty($out[$uid]));
         if (!empty($missingIds) && Schema::hasTable('users') && Schema::hasColumn('users', 'avatar_frame')) {
-            $columns = ['id', 'avatar_frame'];
-            if (Schema::hasColumn('users', 'avatar_frame_id')) $columns[] = 'avatar_frame_id';
-            $userCols = DB::table('users')->whereIn('id', $missingIds)->select($columns)->get();
+            $userCols = DB::table('users')->whereIn('id', $missingIds)->select(['id', 'avatar_frame', 'avatar_frame_id'])->get();
             foreach ($userCols as $uc) {
                 $uid = (int) $uc->id;
                 $val = $uc->avatar_frame ?? ($uc->avatar_frame_id ?? null);

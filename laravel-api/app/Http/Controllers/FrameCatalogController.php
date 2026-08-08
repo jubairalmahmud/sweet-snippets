@@ -217,18 +217,20 @@ class FrameCatalogController extends Controller
             $price = (int) ($frame->price_coins ?? $r->input('price', 10000));
             $days = (int) ($frame->duration_days ?? 30);
 
-            // Paid frames always use the recharge/top-up balance. R-Coins are
-            // host earnings and must never be consumed by a store purchase.
-            $topUpBalance = (int) ($u->diamonds ?? 0);
-            if ($price > 0 && $topUpBalance < $price) {
-                return response()->json([
-                    'ok'       => false,
-                    'message'  => 'Insufficient top-up balance',
-                    'required' => $price,
-                    'diamonds' => $topUpBalance,
-                ], 422);
+            $useWalletTable = Schema::hasTable('wallets');
+            if ($useWalletTable) {
+                $wallet = DB::table('wallets')->where('user_id', $u->id)->lockForUpdate()->first();
+                if ($wallet && $wallet->r_coins >= $price) {
+                    DB::table('wallets')->where('user_id', $u->id)
+                        ->update(['r_coins' => $wallet->r_coins - $price, 'updated_at' => now()]);
+                } else if (isset($u->diamonds) && $u->diamonds >= $price) {
+                    $u->diamonds = $u->diamonds - $price;
+                }
+            } else {
+                if (isset($u->diamonds) && $u->diamonds >= $price) {
+                    $u->diamonds = $u->diamonds - $price;
+                }
             }
-            $u->diamonds = $topUpBalance - $price;
 
             $expires = $days > 0 ? Carbon::now()->addDays($days) : null;
 

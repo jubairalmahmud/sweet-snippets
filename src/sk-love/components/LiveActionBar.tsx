@@ -14,13 +14,13 @@
 
 import React, { useState } from "react";
 import { MessageSquare, Gift, Smile, Gamepad2, Menu, Sofa, Phone } from "lucide-react";
-import commentImg from "../assets/stream-icons/comment.webp";
-import giftImg from "../assets/stream-icons/gift.webp";
-import reactImg from "../assets/stream-icons/react.webp";
-import gameImg from "../assets/stream-icons/game.webp";
-import menuImg from "../assets/stream-icons/menu.webp";
-import seatImg from "../assets/stream-icons/seat.webp";
-import phoneImg from "../assets/stream-icons/phone.webp";
+import commentImg from "../assets/stream-icons/comment.png";
+import giftImg from "../assets/stream-icons/gift.png";
+import reactImg from "../assets/stream-icons/react.png";
+import gameImg from "../assets/stream-icons/game.png";
+import menuImg from "../assets/stream-icons/menu.png";
+import seatImg from "../assets/stream-icons/seat.png";
+import phoneImg from "../assets/stream-icons/phone.png";
 
 type SafeStreamIconProps = {
   src: string;
@@ -39,39 +39,9 @@ export function SafeStreamIcon({
   className = "h-12 w-12 object-contain filter drop-shadow-[0_0_6px_rgba(0,0,0,0.35)]",
   glowColor = "rgba(236,72,153,0.6)",
 }: SafeStreamIconProps) {
-  const [retryStage, setRetryStage] = useState(0);
-  const [currentSrc, setCurrentSrc] = useState(src || "");
+  const [hasError, setHasError] = useState(false);
 
-  React.useEffect(() => {
-    if (src) {
-      setCurrentSrc(src);
-      setRetryStage(0);
-    }
-  }, [src]);
-
-  const handleError = () => {
-    const rawAlt = (alt || "").toLowerCase();
-    let iconName = "comment";
-    if (rawAlt.includes("gift")) iconName = "gift";
-    else if (rawAlt.includes("react") || rawAlt.includes("emoji")) iconName = "react";
-    else if (rawAlt.includes("game")) iconName = "game";
-    else if (rawAlt.includes("menu")) iconName = "menu";
-    else if (rawAlt.includes("seat")) iconName = "seat";
-    else if (rawAlt.includes("call") || rawAlt.includes("phone")) iconName = "phone";
-    else if (rawAlt.includes("comment")) iconName = "comment";
-
-    if (retryStage === 0) {
-      setRetryStage(1);
-      setCurrentSrc(`/stream-icons/${iconName}.png`);
-    } else if (retryStage === 1) {
-      setRetryStage(2);
-      setCurrentSrc(`/assets/stream-icons/${iconName}.png`);
-    } else {
-      setRetryStage(3);
-    }
-  };
-
-  if (retryStage >= 3 || !currentSrc) {
+  if (hasError || !src) {
     return (
       <div
         className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-900/90 border border-white/20 shadow-lg ${fallbackColor}`}
@@ -84,9 +54,9 @@ export function SafeStreamIcon({
 
   return (
     <img
-      src={currentSrc}
+      src={src}
       alt={alt}
-      onError={handleError}
+      onError={() => setHasError(true)}
       className={className}
     />
   );
