@@ -308,6 +308,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/party-rooms/{id}',                  [PartyRoomController::class, 'show']);
     Route::post('/party-rooms',                      [PartyRoomController::class, 'start']);
     Route::post('/party-rooms/{id}/join',            [PartyRoomController::class, 'join']);
+    Route::post('/party-rooms/{id}/heartbeat',       [PartyRoomController::class, 'heartbeat']);
     Route::post('/party-rooms/{id}/end',             [PartyRoomController::class, 'end']);
     Route::post('/party-rooms/{id}/seats/{seatNum}/join',  [PartyRoomController::class, 'joinSeat']);
     Route::post('/party-rooms/{id}/seats/{seatNum}/leave', [PartyRoomController::class, 'leaveSeat']);

@@ -851,6 +851,50 @@ class PartyRoomController extends Controller
         return ['data' => $this->shape($room)];
     }
 
+    /**
+     * Keep an active audio-board session and the caller's occupied seat fresh.
+     * Only the room host may revive a room that was transiently marked closed;
+     * guests can never reopen an explicitly ended room.
+     */
+    public function heartbeat(Request $request, int $id)
+    {
+        $user = $request->user();
+        if (!$user) abort(401);
+
+        $room = DB::table('party_rooms')->where('id', $id)->first();
+        if (!$room) abort(404, 'Party room not found');
+
+        $isHost = (int) $this->prop($room, 'host_id', 0) === (int) $user->id;
+        $revive = $request->boolean('revive') && $isHost;
+        $roomValues = [];
+        if ($revive) {
+            $roomValues['live'] = true;
+            $roomValues['ended_at'] = null;
+        }
+        $roomPayload = $this->roomUpdatePayload($roomValues);
+        if (!empty($roomPayload)) {
+            DB::table('party_rooms')->where('id', $id)->update($roomPayload);
+        }
+
+        $seatActive = false;
+        if ($this->tableExists('party_room_seats')) {
+            $seatQuery = $this->activeSeatQuery($id)->where('user_id', $user->id);
+            $seatActive = $seatQuery->exists();
+            $seatUpdate = $this->seatTimestampUpdate();
+            if ($seatActive && !empty($seatUpdate)) {
+                $seatQuery->update($seatUpdate);
+            }
+        }
+
+        $freshRoom = DB::table('party_rooms')->where('id', $id)->first();
+        return [
+            'ok' => true,
+            'live' => (bool) $this->prop($freshRoom, 'live', true),
+            'seatActive' => $seatActive,
+            'updatedAt' => $this->prop($freshRoom, 'updated_at'),
+        ];
+    }
+
     public function joinSeat(Request $request, int $id, int $seatNum)
     {
         $user = $request->user();

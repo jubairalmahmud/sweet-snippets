@@ -6869,27 +6869,26 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     };
   }, [activeLiveRoom?.id, appSection]);
 
-  // Party Room host keep-alive: keep the host room fresh even if seat/audio
-  // state is changing, so the backend cannot mark the room closed while the
-  // host is still inside the room.
+  // Party Room keep-alive: keep both the room and each participant's active
+  // seat fresh. Some older live databases still have time-based seat cleanup,
+  // so host-only heartbeats could make a real guest disappear after a while.
   useEffect(() => {
     if (!isPartyRoomOpen || !activePartyRoom?.id) return;
     if (isClosingPartyRoomRef.current) return;
-    const currentUserId = getCurrentUserId();
-    const localRoomId = Number(activePartyRoom?.id ?? 0);
-    const isHost =
-      Boolean(localRoomId && locallyHostedPartyRoomIdsRef.current.has(localRoomId)) ||
-      (Boolean(activePartyRoom?.hostId) && Number(activePartyRoom.hostId) === Number(currentUserId));
-    if (!isHost) return;
 
-    const pingPartyHost = () => {
+    const pingPartySession = () => {
       if (isClosingPartyRoomRef.current) return;
+      const currentUserId = getCurrentUserId();
+      const localRoomId = Number(activePartyRoom?.id ?? 0);
+      const isHost =
+        Boolean(localRoomId && locallyHostedPartyRoomIdsRef.current.has(localRoomId)) ||
+        (Boolean(activePartyRoom?.hostId) && Number(activePartyRoom.hostId) === Number(currentUserId));
       api
-        .post(`/api/party-rooms/${activePartyRoom.id}/heartbeat`, { revive: true })
+        .post(`/api/party-rooms/${activePartyRoom.id}/heartbeat`, { revive: isHost })
         .catch(() => undefined);
     };
-    pingPartyHost();
-    const timer = window.setInterval(pingPartyHost, 15000);
+    pingPartySession();
+    const timer = window.setInterval(pingPartySession, 15000);
     return () => window.clearInterval(timer);
   }, [isPartyRoomOpen, activePartyRoom?.id, activePartyRoom?.hostId]);
 
