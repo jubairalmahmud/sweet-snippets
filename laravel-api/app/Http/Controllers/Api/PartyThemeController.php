@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -19,7 +20,7 @@ use Throwable;
  *   POST   /api/party-themes/admin/upsert     -> admin, create/update theme
  *   DELETE /api/party-themes/admin/{id}       -> admin, delete theme
  *   GET    /api/party-themes/my               -> auth, owned themes + equipped id
- *   POST   /api/party-themes/purchase         -> auth, buy a theme with diamonds
+ *   POST   /api/party-themes/purchase         -> auth, permanently unlock a free theme
  *   POST   /api/party-themes/equip            -> auth, equip (also writes to any
  *                                                room this user hosts so all
  *                                                viewers pick it up)
@@ -30,12 +31,14 @@ class PartyThemeController extends Controller
     // ────────────────────── PUBLIC / CATALOG ──────────────────────
     public function catalog(): array
     {
-        $this->ensureTables();
-        $rows = DB::table('party_themes')
-            ->where('active', 1)
-            ->orderBy('sort_order')->orderBy('id')
-            ->get();
-        return ['themes' => $rows->map(fn ($r) => $this->shape($r))->all()];
+        return Cache::remember('party_theme_catalog_free_v1', 300, function () {
+            $this->ensureTables();
+            $rows = DB::table('party_themes')
+                ->where('active', 1)
+                ->orderBy('sort_order')->orderBy('id')
+                ->get();
+            return ['themes' => $rows->map(fn ($r) => $this->shape($r))->all()];
+        });
     }
 
     // ────────────────────── ADMIN ──────────────────────
@@ -83,6 +86,7 @@ class PartyThemeController extends Controller
             $id = DB::table('party_themes')->insertGetId($payload);
         }
         $row = DB::table('party_themes')->where('id', $id)->first();
+        Cache::forget('party_theme_catalog_free_v1');
         return ['theme' => $this->shape($row)];
     }
 
@@ -118,6 +122,7 @@ class PartyThemeController extends Controller
         }
 
         $rows = DB::table('party_themes')->orderBy('sort_order')->orderBy('id')->get();
+        Cache::forget('party_theme_catalog_free_v1');
         return ['ok' => true, 'inserted' => $inserted, 'themes' => $rows->map(fn ($r) => $this->shape($r))->all()];
     }
 
@@ -131,6 +136,7 @@ class PartyThemeController extends Controller
             DB::table('party_rooms')->where('active_theme_id', $id)
                 ->update(['active_theme_id' => null, 'active_theme_img' => null]);
         }
+        Cache::forget('party_theme_catalog_free_v1');
         return ['ok' => true];
     }
 
@@ -142,13 +148,12 @@ class PartyThemeController extends Controller
         if (!Schema::hasTable('user_party_themes') || !Schema::hasTable('party_themes')) {
             return ['owned' => [], 'equipped' => null];
         }
-        $now = now();
-        // auto-expire
+        // Themes are free and permanent, including themes unlocked before the
+        // free-theme policy was introduced.
         DB::table('user_party_themes')
             ->where('user_id', $user->id)
             ->whereNotNull('expires_at')
-            ->where('expires_at', '<', $now)
-            ->delete();
+            ->update(['expires_at' => null, 'updated_at' => now()]);
 
         $rows = DB::table('user_party_themes as u')
             ->join('party_themes as t', 't.id', '=', 'u.theme_id')
@@ -186,32 +191,23 @@ class PartyThemeController extends Controller
         }
         if (!$theme) return ['ok' => false, 'error' => 'theme_not_found'];
 
-        $price = (int) ($theme->offer_price ?? $theme->price);
-
-        return DB::transaction(function () use ($user, $theme, $price) {
+        return DB::transaction(function () use ($user, $theme) {
             $fresh = DB::table('users')->where('id', $user->id)->lockForUpdate()->first();
             if (!$fresh) return ['ok' => false, 'error' => 'user_missing'];
-            if ((int) $fresh->diamonds < $price) {
-                return ['ok' => false, 'error' => 'insufficient_diamonds'];
-            }
 
-            DB::table('users')->where('id', $user->id)
-                ->update(['diamonds' => (int) $fresh->diamonds - $price, 'updated_at' => now()]);
-
-            $expiresAt = now()->addDays((int) ($theme->duration_days ?: 30));
             $existing = DB::table('user_party_themes')
                 ->where('user_id', $user->id)->where('theme_id', $theme->id)->first();
 
             if ($existing) {
                 DB::table('user_party_themes')->where('id', $existing->id)->update([
-                    'expires_at' => $expiresAt,
+                    'expires_at' => null,
                     'updated_at' => now(),
                 ]);
             } else {
                 DB::table('user_party_themes')->insert([
                     'user_id'    => $user->id,
                     'theme_id'   => $theme->id,
-                    'expires_at' => $expiresAt,
+                    'expires_at' => null,
                     'is_equipped'=> 0,
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -220,10 +216,10 @@ class PartyThemeController extends Controller
 
             return [
                 'ok'         => true,
-                'diamonds'   => (int) $fresh->diamonds - $price,
+                'diamonds'   => (int) $fresh->diamonds,
                 'themeId'    => (int) $theme->id,
                 'code'       => $theme->code,
-                'expiresAt'  => strtotime($expiresAt) * 1000,
+                'expiresAt'  => null,
             ];
         });
     }
@@ -244,7 +240,20 @@ class PartyThemeController extends Controller
 
         $owned = DB::table('user_party_themes')
             ->where('user_id', $user->id)->where('theme_id', $theme->id)->first();
-        if (!$owned) return ['ok' => false, 'error' => 'not_owned'];
+        // Themes are free: equipping one also unlocks it permanently. This
+        // avoids a purchase/equip request race on slower shared hosting.
+        if (!$owned) {
+            DB::table('user_party_themes')->insert([
+                'user_id' => $user->id,
+                'theme_id' => $theme->id,
+                'expires_at' => null,
+                'is_equipped' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $owned = DB::table('user_party_themes')
+                ->where('user_id', $user->id)->where('theme_id', $theme->id)->first();
+        }
         if ($owned->expires_at && strtotime($owned->expires_at) < time()) {
             return ['ok' => false, 'error' => 'expired'];
         }
@@ -334,9 +343,9 @@ class PartyThemeController extends Controller
             'name'         => $r->name,
             'imageUrl'     => $r->image_url,
             'image'        => $r->image_url,
-            'price'        => (int) $r->price,
-            'offerPrice'   => isset($r->offer_price) ? (int) $r->offer_price : null,
-            'durationDays' => (int) ($r->duration_days ?? 30),
+            'price'        => 0,
+            'offerPrice'   => null,
+            'durationDays' => 3650,
             'active'       => (bool) ($r->active ?? true),
             'sortOrder'    => (int) ($r->sort_order ?? 0),
         ];

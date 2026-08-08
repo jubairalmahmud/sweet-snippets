@@ -245,16 +245,16 @@ export type PartyThemeItem = {
   durationDays: number;
 };
 const DEFAULT_PARTY_THEME_CATALOG: PartyThemeItem[] = [
-  { id: "party-theme-1",  name: "Royal Night",   image: partyTheme1Img,  price: 5000,  offerPrice: 3500, durationDays: 30 },
-  { id: "party-theme-2",  name: "Neon Vibes",    image: partyTheme2Img,  price: 4000,  durationDays: 30 },
-  { id: "party-theme-3",  name: "Sunset Glow",   image: partyTheme3Img,  price: 6000,  offerPrice: 4500, durationDays: 30 },
-  { id: "party-theme-4",  name: "Ocean Blue",    image: partyTheme4Img,  price: 3500,  durationDays: 30 },
-  { id: "party-theme-5",  name: "Purple Haze",   image: partyTheme5Img,  price: 5500,  durationDays: 30 },
-  { id: "party-theme-6",  name: "Golden Hour",   image: partyTheme6Img,  price: 8000,  offerPrice: 6000, durationDays: 30 },
-  { id: "party-theme-7",  name: "Mystic Forest", image: partyTheme7Img,  price: 4500,  durationDays: 30 },
-  { id: "party-theme-8",  name: "Cyber City",    image: partyTheme8Img,  price: 7000,  durationDays: 30 },
-  { id: "party-theme-9",  name: "Rose Garden",   image: partyTheme9Img,  price: 4000,  offerPrice: 2800, durationDays: 30 },
-  { id: "party-theme-10", name: "Aurora",        image: partyTheme10Img, price: 9000,  durationDays: 30 },
+  { id: "party-theme-1",  name: "Royal Night",   image: partyTheme1Img,  price: 0, durationDays: 3650 },
+  { id: "party-theme-2",  name: "Neon Vibes",    image: partyTheme2Img,  price: 0, durationDays: 3650 },
+  { id: "party-theme-3",  name: "Sunset Glow",   image: partyTheme3Img,  price: 0, durationDays: 3650 },
+  { id: "party-theme-4",  name: "Ocean Blue",    image: partyTheme4Img,  price: 0, durationDays: 3650 },
+  { id: "party-theme-5",  name: "Purple Haze",   image: partyTheme5Img,  price: 0, durationDays: 3650 },
+  { id: "party-theme-6",  name: "Golden Hour",   image: partyTheme6Img,  price: 0, durationDays: 3650 },
+  { id: "party-theme-7",  name: "Mystic Forest", image: partyTheme7Img,  price: 0, durationDays: 3650 },
+  { id: "party-theme-8",  name: "Cyber City",    image: partyTheme8Img,  price: 0, durationDays: 3650 },
+  { id: "party-theme-9",  name: "Rose Garden",   image: partyTheme9Img,  price: 0, durationDays: 3650 },
+  { id: "party-theme-10", name: "Aurora",        image: partyTheme10Img, price: 0, durationDays: 3650 },
 ];
 
 
@@ -3093,7 +3093,7 @@ export default function App() {
         (mine?.owned || []).forEach((o: any) => {
           const code = String(o.code || "");
           if (code) {
-            owned[code] = Number(o.expiresAt || Date.now() + 30 * 86400 * 1000);
+            owned[code] = Number(o.expiresAt || Date.now() + 3650 * 86400 * 1000);
             dbSyncKnownOwnedThemesRef.current[code] = true;
           }
         });
