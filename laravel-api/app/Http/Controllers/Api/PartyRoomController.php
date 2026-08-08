@@ -6,11 +6,41 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class PartyRoomController extends Controller
 {
+    private function touchPresence(int $roomId, object $user): array
+    {
+        $key = "party_room_presence_{$roomId}";
+        $now = time();
+        $presence = (array) Cache::get($key, []);
+        $presence = array_filter($presence, fn ($row) => (int) ($row['lastSeen'] ?? 0) >= $now - 45);
+        $presence[(string) $user->id] = [
+            'id' => (int) $user->id,
+            'userId' => (int) $user->id,
+            'name' => $user->name ?? 'Viewer',
+            'avatar' => $this->pickAvatar($user),
+            'lastSeen' => $now,
+        ];
+        Cache::put($key, $presence, now()->addMinutes(2));
+        return array_values($presence);
+    }
+
+    private function roomPresence(int $roomId): array
+    {
+        $key = "party_room_presence_{$roomId}";
+        $now = time();
+        $presence = array_filter(
+            (array) Cache::get($key, []),
+            fn ($row) => (int) ($row['lastSeen'] ?? 0) >= $now - 45
+        );
+        Cache::put($key, $presence, now()->addMinutes(2));
+        return array_values($presence);
+    }
+
     /**
      * Build the JSON shape the frontend (App.tsx → applyPartyRoomState) expects.
      * Always re-reads host + seats + recent gifts from DB so BOTH host-side and
@@ -632,6 +662,8 @@ class PartyRoomController extends Controller
 
         $totalDiamondsVal = max((int) $this->prop($room, 'total_diamonds', 0), $calcTotalCoins);
 
+        $presence = $roomId > 0 ? $this->roomPresence($roomId) : [];
+
         return array_merge([
             'id'               => (int) $room->id,
             'hostId'           => $hostId,
@@ -647,7 +679,8 @@ class PartyRoomController extends Controller
             'maxGuestSeats'    => (int) $this->prop($room, 'max_guest_seats', 10),
             'max_guest_seats'  => (int) $this->prop($room, 'max_guest_seats', 10),
             'live'             => (bool) $this->prop($room, 'live', true),
-            'viewerCount'      => (int) $this->prop($room, 'viewer_count', count($seatsArr)),
+            'viewerCount'      => max(1, count($seatsArr), count($presence)),
+            'viewers'          => $presence,
             'totalDiamonds'    => $totalDiamondsVal,
             'total_diamonds'   => $totalDiamondsVal,
             'totalCoins'       => $totalDiamondsVal,
@@ -837,6 +870,7 @@ class PartyRoomController extends Controller
         }
 
         $roomId = DB::table('party_rooms')->insertGetId($createPayload);
+        $this->touchPresence($roomId, $user);
 
         // NOTE: Host is NOT auto-seated. New design: crown seat stays empty until
         // the host taps to sit. Host leaving the crown seat ends the room.
@@ -850,13 +884,15 @@ class PartyRoomController extends Controller
         $room = DB::table('party_rooms')->where('id', $id)->first();
         if (!$room) abort(404, 'Party room not found');
         if (!$room->live) abort(410, 'Party room is closed');
+        $user = $request->user();
+        $presence = $user ? $this->touchPresence($id, $user) : $this->roomPresence($id);
 
         $count = $this->tableExists('party_room_seats')
             ? $this->activeSeatQuery($id)->count()
             : 0;
 
         $viewerPayload = $this->roomUpdatePayload([
-            'viewer_count' => max((int) $this->prop($room, 'viewer_count', 0), $count),
+            'viewer_count' => max(1, $count, count($presence)),
         ]);
         if (!empty($viewerPayload)) {
             DB::table('party_rooms')->where('id', $id)->update($viewerPayload);
@@ -901,11 +937,18 @@ class PartyRoomController extends Controller
             }
         }
 
+        $presence = $this->touchPresence($id, $user);
+        if ($this->columnExists('party_rooms', 'viewer_count')) {
+            DB::table('party_rooms')->where('id', $id)->update(['viewer_count' => max(1, count($presence))]);
+        }
+
         $freshRoom = DB::table('party_rooms')->where('id', $id)->first();
         return [
             'ok' => true,
             'live' => (bool) $this->prop($freshRoom, 'live', true),
             'seatActive' => $seatActive,
+            'viewerCount' => count($presence),
+            'viewers' => $presence,
             'updatedAt' => $this->prop($freshRoom, 'updated_at'),
         ];
     }
@@ -1233,6 +1276,7 @@ class PartyRoomController extends Controller
         if ($this->tableExists('party_room_seats')) {
             $this->markSeatRowsInactive($this->activeSeatQuery($id));
         }
+        Cache::forget("party_room_presence_{$id}");
 
         return ['ok' => true];
     }
@@ -1320,27 +1364,32 @@ class PartyRoomController extends Controller
             $payload['muted'] = false;
         }
 
-        try {
-            DB::table('party_room_seats')->insert($payload);
-        } catch (Throwable $e) {
-            // Some live databases have an old UNIQUE(room_id, seat_num) or
-            // UNIQUE(room_id, user_id) index. After the conflict checks above,
-            // it is safe to reuse that old row instead of failing the join.
+        $table = DB::table('party_room_seats');
+        $targetRow = $table->where('room_id', $roomId)->where('seat_num', $seatNum)->first();
+        $userRow = $targetRow ?: DB::table('party_room_seats')
+            ->where('room_id', $roomId)->where('user_id', $user->id)->first();
+
+        if ($userRow) {
             $update = $payload;
             unset($update['room_id'], $update['created_at']);
-
-            $updated = DB::table('party_room_seats')
-                ->where('room_id', $roomId)
-                ->where('seat_num', $seatNum)
-                ->update($update);
-
-            if (!$updated) {
-                unset($update['seat_num']);
-                DB::table('party_room_seats')
-                    ->where('room_id', $roomId)
-                    ->where('user_id', $user->id)
-                    ->update(array_merge($update, ['seat_num' => $seatNum]));
+            $rowQuery = DB::table('party_room_seats');
+            if ($this->columnExists('party_room_seats', 'id') && $this->prop($userRow, 'id')) {
+                $rowQuery->where('id', $this->prop($userRow, 'id'));
+            } else {
+                $rowQuery->where('room_id', $roomId)
+                    ->where('seat_num', $this->prop($userRow, 'seat_num', $seatNum));
             }
+            $rowQuery->update($update);
+        } else {
+            DB::table('party_room_seats')->insert($payload);
+        }
+
+        $confirmed = $this->activeSeatQuery($roomId)
+            ->where('seat_num', $seatNum)
+            ->where('user_id', $user->id)
+            ->exists();
+        if (!$confirmed) {
+            throw new \RuntimeException('Seat write was not persisted');
         }
     }
 

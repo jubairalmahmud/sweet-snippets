@@ -179,6 +179,24 @@ const formatCompact = (n: number): string => {
   if (abs >= 1e3) return (n / 1e3).toFixed(abs >= 1e4 ? 0 : 1).replace(/\.0$/, "") + "K";
   return String(Math.round(n));
 };
+
+const mergePartyPresence = (room: any, seats: any[]) => {
+  const merged = new Map<string, any>();
+  const add = (entry: any) => {
+    const userId = Number(entry?.userId ?? entry?.user_id ?? entry?.id ?? 0) || null;
+    const occupant = entry?.occupant ?? entry?.name ?? entry?.userName ?? "Viewer";
+    const key = userId ? `u:${userId}` : `n:${String(occupant).trim().toLowerCase()}`;
+    merged.set(key, {
+      ...entry,
+      userId,
+      occupant,
+      icon: entry?.icon ?? entry?.avatar ?? entry?.avatar_url ?? null,
+    });
+  };
+  (Array.isArray(room?.viewers) ? room.viewers : []).forEach(add);
+  (Array.isArray(seats) ? seats : []).filter((seat) => seat?.occupant || seat?.userId).forEach(add);
+  return Array.from(merged.values());
+};
 const frameEgolImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='none' stroke='%23FFD700' stroke-width='6'/><circle cx='50' cy='50' r='42' fill='none' stroke='%23FF8C00' stroke-width='2' stroke-dasharray='4 2'/></svg>";
 const frameFairImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='none' stroke='%2300FFFF' stroke-width='6'/><circle cx='50' cy='50' r='42' fill='none' stroke='%23FF007F' stroke-width='2'/></svg>";
 const frameKingImg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='none' stroke='%23E6C200' stroke-width='7'/><path d='M35 25 L42 35 L50 20 L58 35 L65 25 L65 40 L35 40 Z' fill='%23FFD700'/></svg>";
@@ -14990,9 +15008,9 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
             {/* Center: joined guest avatars with initial badges */}
             {(() => {
-              const guestOccupants = partySeats
-                .slice(1, maxGuestSeats + 1)
-                .filter((s) => s && s.occupant);
+              const hostId = Number(activePartyRoom?.hostId || 0);
+              const guestOccupants = mergePartyPresence(activePartyRoom, partySeats)
+                .filter((s) => !hostId || Number(s.userId || 0) !== hostId);
               const shown = guestOccupants.slice(0, 4);
               const hasMore = guestOccupants.length > shown.length;
               const initials = (name: string) =>
@@ -15043,9 +15061,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
             {/* Round viewers pill — stacked viewer avatars + count. Sits between guests and hex icon. */}
             {(() => {
-              const occupants = partySeats
-                .slice(0, maxGuestSeats + 1)
-                .filter((s) => s.occupant);
+              const occupants = mergePartyPresence(activePartyRoom, partySeats);
               const viewerCount = Math.max(
                 Number(activePartyRoom?.viewerCount || 0),
                 occupants.length,
@@ -15108,7 +15124,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 <Eye className="h-3.5 w-3.5" />
                 {Math.max(
                   Number(activePartyRoom?.viewerCount || 0),
-                  partySeats.slice(0, maxGuestSeats + 1).filter((s) => s.occupant).length,
+                  mergePartyPresence(activePartyRoom, partySeats).length,
                 )}
               </span>
             </button>
@@ -15639,7 +15655,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               Click a bubble to reply. Toggle expands to show more history. */}
           {isPartyCommentsOpen && partyChatMessages.length > 0 && (
             <div
-              className={`party-chat-feed mt-auto mx-3 mb-16 relative z-20 max-w-[100%] overflow-y-auto p-0 flex flex-col-reverse ${
+              className={`party-chat-feed mt-auto mx-3 mb-28 relative z-20 max-w-[100%] overflow-y-auto p-0 flex flex-col-reverse ${
                 isPartyChatExpanded ? "max-h-40" : "max-h-32"
               }`}
               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
@@ -15713,6 +15729,17 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                 })}
               </div>
             </div>
+          )}
+
+          {!isPartyCommentPopupOpen && (
+            <button
+              type="button"
+              onClick={() => setIsPartyCommentPopupOpen(true)}
+              className="fixed bottom-12 left-1/2 z-[61] flex w-[calc(100%-24px)] max-w-[456px] -translate-x-1/2 items-center rounded-full border border-fuchsia-500/45 bg-slate-950/95 px-4 py-2 text-left text-[11px] font-medium text-slate-400 shadow-lg backdrop-blur"
+              aria-label="Write a party room comment"
+            >
+              মেসেজ পাঠান...
+            </button>
           )}
 
           {/* FIX: Bottom bar is fixed to the party screen bottom; parent padding/scroll can no longer leave a visible gap. */}
@@ -16262,6 +16289,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
 
           {isPartyViewersOpen && (() => {
             const hostIdNum = activePartyRoom?.hostId ? Number(activePartyRoom.hostId) : null;
+            const present = mergePartyPresence(activePartyRoom, partySeats);
             const seated = partySeats
               .slice(0, maxGuestSeats + 1)
               .map((s, i) => ({ ...s, _idx: i }))
@@ -16270,11 +16298,20 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
               (s) => hostIdNum != null && s.userId && Number(s.userId) === hostIdNum,
             );
             const guests = seated.filter((s) => s !== hostSeat);
+            const seatedKeys = new Set(seated.map((s) =>
+              s.userId ? `u:${Number(s.userId)}` : `n:${String(s.occupant || "").trim().toLowerCase()}`
+            ));
+            const silentViewers = present.filter((viewer) => {
+              const key = viewer.userId
+                ? `u:${Number(viewer.userId)}`
+                : `n:${String(viewer.occupant || "").trim().toLowerCase()}`;
+              return !seatedKeys.has(key);
+            });
             const totalCount = Math.max(
               Number(activePartyRoom?.viewerCount || 0),
-              seated.length,
+              present.length,
             );
-            const silentCount = Math.max(0, totalCount - seated.length);
+            const silentCount = Math.max(silentViewers.length, totalCount - seated.length);
             return (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4">
                 <div className="w-full max-w-sm rounded-3xl border border-purple-400/25 bg-gradient-to-br from-[#1a1030] via-[#140a2b] to-[#0a0618] p-5 shadow-[0_25px_60px_-15px_rgba(168,85,247,0.4)] relative overflow-hidden">
@@ -16328,10 +16365,28 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
                         </div>
                       </div>
                     ))}
+                    {silentViewers.map((viewer, index) => (
+                      <div
+                        key={`silent-viewer-${viewer.userId ?? index}`}
+                        className="flex items-center gap-2.5 rounded-xl border border-sky-400/10 bg-sky-500/[0.04] px-2.5 py-2"
+                      >
+                        <img
+                          src={getUserAvatarUrl({ name: viewer.occupant || "Viewer", avatar: viewer.icon })}
+                          alt={viewer.occupant || "Viewer"}
+                          className="h-7 w-7 rounded-full border border-white/10 object-cover"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[12px] font-bold text-white">{viewer.occupant || "Viewer"}</div>
+                          <div className="text-[9px] font-semibold text-sky-200/60">Listening</div>
+                        </div>
+                      </div>
+                    ))}
                     {silentCount > 0 && (
                       <div className="mt-2 rounded-xl border border-white/8 bg-white/[0.02] px-2.5 py-2 text-center">
                         <span className="text-[11px] font-semibold text-purple-200/70">
-                          + {silentCount} silent viewer{silentCount > 1 ? "s" : ""}
+                          {silentViewers.length > 0
+                            ? `${silentViewers.length} listening`
+                            : `+ ${silentCount} silent viewer${silentCount > 1 ? "s" : ""}`}
                         </span>
                       </div>
                     )}
