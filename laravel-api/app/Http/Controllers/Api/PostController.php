@@ -33,6 +33,7 @@ class PostController extends Controller
     {
         $userId = $request->query('user_id');
         $viewerId = $request->user()?->id;
+        $limit = max(1, min(50, (int) $request->query('limit', 30)));
         $query = DB::table('posts as p')
             ->join('users as u', 'u.id', '=', 'p.user_id')
             ->select([
@@ -41,7 +42,7 @@ class PostController extends Controller
                 DB::raw('COALESCE(u.avatar, "") as user_avatar'),
             ])
             ->orderByDesc('p.id')
-            ->limit(100);
+            ->limit($limit);
 
         if ($userId) {
             $query->where('p.user_id', (int) $userId);

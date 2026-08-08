@@ -34,9 +34,9 @@ export function getBackendCandidates(): string[] {
     cleanEnv = "";
   }
 
-  const primaryCandidate = cleanBaseUrl(custom) || cleanEnv || cleanBaseUrl(DEFAULT_PRIMARY_API);
-
-  const list = [primaryCandidate, cleanBaseUrl(DEFAULT_PRIMARY_API)]
+  // The official production API always goes first. A stale browser override
+  // must never hold the feed hostage before the healthy API is attempted.
+  const list = [cleanEnv, cleanBaseUrl(DEFAULT_PRIMARY_API), cleanBaseUrl(custom)]
     .map((url) => cleanBaseUrl(url))
     .filter(Boolean);
 
@@ -133,7 +133,21 @@ export async function apiFetch<T = any>(
     }
 
     try {
-      const response = await fetch(url, { ...rest, headers: finalHeaders, body: body as any });
+      const timeoutController = rest.signal ? null : new AbortController();
+      const timeoutId = timeoutController
+        ? window.setTimeout(() => timeoutController.abort(), 8000)
+        : null;
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          ...rest,
+          signal: rest.signal || timeoutController?.signal,
+          headers: finalHeaders,
+          body: body as any,
+        });
+      } finally {
+        if (timeoutId !== null) window.clearTimeout(timeoutId);
+      }
 
       // If server responded with Gateway/Server Down codes (502, 503, 504), failover to backup
       if ([502, 503, 504].includes(response.status) && i < candidates.length - 1) {
@@ -206,39 +220,79 @@ function serializeBody(body: unknown): BodyInit | undefined {
   return JSON.stringify(body);
 }
 
+const inFlightGets = new Map<string, Promise<any>>();
+const shortGetCache = new Map<string, { expiresAt: number; value: any }>();
+
+function getCacheTtl(path: string): number {
+  return /^\/api\/(posts(?:\?|$)|live-rooms\?status=live|party-rooms(?:\?|$)|banners(?:\?|$)|gift-catalog(?:\?|$)|games\/config(?:\?|$))/.test(path)
+    ? 5000
+    : 0;
+}
+
+function deduplicatedGet<T>(
+  path: string,
+  opts: Omit<RequestInit, "method"> & { auth?: boolean } = {},
+): Promise<T> {
+  const cacheKey = `${getToken() || "anonymous"}:${path}`;
+  const cached = shortGetCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return Promise.resolve(cached.value as T);
+  if (cached) shortGetCache.delete(cacheKey);
+
+  const existing = inFlightGets.get(cacheKey);
+  if (existing) return existing as Promise<T>;
+
+  const request = apiFetch<T>(path, { ...opts, method: "GET" })
+    .then((value) => {
+      const ttl = getCacheTtl(path);
+      if (ttl > 0) shortGetCache.set(cacheKey, { expiresAt: Date.now() + ttl, value });
+      return value;
+    })
+    .finally(() => inFlightGets.delete(cacheKey));
+  inFlightGets.set(cacheKey, request);
+  return request;
+}
+
 export const api = {
   get: <T = any>(path: string, opts: Omit<RequestInit, "method"> & { auth?: boolean } = {}) =>
-    apiFetch<T>(path, { ...opts, method: "GET" }),
+    deduplicatedGet<T>(path, opts),
   post: <T = any>(
     path: string,
     body?: unknown,
     opts: Omit<RequestInit, "method" | "body"> & { auth?: boolean } = {},
-  ) =>
-    apiFetch<T>(path, {
+  ) => {
+    shortGetCache.clear();
+    return apiFetch<T>(path, {
       ...opts,
       method: "POST",
       body: serializeBody(body),
-    }),
+    });
+  },
   put: <T = any>(
     path: string,
     body?: unknown,
     opts: Omit<RequestInit, "method" | "body"> & { auth?: boolean } = {},
-  ) =>
-    apiFetch<T>(path, {
+  ) => {
+    shortGetCache.clear();
+    return apiFetch<T>(path, {
       ...opts,
       method: "PUT",
       body: serializeBody(body),
-    }),
+    });
+  },
   patch: <T = any>(
     path: string,
     body?: unknown,
     opts: Omit<RequestInit, "method" | "body"> & { auth?: boolean } = {},
-  ) =>
-    apiFetch<T>(path, {
+  ) => {
+    shortGetCache.clear();
+    return apiFetch<T>(path, {
       ...opts,
       method: "PATCH",
       body: serializeBody(body),
-    }),
-  delete: <T = any>(path: string, opts: Omit<RequestInit, "method"> & { auth?: boolean } = {}) =>
-    apiFetch<T>(path, { ...opts, method: "DELETE" }),
+    });
+  },
+  delete: <T = any>(path: string, opts: Omit<RequestInit, "method"> & { auth?: boolean } = {}) => {
+    shortGetCache.clear();
+    return apiFetch<T>(path, { ...opts, method: "DELETE" });
+  },
 };

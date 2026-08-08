@@ -8,14 +8,14 @@ import LiveActionBar, { SafeStreamIcon } from "./components/LiveActionBar";
 import TopGameWinnerBanner from "./components/TopGameWinnerBanner";
 import RoyalGiftBanner from "./components/RoyalGiftBanner";
 
-import commentImg from "./assets/stream-icons/comment.png";
-import menuImg from "./assets/stream-icons/menu.png";
-import phoneImg from "./assets/stream-icons/phone.png";
-import giftImg from "./assets/stream-icons/gift.png";
-import gameImg from "./assets/stream-icons/game.png";
-import reactImg from "./assets/stream-icons/react.png";
-import seatImg from "./assets/stream-icons/seat.png";
-import navGemBarImg from "./assets/nav-gem-bar.png";
+import commentImg from "./assets/stream-icons/comment.webp";
+import menuImg from "./assets/stream-icons/menu.webp";
+import phoneImg from "./assets/stream-icons/phone.webp";
+import giftImg from "./assets/stream-icons/gift.webp";
+import gameImg from "./assets/stream-icons/game.webp";
+import reactImg from "./assets/stream-icons/react.webp";
+import seatImg from "./assets/stream-icons/seat.webp";
+import navGemBarImg from "./assets/nav-gem-bar.webp";
 
 import { createPortal } from "react-dom";
 import type {
@@ -23,15 +23,17 @@ import type {
   ICameraVideoTrack,
   IMicrophoneAudioTrack,
 } from "agora-rtc-sdk-ng";
-// FIX: agora-rtc-sdk-ng reads `window` at module load and crashes during SSR
-// ("window is not defined"). Load it only on the client via top-level await.
-import AgoraRTC from "agora-rtc-sdk-ng";
-
-if (typeof window !== "undefined" && AgoraRTC && typeof (AgoraRTC as any).setLogLevel === "function") {
-  try {
-    (AgoraRTC as any).setLogLevel(3);
-  } catch {}
-}
+let agoraRtcPromise: Promise<any> | null = null;
+const loadAgoraRTC = async () => {
+  if (!agoraRtcPromise) {
+    agoraRtcPromise = import("agora-rtc-sdk-ng").then((module) => {
+      const rtc = module.default;
+      try { rtc?.setLogLevel?.(3); } catch {}
+      return rtc;
+    });
+  }
+  return agoraRtcPromise;
+};
 import { api } from "./lib/api";
 import { formatCoinCompact } from "./lib/hooks";
 import { toast } from "sonner";
@@ -168,7 +170,10 @@ import partyTheme7Img from "./assets/party-themes/theme-7.jpg";
 import partyTheme8Img from "./assets/party-themes/theme-8.jpg";
 import partyTheme9Img from "./assets/party-themes/theme-9.jpg";
 import partyTheme10Img from "./assets/party-themes/theme-10.jpg";
-import { GamesLauncher, type GameKey } from "./games/GamesLauncher";
+import type { GameKey } from "./games/GamesLauncher";
+const GamesLauncher = React.lazy(() =>
+  import("./games/GamesLauncher").then((module) => ({ default: module.GamesLauncher })),
+);
 
 // ==========================================
 // STORE — Avatar Frame catalog (frontend only; wire to Laravel later)
@@ -4463,7 +4468,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // ---- হ্যান্ডলার: পোস্ট (refreshPosts) ----
   const refreshPosts = async () => {
     try {
-      const res: any = await api.get("/api/posts");
+      const res: any = await api.get("/api/posts?limit=24");
       const rows = Array.isArray(res?.data) ? res.data.map(normalizePost) : [];
       const tombstones = deletedPostIdsRef.current;
       setProfilePosts(rows.filter((p: SocialPost) => !tombstones.has(Number(p.id))));
@@ -5270,6 +5275,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
         return;
       }
 
+      const AgoraRTC = await loadAgoraRTC();
       await cleanupAgoraSession();
       setAgoraStatus(streamRole === "streamer" ? "Starting camera..." : "Joining stream...");
 
@@ -5573,6 +5579,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     let cancelled = false;
 
     const connectCallAgora = async () => {
+      const AgoraRTC = await loadAgoraRTC();
       await cleanupCallAgoraSession();
       setCallAgoraStatus("Connecting private video call...");
 
@@ -5704,9 +5711,12 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   // ---- ইফেক্ট: useEffect — if (appSection === "home" && homeSubTab === "explore") { ----
   useEffect(() => {
     if (appSection === "home" && homeSubTab === "explore") {
-      void refreshLiveRooms();
-      void refreshPartyRooms();
-      void refreshBanners();
+      void Promise.allSettled([
+        refreshPosts(),
+        refreshLiveRooms(),
+        refreshPartyRooms(),
+        refreshBanners(),
+      ]);
     }
   }, [appSection, homeSubTab]);
 
@@ -5940,6 +5950,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       return null;
     }
     if (!partyPreparingMicRef.current) {
+      const AgoraRTC = await loadAgoraRTC();
       partyPreparingMicRef.current = AgoraRTC.createMicrophoneAudioTrack()
         .then(async (track) => {
           partyAgoraAudioTrackRef.current = track;
@@ -6035,6 +6046,7 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
     let cancelled = false;
 
     const connectPartyAudio = async () => {
+      const AgoraRTC = await loadAgoraRTC();
       await cleanupPartyAgoraSession(true);
       setPartyAgoraStatus("Connecting party voice...");
 
@@ -6600,9 +6612,10 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
   useEffect(() => {
     if (appSection !== "home" || !["explore", "live", "party"].includes(homeSubTab)) return;
     const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
       void refreshLiveRooms();
       void refreshPartyRooms();
-    }, 8000);
+    }, 15000);
     return () => clearInterval(timer);
   }, [appSection, homeSubTab]);
 
@@ -12109,12 +12122,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       });
 
       // Load freshest wallet balance dynamically
-      await fetchUserWalletData(token);
-      await refreshPosts();
-      await refreshBanners();
-      await refreshLiveRooms();
-      await refreshPartyRooms();
-      await refreshGiftCatalog();
+      await Promise.allSettled([
+        fetchUserWalletData(token),
+        refreshPosts(),
+        refreshBanners(),
+        refreshLiveRooms(),
+        refreshPartyRooms(),
+        refreshGiftCatalog(),
+      ]);
     } catch (err: any) {
       const msg = err?.message || "Login failed. Please try again.";
       setAuthFeedback({ type: "error", msg });
@@ -12188,12 +12203,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       );
 
       // Load freshest wallet balance dynamically
-      await fetchUserWalletData(token);
-      await refreshPosts();
-      await refreshBanners();
-      await refreshLiveRooms();
-      await refreshPartyRooms();
-      await refreshGiftCatalog();
+      await Promise.allSettled([
+        fetchUserWalletData(token),
+        refreshPosts(),
+        refreshBanners(),
+        refreshLiveRooms(),
+        refreshPartyRooms(),
+        refreshGiftCatalog(),
+      ]);
     } catch (err: any) {
       const msg = err?.message || "Registration failed. Please try again.";
       setAuthFeedback({ type: "error", msg });
@@ -28917,12 +28934,14 @@ const [isPartyGiftPopupOpen, setIsPartyGiftPopupOpen] = useState<boolean>(false)
       )}
 
       {/* SK Games Arena — full-screen modal (Home Game tab + Party hamburger Games) */}
-      <GamesLauncher
-        open={isFullGamesOpen}
-        onClose={() => setIsFullGamesOpen(false)}
-        initialGame={fullGamesInitial}
-        compact={gamesLauncherCompact}
-      />
+      <React.Suspense fallback={null}>
+        <GamesLauncher
+          open={isFullGamesOpen}
+          onClose={() => setIsFullGamesOpen(false)}
+          initialGame={fullGamesInitial}
+          compact={gamesLauncherCompact}
+        />
+      </React.Suspense>
     </div>
 
   );
